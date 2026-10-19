@@ -24,20 +24,33 @@ namespace Ascua.Lighting
         [SerializeField] private Renderer coreRenderer;
         [Tooltip("Pivote visual que se balancea al caminar.")]
         [SerializeField] private Transform swayPivot;
+        [Tooltip("Luz de relleno sobre el personaje (sin sombras) para que no quede a contraluz.")]
+        [SerializeField] private Light fillLight;
 
         [Header("Radios del Farol (m) y consumo (energía/s)")]
+        [Tooltip("Radio JUGABLE: hasta dónde reacciona el mundo (ventanas, etc.).")]
         [SerializeField] private float[] radii = { 4.5f, 7f, 10.5f };
         [SerializeField] private float[] drainPerSecond = { 6f, 10f, 16f };
         [SerializeField] private int startRadiusIndex = 1;
 
-        [Header("Luz")]
+        [Header("Luz principal")]
         [SerializeField] private Color lightColor = new Color(1f, 0.769f, 0.42f);
+        [Tooltip("Radio jugable en reposo (no cuenta para iluminar objetos).")]
         [SerializeField] private float idleRange = 2.8f;
-        [SerializeField] private float idleIntensity = 1.1f;
-        [SerializeField] private float activeIntensity = 3.4f;
+        [Tooltip("El halo visible se extiende más allá del radio jugable: range de la Light = radio x este factor.")]
+        [SerializeField] private float lightRangeMultiplier = 1.5f;
+        [SerializeField] private float idleIntensity = 0.8f;
+        [Tooltip("Intensidad activa por tamaño (pequeño / medio / grande).")]
+        [SerializeField] private float[] activeIntensities = { 2.0f, 2.4f, 2.8f };
         [Tooltip("Velocidad de transición reposo <-> activo (1/s).")]
         [SerializeField] private float rampSpeed = 5f;
         [SerializeField] private float rangeSmoothing = 8f;
+
+        [Header("Luz de relleno")]
+        [SerializeField] private Color fillColor = new Color(1f, 0.85f, 0.66f);
+        [SerializeField] private float fillRange = 3f;
+        [SerializeField] private float fillIntensityIdle = 0.35f;
+        [SerializeField] private float fillIntensityActive = 0.6f;
 
         [Header("Brasa")]
         [SerializeField] private float coreEmissionIdle = 1.6f;
@@ -135,8 +148,15 @@ namespace Ascua.Lighting
             if (lanternLight != null)
             {
                 lanternLight.color = lightColor;
-                lanternLight.range = currentRange;
-                lanternLight.intensity = Mathf.Lerp(idleIntensity, activeIntensity, eased) * flicker;
+                lanternLight.range = currentRange * lightRangeMultiplier;
+                lanternLight.intensity = Mathf.Lerp(idleIntensity, GetActiveIntensity(RadiusIndex), eased) * flicker;
+            }
+
+            if (fillLight != null)
+            {
+                fillLight.color = fillColor;
+                fillLight.range = fillRange;
+                fillLight.intensity = Mathf.Lerp(fillIntensityIdle, fillIntensityActive, eased) * flicker;
             }
 
             if (coreRenderer != null)
@@ -162,6 +182,12 @@ namespace Ascua.Lighting
         {
             if (drainPerSecond == null || drainPerSecond.Length == 0) return 0f;
             return drainPerSecond[Mathf.Min(index, drainPerSecond.Length - 1)];
+        }
+
+        private float GetActiveIntensity(int index)
+        {
+            if (activeIntensities == null || activeIntensities.Length == 0) return idleIntensity;
+            return activeIntensities[Mathf.Min(index, activeIntensities.Length - 1)];
         }
 
         private void SetActive(bool value)

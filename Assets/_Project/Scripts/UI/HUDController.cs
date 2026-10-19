@@ -28,6 +28,13 @@ namespace Ascua.UI
         [SerializeField] private Color exhaustedColor = new Color(0.45f, 0.47f, 0.6f);
         [SerializeField, Range(0f, 1f)] private float lowThreshold = 0.25f;
 
+        [Header("Ícono de llama")]
+        [Tooltip("Llama exterior; toma el mismo color que la barra.")]
+        [SerializeField] private Image flameIcon;
+        [Tooltip("Núcleo claro de la llama (opcional).")]
+        [SerializeField] private Image flameCore;
+        [SerializeField] private float flameFlickerSpeed = 9f;
+
         [Header("Tamaño del Farol")]
         [SerializeField] private Image[] radiusPips;
         [SerializeField] private Color pipOnColor = new Color(1f, 0.769f, 0.42f);
@@ -90,6 +97,7 @@ namespace Ascua.UI
         private void Update()
         {
             UpdateEnergyBar();
+            UpdateFlame();
             UpdateHint();
             UpdateFade();
             UpdateFps();
@@ -133,12 +141,37 @@ namespace Ascua.UI
             // Solo se reescribe el texto cuando cambia el número (evita basura por frame).
             if (energyValueText != null)
             {
-                int value = Mathf.CeilToInt(targetEnergy * 100f);
+                int max = energy != null ? Mathf.RoundToInt(energy.Max) : 100;
+                int value = Mathf.CeilToInt(targetEnergy * max);
                 if (value != lastShownValue)
                 {
                     lastShownValue = value;
-                    energyValueText.text = value.ToString();
+                    energyValueText.text = value + "/" + max;
                 }
+            }
+        }
+
+        private void UpdateFlame()
+        {
+            if (flameIcon == null) return;
+
+            // La llama comparte color con la barra y "baila" más cuando el Farol está activo.
+            if (energyFillImage != null) flameIcon.color = energyFillImage.color;
+
+            float activity = lantern != null ? lantern.ActivationBlend : 0f;
+            float amplitude = Mathf.Lerp(0.03f, 0.12f, activity);
+            float noise = Mathf.PerlinNoise(Time.time * flameFlickerSpeed, 0.37f) * 2f - 1f;
+            float sway = Mathf.PerlinNoise(0.81f, Time.time * flameFlickerSpeed * 0.5f) * 2f - 1f;
+
+            RectTransform rt = flameIcon.rectTransform;
+            rt.localScale = new Vector3(1f - noise * amplitude * 0.5f, 1f + noise * amplitude, 1f);
+            rt.localRotation = Quaternion.Euler(0f, 0f, sway * amplitude * 40f);
+
+            if (flameCore != null)
+            {
+                Color core = flameCore.color;
+                core.a = exhausted ? 0.2f : Mathf.Lerp(0.55f, 1f, activity);
+                flameCore.color = core;
             }
         }
 
