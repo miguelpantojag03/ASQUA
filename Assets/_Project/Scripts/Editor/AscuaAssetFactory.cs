@@ -27,6 +27,7 @@ namespace Ascua.EditorTools
         public AscuaMaterials Materials;
         public RuntimeAnimatorController ChibiController;
         public VolumeProfile VolumeProfile;
+        public Sprite FlameSprite;
     }
 
     /// <summary>
@@ -62,7 +63,8 @@ namespace Ascua.EditorTools
             {
                 Materials = CreateMaterials(),
                 ChibiController = CreateChibiAnimator(),
-                VolumeProfile = CreateVolumeProfile()
+                VolumeProfile = CreateVolumeProfile(),
+                FlameSprite = CreateFlameSprite()
             };
             AssetDatabase.SaveAssets();
             return assets;
@@ -108,7 +110,7 @@ namespace Ascua.EditorTools
                 WindowReactive = Lit("M_VentanaPrueba", Hex("#0A0E1C"), 0.92f, nearBlack),
                 Wood = Lit("M_Madera", Hex("#3F3433"), 0.15f),
                 Metal = Lit("M_Metal", Hex("#22263A"), 0.5f, null, 0.6f),
-                LampGlass = Lit("M_FarolaCristalApagado", Hex("#2C3350"), 0.9f),
+                LampGlass = Lit("M_FarolaCristalApagado", Hex("#2C3350"), 0.9f, nearBlack),
                 Water = Lit("M_Agua", Hex("#0C1430"), 0.96f),
                 Stone = Lit("M_Piedra", Hex("#4A5172"), 0.2f),
                 LaneMark = Lit("M_MarcaVial", Hex("#5E6688"), 0.2f),
@@ -133,6 +135,20 @@ namespace Ascua.EditorTools
 
             // Ilse-recuerdo es translúcida.
             MakeTransparent(m.IlseBody, true, false);
+
+            // Relieve sutil: ruido tileable en color (base map) + normal map.
+            // Coste: 2 texturas de 512 px compartidas, sin shader custom.
+            CreateSurfaceNoiseTextures(out Texture2D noiseAlbedo, out Texture2D noiseNormal);
+            ApplySurfaceNoise(m.Ground, noiseAlbedo, noiseNormal, new Vector2(14f, 14f), 0.7f);
+            ApplySurfaceNoise(m.Paving, noiseAlbedo, noiseNormal, new Vector2(6f, 6f), 0.5f);
+            ApplySurfaceNoise(m.PavingInset, noiseAlbedo, noiseNormal, new Vector2(3f, 3f), 0.4f);
+            ApplySurfaceNoise(m.Sidewalk, noiseAlbedo, noiseNormal, new Vector2(5f, 5f), 0.5f);
+            ApplySurfaceNoise(m.Stone, noiseAlbedo, noiseNormal, new Vector2(2f, 2f), 0.6f);
+            ApplySurfaceNoise(m.Roof, noiseAlbedo, noiseNormal, new Vector2(3f, 3f), 0.5f);
+            foreach (Material building in m.Buildings)
+            {
+                ApplySurfaceNoise(building, noiseAlbedo, noiseNormal, new Vector2(3f, 3f), 0.45f);
+            }
 
             // Niebla: Unlit transparente con textura suave, doble cara.
             Texture2D fogTexture = CreateFogTexture();
@@ -253,6 +269,198 @@ namespace Ascua.EditorTools
             importer.SaveAndReimport();
 
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
+        // ------------------------------------------------------------------ Ruido de superficie
+
+        /// <summary>Asigna ruido (color + relieve) a un material URP/Lit. El tiling se aplica a ambos mapas.</summary>
+        private static void ApplySurfaceNoise(Material material, Texture2D albedo, Texture2D normal, Vector2 tiling, float bumpScale)
+        {
+            material.SetTexture("_BaseMap", albedo);
+            material.SetTextureScale("_BaseMap", tiling);
+            material.SetTexture("_BumpMap", normal);
+            material.SetFloat("_BumpScale", bumpScale);
+            material.EnableKeyword("_NORMALMAP");
+            EditorUtility.SetDirty(material);
+        }
+
+        /// <summary>
+        /// Genera un ruido fBm periódico (se repite sin costuras) y guarda dos PNG:
+        /// T_RuidoSuperficie (gris claro que modula el color base) y T_RuidoSuperficie_N (normal map).
+        /// </summary>
+        private static void CreateSurfaceNoiseTextures(out Texture2D albedoTexture, out Texture2D normalTexture)
+        {
+            const int size = 512;
+            float[] height = new float[size * size];
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (float)x / size;
+                    float v = (float)y / size;
+                    // Manchas grandes (desgaste) + grano fino (textura del material).
+                    float blotches = TileableFbm(u, v, 4, 4, 11);
+                    float grain = TileableFbm(u, v, 64, 2, 37);
+                    height[y * size + x] = blotches * 0.75f + grain * 0.25f;
+                }
+            }
+
+            Color32[] albedo = new Color32[size * size];
+            Color32[] normal = new Color32[size * size];
+            const float strength = 6f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    int i = y * size + x;
+
+                    // Color: entre 0.84 y 1.0 para que solo matice el color base.
+                    byte g = (byte)(Mathf.Lerp(0.84f, 1f, height[i]) * 255f);
+                    albedo[i] = new Color32(g, g, g, 255);
+
+                    // Normal por diferencias centrales con envoltura (sin costuras).
+                    float left = height[y * size + (x - 1 + size) % size];
+                    float right = height[y * size + (x + 1) % size];
+                    float down = height[((y - 1 + size) % size) * size + x];
+                    float up = height[((y + 1) % size) * size + x];
+                    Vector3 n = new Vector3((left - right) * strength, (down - up) * strength, 1f).normalized;
+                    normal[i] = new Color32((byte)((n.x * 0.5f + 0.5f) * 255f), (byte)((n.y * 0.5f + 0.5f) * 255f), (byte)((n.z * 0.5f + 0.5f) * 255f), 255);
+                }
+            }
+
+            albedoTexture = SaveTexture("T_RuidoSuperficie", size, albedo, false);
+            normalTexture = SaveTexture("T_RuidoSuperficie_N", size, normal, true);
+        }
+
+        private static Texture2D SaveTexture(string name, int size, Color32[] pixels, bool isNormalMap)
+        {
+            string path = $"{TexturesFolder}/{name}.png";
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            string fullPath = Path.Combine(Directory.GetParent(Application.dataPath).FullName, path);
+            File.WriteAllBytes(fullPath, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = isNormalMap ? TextureImporterType.NormalMap : TextureImporterType.Default;
+            importer.wrapMode = TextureWrapMode.Repeat;
+            importer.mipmapEnabled = true;
+            importer.maxTextureSize = size;
+            importer.SaveAndReimport();
+
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
+        /// <summary>Ruido fBm de valor que se repite exactamente cada 1 unidad en u y v.</summary>
+        private static float TileableFbm(float u, float v, int basePeriod, int octaves, int seed)
+        {
+            float sum = 0f;
+            float amplitude = 0.5f;
+            float total = 0f;
+            int period = basePeriod;
+
+            for (int o = 0; o < octaves; o++)
+            {
+                sum += PeriodicValueNoise(u * period, v * period, period, seed + o * 101) * amplitude;
+                total += amplitude;
+                amplitude *= 0.5f;
+                period *= 2;
+            }
+            return sum / total;
+        }
+
+        private static float PeriodicValueNoise(float x, float y, int period, int seed)
+        {
+            int x0 = Mathf.FloorToInt(x);
+            int y0 = Mathf.FloorToInt(y);
+            float fx = x - x0;
+            float fy = y - y0;
+            fx = fx * fx * (3f - 2f * fx);
+            fy = fy * fy * (3f - 2f * fy);
+
+            int xa = Mod(x0, period), xb = Mod(x0 + 1, period);
+            int ya = Mod(y0, period), yb = Mod(y0 + 1, period);
+
+            float a = Hash(xa, ya, seed), b = Hash(xb, ya, seed);
+            float c = Hash(xa, yb, seed), d = Hash(xb, yb, seed);
+            return Mathf.Lerp(Mathf.Lerp(a, b, fx), Mathf.Lerp(c, d, fx), fy);
+        }
+
+        private static int Mod(int a, int p) => ((a % p) + p) % p;
+
+        private static float Hash(int x, int y, int seed)
+        {
+            unchecked
+            {
+                int h = x * 374761393 + y * 668265263 + seed * 1442695041;
+                h = (h ^ (h >> 13)) * 1274126177;
+                h ^= h >> 16;
+                return (h & 0x7fffffff) / (float)int.MaxValue;
+            }
+        }
+
+        // ------------------------------------------------------------------ Ícono de llama
+
+        /// <summary>Dibuja una llama (gota con punta curvada) en blanco con antialiasing y la importa como Sprite.</summary>
+        private static Sprite CreateFlameSprite()
+        {
+            string path = TexturesFolder + "/UI_Llama.png";
+            const int size = 128;
+            Color32[] pixels = new Color32[size * size];
+            const float baseY = 0.35f;
+            const float radius = 0.27f;
+            float aa = 1.5f / size;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + 0.5f) / size;
+                    float v = (y + 0.5f) / size;
+
+                    // La punta se curva ligeramente hacia un lado.
+                    float t = Mathf.Clamp01((v - baseY) / (0.95f - baseY));
+                    float centerX = 0.5f + 0.07f * Mathf.Sin(t * Mathf.PI) * t;
+
+                    float halfWidth;
+                    if (v < baseY)
+                    {
+                        float dy = v - baseY;
+                        halfWidth = radius * radius - dy * dy > 0f ? Mathf.Sqrt(radius * radius - dy * dy) : -1f;
+                    }
+                    else
+                    {
+                        halfWidth = radius * Mathf.Pow(1f - t, 1.4f);
+                    }
+
+                    float distance = halfWidth - Mathf.Abs(u - centerX);
+                    float alpha = Mathf.Clamp01(distance / aa + 0.5f);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                }
+            }
+
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            string fullPath = Path.Combine(Directory.GetParent(Application.dataPath).FullName, path);
+            File.WriteAllBytes(fullPath, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.SaveAndReimport();
+
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
 
         // ------------------------------------------------------------------ Animación chibi

@@ -157,9 +157,10 @@ namespace Ascua.EditorTools
             BuildPlazaGround(env, m);
             BuildFountain(env, m);
 
-            BuildBuilding(env, "Edificio_N1", new Vector3(-6f, 0f, 14.5f), 0f, 10f, 7f, 9f, m.Buildings[0], m, rng, 0);
-            BuildBuilding(env, "Edificio_N2", new Vector3(6.5f, 0f, 14.5f), 0f, 11f, 7f, 12f, m.Buildings[1], m, rng, -1);
-            BuildBuilding(env, "Edificio_E", new Vector3(14.5f, 0f, 1f), 90f, 13f, 7f, 10f, m.Buildings[2], m, rng, 1);
+            // Alturas contrastadas (7.5 / 16 / 13 m) para que el skyline tenga lectura escalonada.
+            BuildBuilding(env, "Edificio_N1", new Vector3(-6f, 0f, 14.5f), 0f, 10f, 7f, 7.5f, m.Buildings[0], m, rng, 0);
+            BuildBuilding(env, "Edificio_N2", new Vector3(6.5f, 0f, 14.5f), 0f, 11f, 7f, 16f, m.Buildings[1], m, rng, -1);
+            BuildBuilding(env, "Edificio_E", new Vector3(14.5f, 0f, 1f), 90f, 13f, 7f, 13f, m.Buildings[2], m, rng, 1);
             BuildBuilding(env, "Edificio_W", new Vector3(-14.5f, 0f, 2f), -90f, 12f, 7f, 8f, m.Buildings[3], m, rng, 3);
             BuildBuilding(env, "Edificio_SE", new Vector3(12.5f, 0f, -11f), 90f, 8f, 6f, 6f, m.Buildings[4], m, rng, -1);
 
@@ -181,7 +182,7 @@ namespace Ascua.EditorTools
 
             // --- Sesión + HUD
             new GameObject("GameSession").AddComponent<GameSession>();
-            BuildHud(player);
+            BuildHud(player, assets.FlameSprite);
 
             EditorSceneManager.SaveScene(scene, PlazaScenePath);
         }
@@ -374,8 +375,24 @@ namespace Ascua.EditorTools
             Prim(PrimitiveType.Cylinder, "Base", lamp.transform, new Vector3(0f, 0.15f, 0f), new Vector3(0.35f, 0.15f, 0.35f), m.Metal, Col.None);
             Prim(PrimitiveType.Cylinder, "Poste", lamp.transform, new Vector3(0f, 1.8f, 0f), new Vector3(0.12f, 1.8f, 0.12f), m.Metal);
             Prim(PrimitiveType.Cube, "Cabeza", lamp.transform, new Vector3(0f, 3.75f, 0f), new Vector3(0.42f, 0.3f, 0.42f), m.Metal, Col.None);
-            Prim(PrimitiveType.Cube, "Cristal", lamp.transform, new Vector3(0f, 3.5f, 0f), new Vector3(0.34f, 0.3f, 0.34f), m.LampGlass, Col.None);
+            GameObject glass = Prim(PrimitiveType.Cube, "Cristal", lamp.transform, new Vector3(0f, 3.5f, 0f), new Vector3(0.34f, 0.3f, 0.34f), m.LampGlass, Col.None);
             Prim(PrimitiveType.Cube, "Remate", lamp.transform, new Vector3(0f, 3.95f, 0f), new Vector3(0.2f, 0.12f, 0.2f), m.Metal, Col.None);
+
+            // Luz preparada pero apagada: StreetLampToggle la encenderá en la Fase 2.
+            GameObject lightObject = new GameObject("Luz_Farola");
+            lightObject.transform.SetParent(lamp.transform, false);
+            lightObject.transform.localPosition = new Vector3(0f, 3.3f, 0f);
+            Light light = lightObject.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = AscuaPalette.Ambar;
+            light.range = 7f;
+            light.intensity = 0f;
+            light.shadows = LightShadows.None;
+            light.enabled = false;
+
+            StreetLampToggle toggle = lamp.AddComponent<StreetLampToggle>();
+            Wire(toggle, "glassRenderer", glass.GetComponent<Renderer>());
+            Wire(toggle, "lampLight", light);
         }
 
         private static void BuildMalecon(Transform env, AscuaMaterials m)
@@ -530,13 +547,25 @@ namespace Ascua.EditorTools
             Light light = lightObject.AddComponent<Light>();
             light.type = LightType.Point;
             light.color = AscuaPalette.Ambar;
-            light.range = 2.8f;
-            light.intensity = 1.1f;
+            light.range = 4.2f;
+            light.intensity = 0.8f;
             light.shadows = LightShadows.Soft;
             light.shadowStrength = 0.85f;
             light.shadowNearPlane = 0.15f;
 
+            // --- Luz de relleno sobre el personaje (sin sombras, no cuenta para la jugabilidad)
+            GameObject fillObject = new GameObject("Luz_Relleno");
+            fillObject.transform.SetParent(player.transform, false);
+            fillObject.transform.localPosition = new Vector3(0f, 2.2f, 0.3f);
+            Light fill = fillObject.AddComponent<Light>();
+            fill.type = LightType.Point;
+            fill.color = new Color(1f, 0.85f, 0.66f);
+            fill.range = 3f;
+            fill.intensity = 0.35f;
+            fill.shadows = LightShadows.None;
+
             // --- Conexiones
+            Wire(lantern, "fillLight", fill);
             Wire(controller, "input", input);
             Wire(playerAnimator, "animator", parts.Animator);
             Wire(playerAnimator, "controller", controller);
@@ -605,7 +634,7 @@ namespace Ascua.EditorTools
 
         // ================================================================== HUD
 
-        private static void BuildHud(GameObject player)
+        private static void BuildHud(GameObject player, Sprite flameSprite)
         {
             Canvas canvas = CreateCanvas("HUD", 10);
             Transform root = canvas.transform;
@@ -620,14 +649,37 @@ namespace Ascua.EditorTools
             UIText("Lugar", root, "Vesper · La Plaza", 18f, new Color(cold.r, cold.g, cold.b, 0.7f), TextAlignmentOptions.TopLeft,
                 new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(42f, -86f), new Vector2(400f, 30f));
 
-            // Panel de energía
-            RectTransform panel = UIRect("Energia", root, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 40f), new Vector2(380f, 70f));
-            UIText("Etiqueta", panel, "FAROL", 18f, new Color(cold.r, cold.g, cold.b, 0.85f), TextAlignmentOptions.BottomLeft,
-                new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, new Vector2(120f, 28f)).characterSpacing = 8f;
-            TextMeshProUGUI value = UIText("Valor", panel, "100", 22f, amber, TextAlignmentOptions.BottomRight,
-                new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(100f, 28f));
+            // Panel de energía:  [llama] FAROL ◆◆◆
+            //                     [llama] ███████████░░░░  100/100
+            const float leftInset = 56f;   // espacio para la llama
+            const float rightInset = 150f; // espacio para el número
+            RectTransform panel = UIRect("Energia", root, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 40f), new Vector2(520f, 70f));
 
-            RectTransform barBg = UIRect("BarraFondo", panel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(0f, 14f));
+            // Ícono de llama con pivote en la base para que "baile" desde abajo.
+            RectTransform flame = UIRect("Llama", panel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0.5f, 0f), new Vector2(22f, 2f), new Vector2(34f, 44f));
+            Image flameImage = flame.gameObject.AddComponent<Image>();
+            flameImage.sprite = flameSprite;
+            flameImage.color = amber;
+            flameImage.preserveAspect = true;
+            flameImage.raycastTarget = false;
+            RectTransform flameCore = UIRect("Nucleo", flame, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 3f), new Vector2(16f, 22f));
+            Image flameCoreImage = flameCore.gameObject.AddComponent<Image>();
+            flameCoreImage.sprite = flameSprite;
+            flameCoreImage.color = new Color(1f, 0.96f, 0.82f, 0.8f);
+            flameCoreImage.preserveAspect = true;
+            flameCoreImage.raycastTarget = false;
+
+            UIText("Etiqueta", panel, "FAROL", 18f, new Color(cold.r, cold.g, cold.b, 0.85f), TextAlignmentOptions.BottomLeft,
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(leftInset, 0f), new Vector2(120f, 28f)).characterSpacing = 8f;
+
+            // Número grande junto al extremo derecho de la barra.
+            TextMeshProUGUI value = UIText("Valor", panel, "100/100", 32f, amber, TextAlignmentOptions.Left,
+                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(0f, 2f), new Vector2(rightInset - 12f, 40f));
+            value.fontStyle = FontStyles.Bold;
+
+            RectTransform barBg = UIRect("BarraFondo", panel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
+            barBg.offsetMin = new Vector2(leftInset, 14f);
+            barBg.offsetMax = new Vector2(-rightInset, 28f);
             barBg.gameObject.AddComponent<Image>().color = new Color(0.05f, 0.07f, 0.15f, 0.75f);
             barBg.GetComponent<Image>().raycastTarget = false;
 
@@ -639,7 +691,7 @@ namespace Ascua.EditorTools
             fillImage.raycastTarget = false;
 
             // Indicadores de tamaño del Farol (3 puntos)
-            RectTransform pipsRoot = UIRect("Radio", panel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(110f, -16f), new Vector2(80f, 16f));
+            RectTransform pipsRoot = UIRect("Radio", panel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(leftInset + 110f, -16f), new Vector2(80f, 16f));
             Image[] pips = new Image[3];
             for (int i = 0; i < pips.Length; i++)
             {
@@ -671,6 +723,8 @@ namespace Ascua.EditorTools
             Wire(hud, "energyFill", fill);
             Wire(hud, "energyFillImage", fillImage);
             Wire(hud, "energyValueText", value);
+            Wire(hud, "flameIcon", flameImage);
+            Wire(hud, "flameCore", flameCoreImage);
             WireArray(hud, "radiusPips", pips);
             Wire(hud, "fpsText", fps);
             Wire(hud, "hintGroup", hintGroup);
@@ -874,7 +928,9 @@ namespace Ascua.EditorTools
         {
             foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
             {
+                // Lo que cambia por script (ventanas, luces, farolas) no se agrupa estáticamente.
                 if (t.GetComponent<WindowLight>() != null || t.GetComponent<Light>() != null) continue;
+                if (t.GetComponentInParent<StreetLampToggle>() != null) continue;
                 GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.BatchingStatic);
             }
         }
