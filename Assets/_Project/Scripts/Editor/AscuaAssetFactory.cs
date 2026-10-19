@@ -20,7 +20,7 @@ namespace Ascua.EditorTools
         public Material TeoBody, TeoAccent;
         public Material AwningA, AwningB;
         public Material Firefly, FireflyParticle;
-        public Material Mist, PenumbraWall;
+        public Material Mist, PenumbraWall, PenumbraEdge;
         public Material[] Buildings;
     }
 
@@ -170,6 +170,12 @@ namespace Ascua.EditorTools
             m.PenumbraWall.SetTexture("_BaseMap", fogTexture);
             m.PenumbraWall.SetColor("_BaseColor", new Color(0.04f, 0.05f, 0.12f, 0.9f));
             MakeTransparent(m.PenumbraWall, false, true);
+
+            // Borde de la Penumbra: bruma fría y pálida que se lee contra la noche oscura.
+            m.PenumbraEdge = GetOrCreateMaterial("M_PenumbraBorde", UnlitShader);
+            m.PenumbraEdge.SetTexture("_BaseMap", fogTexture);
+            m.PenumbraEdge.SetColor("_BaseColor", new Color(0.5f, 0.56f, 0.78f, 0.55f));
+            MakeTransparent(m.PenumbraEdge, false, true);
 
             // Chispas de luciérnaga: partículas aditivas con un punto suave.
             Shader particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");

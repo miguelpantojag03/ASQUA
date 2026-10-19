@@ -63,6 +63,8 @@ namespace Ascua.World
         private bool locked;
         private float penumbraDim;
         private float noiseSeed;
+        private float currentExtinguishDuration;
+        private bool dramaticFade;
 
         public string ZoneId => zoneId;
         public bool IsLit => isLit;
@@ -82,6 +84,7 @@ namespace Ascua.World
             windowRenderer = GetComponent<Renderer>();
             propertyBlock = new MaterialPropertyBlock();
             noiseSeed = UnityEngine.Random.value * 100f;
+            currentExtinguishDuration = extinguishDuration;
 
             if (startLit)
             {
@@ -98,8 +101,12 @@ namespace Ascua.World
             float target = isLit ? 1f : 0f;
             if (!Mathf.Approximately(level, target))
             {
-                float duration = isLit ? igniteDuration : extinguishDuration;
+                float duration = isLit ? igniteDuration : currentExtinguishDuration;
                 level = Mathf.MoveTowards(level, target, Time.deltaTime / Mathf.Max(0.01f, duration));
+            }
+            else if (dramaticFade && level <= 0f)
+            {
+                dramaticFade = false;
             }
 
             if (!hopeControlled && !isLit && !locked)
@@ -154,12 +161,17 @@ namespace Ascua.World
             onLit?.Invoke();
         }
 
-        /// <summary>Apaga la ventana (con transición).</summary>
-        public void Extinguish()
+        /// <summary>
+        /// Apaga la ventana. Con fadeDuration &gt; 0 el apagado es lento y "agónico"
+        /// (parpadea mientras se apaga): se usa cuando muere una zona.
+        /// </summary>
+        public void Extinguish(float fadeDuration = -1f)
         {
             if (!isLit) return;
             isLit = false;
             charge = 0f;
+            dramaticFade = fadeDuration > 0f;
+            currentExtinguishDuration = dramaticFade ? fadeDuration : extinguishDuration;
 
             Extinguished?.Invoke(this);
             AnyWindowExtinguished?.Invoke(this);
@@ -178,6 +190,13 @@ namespace Ascua.World
                 float p = charge / requiredLitTime;
                 float flicker = 0.75f + 0.25f * Mathf.PerlinNoise(Time.time * 9f, noiseSeed);
                 hint = chargeHintIntensity * p * p * flicker;
+            }
+
+            // Apagado dramático: la luz tiembla y "tose" antes de morir.
+            if (dramaticFade && !isLit && level > 0f)
+            {
+                float stutter = Mathf.PerlinNoise(Time.time * 14f, noiseSeed);
+                alive *= stutter > 0.4f ? 1f : Mathf.Lerp(0.15f, 1f, 1f - level);
             }
 
             float visibility = 1f - penumbraDim;

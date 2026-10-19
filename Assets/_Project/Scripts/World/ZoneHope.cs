@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Ascua.Lighting;
 using UnityEngine;
@@ -36,6 +37,12 @@ namespace Ascua.World
         [SerializeField] private Vector2 lampThresholdRange = new Vector2(45f, 85f);
         [Tooltip("Margen para que las luces no parpadeen al oscilar alrededor de un umbral.")]
         [SerializeField] private float hysteresis = 3f;
+
+        [Header("Muerte de la zona")]
+        [Tooltip("Tiempo total de la cascada de apagado (las luces mueren una tras otra).")]
+        [SerializeField] private float deathCascadeDuration = 2.5f;
+        [Tooltip("Duración del fundido de cada ventana/farola al morir la zona.")]
+        [SerializeField] private float deathFadeDuration = 1.8f;
 
         /// <summary>(zona, esperanza actual)</summary>
         public event Action<ZoneHope, float> HopeChanged;
@@ -81,6 +88,17 @@ namespace Ascua.World
             zoneId = id;
             displayName = nameToShow;
             radius = zoneRadius;
+        }
+
+        /// <summary>
+        /// Ajusta el ritmo (lo llama NightManager según el preset Sutil / Demo rápida).
+        /// Debe llamarse antes de Start para que la Esperanza inicial se aplique.
+        /// </summary>
+        public void ApplyPacing(float initialHope, float decay, float rise)
+        {
+            startHope = initialHope;
+            decayPerSecond = decay;
+            risePerSecond = rise;
         }
 
         private void OnEnable()
@@ -161,19 +179,42 @@ namespace Ascua.World
             isDead = true;
             isIlluminated = false;
 
-            foreach (WindowLight window in windows)
-            {
-                window.Extinguish();
-                window.SetLocked(true);
-            }
-            foreach (StreetLampToggle lamp in lamps)
-            {
-                lamp.TurnOff();
-                lamp.SetLocked(true);
-            }
+            // Se bloquea todo ya, para que nada vuelva a encenderse durante la cascada.
+            foreach (WindowLight window in windows) window.SetLocked(true);
+            foreach (StreetLampToggle lamp in lamps) lamp.SetLocked(true);
+            StartCoroutine(DeathCascade());
 
             Died?.Invoke(this);
             AnyZoneDied?.Invoke(this);
+        }
+
+        /// <summary>Las luces encendidas mueren una tras otra, en orden aleatorio, y las farolas al final.</summary>
+        private IEnumerator DeathCascade()
+        {
+            List<WindowLight> litWindows = new List<WindowLight>();
+            foreach (WindowLight window in windows)
+            {
+                if (window.IsLit) litWindows.Add(window);
+            }
+            for (int i = litWindows.Count - 1; i > 0; i--)
+            {
+                int j = UnityEngine.Random.Range(0, i + 1);
+                (litWindows[i], litWindows[j]) = (litWindows[j], litWindows[i]);
+            }
+
+            int steps = Mathf.Max(1, litWindows.Count + 1);
+            WaitForSeconds wait = new WaitForSeconds(deathCascadeDuration / steps);
+
+            foreach (WindowLight window in litWindows)
+            {
+                window.Extinguish(deathFadeDuration);
+                yield return wait;
+            }
+
+            foreach (StreetLampToggle lamp in lamps) lamp.TurnOff(deathFadeDuration);
+
+            // Por si alguna ventana se estaba encendiendo justo en ese momento.
+            foreach (WindowLight window in windows) window.Extinguish(deathFadeDuration);
         }
 
         /// <summary>Busca las ventanas y farolas con el mismo ZoneId y les reparte umbrales.</summary>
