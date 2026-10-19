@@ -1,0 +1,45 @@
+# Carpetas generadas por Unity (se regeneran solas)
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Archivos de IDE generados automáticamente
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Ejecutables y paquetes exportados
+*.apk
+*.aab
+*.unitypackage
+*.app
+crashlytics-build.properties
+sysinfo.txt
