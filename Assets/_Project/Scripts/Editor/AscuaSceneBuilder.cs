@@ -7,10 +7,12 @@ using Ascua.Player;
 using Ascua.UI;
 using Ascua.World;
 using TMPro;
+using Unity.AI.Navigation;
 using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering;
@@ -21,16 +23,25 @@ using UnityEngine.UI;
 namespace Ascua.EditorTools
 {
     /// <summary>
-    /// Construye automáticamente las escenas de la Fase 1 (Título y Plaza),
-    /// los prefabs de Ilse y Mina y la configuración del proyecto ("Ascua").
-    /// Menú: Ascua > Construir Fase 1.
+    /// Construye automáticamente las escenas (Título y Plaza, que incluye La Plaza y El Mercado),
+    /// los prefabs de Ilse, Mina y Teo, el NavMesh y la configuración del proyecto ("Ascua").
+    /// Menú: Ascua > Construir juego.
     /// </summary>
     public static class AscuaSceneBuilder
     {
         private const string TitleScenePath = AscuaAssetFactory.ScenesFolder + "/Title.unity";
         private const string PlazaScenePath = AscuaAssetFactory.ScenesFolder + "/Plaza.unity";
+        private const string NavMeshPath = AscuaAssetFactory.ScenesFolder + "/NavMesh_Plaza.asset";
         private const int IgnoreRaycastLayer = 2;
         private const int UILayer = 5;
+
+        // Zonas jugables.
+        private const string PlazaZone = "Plaza";
+        private const string MercadoZone = "Mercado";
+        private static readonly Vector3 PlazaCenter = new Vector3(0f, 0f, 0f);
+        private static readonly Vector3 MercadoCenter = new Vector3(-44f, 0f, 2f);
+        // Centro del mapa completo: hacia aquí se cierra la Penumbra.
+        private static readonly Vector3 MapCenter = new Vector3(-22f, 0f, 4f);
 
         private enum Col { None, Keep, Mesh }
 
@@ -43,7 +54,7 @@ namespace Ascua.EditorTools
 
         // ================================================================== Menú
 
-        [MenuItem("Ascua/Construir Fase 1 (assets + escenas)", priority = 0)]
+        [MenuItem("Ascua/Construir juego (assets + escenas + NavMesh)", priority = 0)]
         public static void BuildAll()
         {
             if (!Validate()) return;
@@ -54,7 +65,7 @@ namespace Ascua.EditorTools
             ConfigureProject();
 
             EditorSceneManager.OpenScene(TitleScenePath);
-            EditorUtility.DisplayDialog("Ascua", "Fase 1 construida.\n\nEscenas: Title y Plaza (Assets/_Project/Scenes).\nPulsa Play desde Title.", "Vale");
+            EditorUtility.DisplayDialog("Ascua", "Juego construido.\n\nEscenas: Title y Plaza (Assets/_Project/Scenes).\nPulsa Play desde Title.", "Vale");
         }
 
         /// <summary>
@@ -80,7 +91,7 @@ namespace Ascua.EditorTools
             BuildPlaza(assets);
             BuildTitle(assets);
             ConfigureProject();
-            Debug.Log("[Ascua] Fase 1 construida correctamente.");
+            Debug.Log("[Ascua] Juego construido correctamente.");
         }
 
         [MenuItem("Ascua/Reconstruir solo Plaza", priority = 20)]
@@ -157,14 +168,18 @@ namespace Ascua.EditorTools
             BuildPlazaGround(env, m);
             BuildFountain(env, m);
 
-            // Alturas contrastadas (7.5 / 16 / 13 m) para que el skyline tenga lectura escalonada.
-            BuildBuilding(env, "Edificio_N1", new Vector3(-6f, 0f, 14.5f), 0f, 10f, 7f, 7.5f, m.Buildings[0], m, rng, 0);
-            BuildBuilding(env, "Edificio_N2", new Vector3(6.5f, 0f, 14.5f), 0f, 11f, 7f, 16f, m.Buildings[1], m, rng, -1);
-            BuildBuilding(env, "Edificio_E", new Vector3(14.5f, 0f, 1f), 90f, 13f, 7f, 13f, m.Buildings[2], m, rng, 1);
-            BuildBuilding(env, "Edificio_W", new Vector3(-14.5f, 0f, 2f), -90f, 12f, 7f, 8f, m.Buildings[3], m, rng, 3);
-            BuildBuilding(env, "Edificio_SE", new Vector3(12.5f, 0f, -11f), 90f, 8f, 6f, 6f, m.Buildings[4], m, rng, -1);
+            // --- La Plaza. Alturas contrastadas (7.5 / 16 / 13 m) para un skyline escalonado.
+            BuildBuilding(env, "Edificio_N1", new Vector3(-6f, 0f, 14.5f), 0f, 10f, 7f, 7.5f, m.Buildings[0], m, rng, 0, PlazaZone);
+            BuildBuilding(env, "Edificio_N2", new Vector3(6.5f, 0f, 14.5f), 0f, 11f, 7f, 16f, m.Buildings[1], m, rng, -1, PlazaZone);
+            BuildBuilding(env, "Edificio_E", new Vector3(14.5f, 0f, 1f), 90f, 13f, 7f, 13f, m.Buildings[2], m, rng, 1, PlazaZone);
+            BuildBuilding(env, "Edificio_W", new Vector3(-14.5f, 0f, 2f), -90f, 12f, 7f, 8f, m.Buildings[3], m, rng, 3, PlazaZone);
+            BuildBuilding(env, "Edificio_SE", new Vector3(12.5f, 0f, -11f), 90f, 8f, 6f, 6f, m.Buildings[4], m, rng, -1, PlazaZone);
 
             BuildStreetFurniture(env, m);
+
+            // --- El Mercado (mismo kit modular), al oeste de La Plaza.
+            BuildMercado(env, m, rng);
+
             BuildMalecon(env, m);
             BuildDistantSkyline(env, m, rng);
             BuildBoundaries(env);
@@ -173,16 +188,29 @@ namespace Ascua.EditorTools
             // --- Niebla baja a ras de suelo
             BuildGroundMist(m);
 
+            // --- Sistemas de la noche: zonas, Penumbra, temporizador y luciérnagas
+            ZoneHope plazaZone = BuildZone("Zona_Plaza", PlazaZone, "La Plaza", PlazaCenter, 14f);
+            ZoneHope mercadoZone = BuildZone("Zona_Mercado", MercadoZone, "El Mercado", MercadoCenter, 13f);
+            BuildPenumbra(m);
+            NightManager night = new GameObject("NightManager").AddComponent<NightManager>();
+            BuildFireflies(m);
+
             // --- Personajes
             GameObject player = BuildPlayer(assets, out Transform cameraTarget, out PlayerInputReader input);
-            BuildMina(assets);
+            BuildMina(assets, plazaZone);
+            BuildTeo(assets, mercadoZone);
 
             // --- Cámara en tercera persona
             BuildThirdPersonCamera(cameraTarget, input);
 
             // --- Sesión + HUD
             new GameObject("GameSession").AddComponent<GameSession>();
-            BuildHud(player, assets.FlameSprite);
+            new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule))
+                .GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
+            BuildHud(player, assets.FlameSprite, night, new[] { plazaZone, mercadoZone });
+
+            // --- NavMesh (al final, con toda la geometría ya colocada)
+            BakeNavMesh();
 
             EditorSceneManager.SaveScene(scene, PlazaScenePath);
         }
@@ -228,15 +256,17 @@ namespace Ascua.EditorTools
 
         /// <summary>
         /// Edificio modular: la raíz está en el centro inferior de la fachada, que mira a -Z local.
-        /// reactiveColumn = columna de la planta baja con ventana de prueba (-1 = ninguna).
+        /// Las ventanas de las dos primeras plantas son reactivas (las controla la Esperanza de zoneId).
+        /// glowColumn = columna de la planta baja con ventana de prueba + luz cálida (-1 = ninguna).
         /// </summary>
         private static void BuildBuilding(Transform env, string name, Vector3 position, float yaw,
-            float width, float depth, float height, Material wall, AscuaMaterials m, System.Random rng, int reactiveColumn)
+            float width, float depth, float height, Material wall, AscuaMaterials m, System.Random rng, int glowColumn, string zoneId)
         {
             Transform root = new GameObject(name).transform;
             root.SetParent(env, false);
             root.localPosition = position;
             root.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            root.gameObject.AddComponent<PenumbraFade>();
 
             Prim(PrimitiveType.Cube, "Muro", root, new Vector3(0f, height * 0.5f, depth * 0.5f), new Vector3(width, height, depth), wall);
             Prim(PrimitiveType.Cube, "Cornisa", root, new Vector3(0f, height + 0.12f, depth * 0.5f), new Vector3(width + 0.4f, 0.25f, depth + 0.4f), m.Trim, Col.None);
@@ -276,31 +306,38 @@ namespace Ascua.EditorTools
                         continue;
                     }
 
-                    bool reactive = f == 0 && c == reactiveColumn;
+                    bool reactive = f <= 1;
+                    bool testWindow = f == 0 && c == glowColumn;
                     Material windowMaterial = reactive ? m.WindowReactive : PickWindowMaterial(m, rng);
 
                     Prim(PrimitiveType.Cube, "Marco", root, new Vector3(x, y, -0.01f), new Vector3(1.25f, 1.55f, 0.04f), m.Trim, Col.None);
                     Prim(PrimitiveType.Cube, "Alfeizar", root, new Vector3(x, y - 0.75f, -0.1f), new Vector3(1.35f, 0.08f, 0.22f), m.Trim, Col.None);
 
                     // La ventana mira hacia fuera (forward = normal de la fachada).
-                    GameObject window = Prim(PrimitiveType.Cube, reactive ? "VentanaPrueba" : "Ventana", root,
+                    GameObject window = Prim(PrimitiveType.Cube, testWindow ? "VentanaPrueba" : "Ventana", root,
                         new Vector3(x, y, -0.03f), new Vector3(1.05f, 1.35f, 0.08f), windowMaterial, Col.None, Quaternion.Euler(0f, 180f, 0f));
 
-                    if (reactive) SetupReactiveWindow(window, root, new Vector3(x, y, -0.9f));
+                    if (reactive) SetupReactiveWindow(window, root, testWindow, new Vector3(x, y, -0.9f), zoneId);
                 }
             }
         }
 
+        /// <summary>
+        /// Ventanas estáticas de los pisos altos: solo apagadas o frías.
+        /// La luz cálida queda reservada para la Esperanza (ventanas reactivas).
+        /// </summary>
         private static Material PickWindowMaterial(AscuaMaterials m, System.Random rng)
         {
-            double r = rng.NextDouble();
-            if (r < 0.55) return m.WindowDark;
-            if (r < 0.85) return m.WindowCold;
-            return m.WindowWarm;
+            return rng.NextDouble() < 0.65 ? m.WindowDark : m.WindowCold;
         }
 
-        private static void SetupReactiveWindow(GameObject window, Transform buildingRoot, Vector3 glowLocalPosition)
+        private static void SetupReactiveWindow(GameObject window, Transform buildingRoot, bool withGlow, Vector3 glowLocalPosition, string zoneId)
         {
+            WindowLight windowLight = window.AddComponent<WindowLight>();
+            windowLight.ConfigureZone(zoneId);
+            if (!withGlow) return;
+
+            // Solo las ventanas de prueba proyectan luz a la calle (pocas luces = buen rendimiento).
             GameObject glow = new GameObject("Resplandor");
             glow.transform.SetParent(buildingRoot, false);
             glow.transform.localPosition = glowLocalPosition;
@@ -311,8 +348,6 @@ namespace Ascua.EditorTools
             light.intensity = 0f;
             light.shadows = LightShadows.None;
             light.enabled = false;
-
-            WindowLight windowLight = window.AddComponent<WindowLight>();
             Wire(windowLight, "glowLight", light);
         }
 
@@ -336,7 +371,7 @@ namespace Ascua.EditorTools
                 new Vector3(-16f, 0f, -14.8f), new Vector3(-6f, 0f, -14.8f),
                 new Vector3(6f, 0f, -14.8f), new Vector3(16f, 0f, -14.8f)
             };
-            foreach (Vector3 p in lamps) LampPost(furniture, m, p);
+            foreach (Vector3 p in lamps) LampPost(furniture, m, p, PlazaZone);
 
             // Cajas, bolardos y papelera para romper la regularidad.
             Prim(PrimitiveType.Cube, "Caja", furniture, new Vector3(13.4f, 0.55f, 9.2f), new Vector3(0.8f, 0.8f, 0.8f), m.Wood, Col.Keep, Quaternion.Euler(0f, 12f, 0f));
@@ -366,11 +401,12 @@ namespace Ascua.EditorTools
             box.size = new Vector3(1.8f, 1f, 0.6f);
         }
 
-        private static void LampPost(Transform parent, AscuaMaterials m, Vector3 position)
+        private static void LampPost(Transform parent, AscuaMaterials m, Vector3 position, string zoneId)
         {
-            GameObject lamp = new GameObject("Farola_Apagada");
+            GameObject lamp = new GameObject("Farola");
             lamp.transform.SetParent(parent, false);
             lamp.transform.localPosition = position;
+            lamp.AddComponent<PenumbraFade>();
 
             Prim(PrimitiveType.Cylinder, "Base", lamp.transform, new Vector3(0f, 0.15f, 0f), new Vector3(0.35f, 0.15f, 0.35f), m.Metal, Col.None);
             Prim(PrimitiveType.Cylinder, "Poste", lamp.transform, new Vector3(0f, 1.8f, 0f), new Vector3(0.12f, 1.8f, 0.12f), m.Metal);
@@ -378,7 +414,7 @@ namespace Ascua.EditorTools
             GameObject glass = Prim(PrimitiveType.Cube, "Cristal", lamp.transform, new Vector3(0f, 3.5f, 0f), new Vector3(0.34f, 0.3f, 0.34f), m.LampGlass, Col.None);
             Prim(PrimitiveType.Cube, "Remate", lamp.transform, new Vector3(0f, 3.95f, 0f), new Vector3(0.2f, 0.12f, 0.2f), m.Metal, Col.None);
 
-            // Luz preparada pero apagada: StreetLampToggle la encenderá en la Fase 2.
+            // Luz apagada al inicio: ZoneHope la enciende con StreetLampToggle según la Esperanza.
             GameObject lightObject = new GameObject("Luz_Farola");
             lightObject.transform.SetParent(lamp.transform, false);
             lightObject.transform.localPosition = new Vector3(0f, 3.3f, 0f);
@@ -391,6 +427,7 @@ namespace Ascua.EditorTools
             light.enabled = false;
 
             StreetLampToggle toggle = lamp.AddComponent<StreetLampToggle>();
+            toggle.ConfigureZone(zoneId);
             Wire(toggle, "glassRenderer", glass.GetComponent<Renderer>());
             Wire(toggle, "lampLight", light);
         }
@@ -400,14 +437,15 @@ namespace Ascua.EditorTools
             Transform malecon = new GameObject("Malecon").transform;
             malecon.SetParent(env, false);
 
-            for (float x = -24f; x <= 24f; x += 2f)
+            // El paseo marítimo recorre La Plaza y El Mercado (x de -64 a 24).
+            for (float x = -64f; x <= 24f; x += 2f)
             {
                 Prim(PrimitiveType.Cube, "Poste", malecon, new Vector3(x, 0.55f, -16f), new Vector3(0.1f, 1.1f, 0.1f), m.Metal, Col.None);
             }
-            Prim(PrimitiveType.Cube, "Baranda", malecon, new Vector3(0f, 1.08f, -16f), new Vector3(48.2f, 0.07f, 0.09f), m.Metal, Col.None);
-            Prim(PrimitiveType.Cube, "BarandaMedia", malecon, new Vector3(0f, 0.6f, -16f), new Vector3(48.2f, 0.05f, 0.06f), m.Metal, Col.None);
-            Prim(PrimitiveType.Cube, "Rompeolas", malecon, new Vector3(0f, -0.8f, -16.4f), new Vector3(60f, 1.6f, 0.8f), m.Stone, Col.None);
-            Prim(PrimitiveType.Plane, "Mar", malecon, new Vector3(0f, -1.1f, -70f), new Vector3(20f, 1f, 10.5f), m.Water, Col.None);
+            Prim(PrimitiveType.Cube, "Baranda", malecon, new Vector3(-20f, 1.08f, -16f), new Vector3(88.2f, 0.07f, 0.09f), m.Metal, Col.None);
+            Prim(PrimitiveType.Cube, "BarandaMedia", malecon, new Vector3(-20f, 0.6f, -16f), new Vector3(88.2f, 0.05f, 0.06f), m.Metal, Col.None);
+            Prim(PrimitiveType.Cube, "Rompeolas", malecon, new Vector3(-20f, -0.8f, -16.4f), new Vector3(100f, 1.6f, 0.8f), m.Stone, Col.None);
+            Prim(PrimitiveType.Plane, "Mar", malecon, new Vector3(-20f, -1.1f, -70f), new Vector3(24f, 1f, 10.5f), m.Water, Col.None);
         }
 
         private static void BuildDistantSkyline(Transform env, AscuaMaterials m, System.Random rng)
@@ -415,7 +453,7 @@ namespace Ascua.EditorTools
             Transform skyline = new GameObject("Skyline_Lejano").transform;
             skyline.SetParent(env, false);
 
-            for (float x = -40f; x <= 40f; x += 7f)
+            for (float x = -76f; x <= 40f; x += 7f)
             {
                 float h = 8f + (float)rng.NextDouble() * 18f;
                 float z = 32f + (float)rng.NextDouble() * 18f;
@@ -426,7 +464,7 @@ namespace Ascua.EditorTools
                 float hE = 10f + (float)rng.NextDouble() * 14f;
                 float hW = 10f + (float)rng.NextDouble() * 14f;
                 Prim(PrimitiveType.Cube, "Silueta", skyline, new Vector3(34f, hE * 0.5f, z), new Vector3(6f, hE, 6f), m.Skyline, Col.None);
-                Prim(PrimitiveType.Cube, "Silueta", skyline, new Vector3(-34f, hW * 0.5f, z), new Vector3(6f, hW, 6f), m.Skyline, Col.None);
+                Prim(PrimitiveType.Cube, "Silueta", skyline, new Vector3(-74f, hW * 0.5f, z), new Vector3(6f, hW, 6f), m.Skyline, Col.None);
             }
         }
 
@@ -434,10 +472,177 @@ namespace Ascua.EditorTools
         {
             Transform bounds = new GameObject("Limites_Invisibles").transform;
             bounds.SetParent(env, false);
-            InvisibleWall(bounds, new Vector3(0f, 1.5f, -15.8f), new Vector3(50f, 3f, 0.3f));
-            InvisibleWall(bounds, new Vector3(0f, 1.5f, 24f), new Vector3(50f, 3f, 0.3f));
+            InvisibleWall(bounds, new Vector3(-20f, 1.5f, -15.8f), new Vector3(88f, 3f, 0.3f));
+            InvisibleWall(bounds, new Vector3(-20f, 1.5f, 24f), new Vector3(88f, 3f, 0.3f));
             InvisibleWall(bounds, new Vector3(23.5f, 1.5f, 4f), new Vector3(0.3f, 3f, 42f));
-            InvisibleWall(bounds, new Vector3(-23.5f, 1.5f, 4f), new Vector3(0.3f, 3f, 42f));
+            InvisibleWall(bounds, new Vector3(-63.5f, 1.5f, 4f), new Vector3(0.3f, 3f, 42f));
+        }
+
+        // ================================================================== El Mercado
+
+        private static void BuildMercado(Transform env, AscuaMaterials m, System.Random rng)
+        {
+            Transform mercado = new GameObject("El_Mercado").transform;
+            mercado.SetParent(env, false);
+            Vector3 c = MercadoCenter;
+
+            // Suelo, pavimento y bordillos.
+            Prim(PrimitiveType.Cube, "Suelo_Calles", mercado, new Vector3(-47f, -0.05f, 4f), new Vector3(34f, 0.1f, 40f), m.Ground);
+            Prim(PrimitiveType.Cube, "Mercado_Pavimento", mercado, c + new Vector3(0f, 0.05f, 0f), new Vector3(20f, 0.1f, 20f), m.Paving);
+            Prim(PrimitiveType.Cube, "Bordillo_N", mercado, c + new Vector3(0f, 0.06f, 10.1f), new Vector3(20.4f, 0.12f, 0.3f), m.Trim);
+            Prim(PrimitiveType.Cube, "Bordillo_S", mercado, c + new Vector3(0f, 0.06f, -10.1f), new Vector3(20.4f, 0.12f, 0.3f), m.Trim);
+            Prim(PrimitiveType.Cube, "Bordillo_E", mercado, c + new Vector3(10.1f, 0.06f, 0f), new Vector3(0.3f, 0.12f, 20.4f), m.Trim);
+            Prim(PrimitiveType.Cube, "Bordillo_W", mercado, c + new Vector3(-10.1f, 0.06f, 0f), new Vector3(0.3f, 0.12f, 20.4f), m.Trim);
+
+            // Edificios alrededor (norte, oeste y sur), con una ventana de prueba cada uno.
+            BuildBuilding(mercado, "Mercado_N", new Vector3(-44f, 0f, 14.5f), 0f, 14f, 7f, 10f, m.Buildings[2], m, rng, 1, MercadoZone);
+            BuildBuilding(mercado, "Mercado_W", new Vector3(-56.5f, 0f, 2f), -90f, 12f, 7f, 8f, m.Buildings[4], m, rng, 0, MercadoZone);
+            BuildBuilding(mercado, "Mercado_S", new Vector3(-44f, 0f, -9f), 180f, 12f, 6f, 7f, m.Buildings[1], m, rng, 3, MercadoZone);
+
+            // Puestos con toldo en cuadrícula, dejando pasillos libres para Teo.
+            Stall(mercado, m, c + new Vector3(-4f, 0.1f, 4f), 0f, m.AwningA);
+            Stall(mercado, m, c + new Vector3(4f, 0.1f, 4f), 0f, m.AwningB);
+            Stall(mercado, m, c + new Vector3(-4f, 0.1f, -4f), 180f, m.AwningB);
+            Stall(mercado, m, c + new Vector3(4f, 0.1f, -4f), 180f, m.AwningA);
+
+            // Farolas del Mercado.
+            LampPost(mercado, m, c + new Vector3(-9f, 0.1f, -9f), MercadoZone);
+            LampPost(mercado, m, c + new Vector3(9f, 0.1f, -9f), MercadoZone);
+            LampPost(mercado, m, c + new Vector3(-9f, 0.1f, 9f), MercadoZone);
+            LampPost(mercado, m, c + new Vector3(9f, 0.1f, 9f), MercadoZone);
+
+            // Cajas apiladas junto a los puestos.
+            Prim(PrimitiveType.Cube, "Caja", mercado, c + new Vector3(-7.5f, 0.5f, 6.5f), new Vector3(0.8f, 0.8f, 0.8f), m.Wood, Col.Keep, Quaternion.Euler(0f, 15f, 0f));
+            Prim(PrimitiveType.Cube, "Caja", mercado, c + new Vector3(7.4f, 0.4f, -6.8f), new Vector3(0.7f, 0.6f, 0.7f), m.Wood, Col.Keep, Quaternion.Euler(0f, -25f, 0f));
+        }
+
+        private static void Stall(Transform parent, AscuaMaterials m, Vector3 position, float yaw, Material awning)
+        {
+            GameObject stall = new GameObject("Puesto");
+            stall.transform.SetParent(parent, false);
+            stall.transform.localPosition = position;
+            stall.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+
+            Prim(PrimitiveType.Cube, "Mostrador", stall.transform, new Vector3(0f, 0.45f, 0f), new Vector3(2.6f, 0.9f, 1.2f), m.Wood);
+            Prim(PrimitiveType.Cube, "Poste", stall.transform, new Vector3(-1.2f, 1.15f, 0.5f), new Vector3(0.08f, 2.3f, 0.08f), m.Metal, Col.None);
+            Prim(PrimitiveType.Cube, "Poste", stall.transform, new Vector3(1.2f, 1.15f, 0.5f), new Vector3(0.08f, 2.3f, 0.08f), m.Metal, Col.None);
+            Prim(PrimitiveType.Cube, "Toldo", stall.transform, new Vector3(0f, 2.3f, 0f), new Vector3(2.9f, 0.06f, 1.7f), awning, Col.None, Quaternion.Euler(-12f, 0f, 0f));
+            Prim(PrimitiveType.Cube, "Mercancia", stall.transform, new Vector3(-0.6f, 1.02f, -0.1f), new Vector3(0.5f, 0.25f, 0.4f), m.Wood, Col.None);
+            Prim(PrimitiveType.Cube, "Mercancia", stall.transform, new Vector3(0.5f, 1.0f, 0.1f), new Vector3(0.6f, 0.2f, 0.35f), awning, Col.None);
+        }
+
+        // ================================================================== Sistemas de la noche
+
+        private static ZoneHope BuildZone(string name, string id, string displayName, Vector3 center, float radius)
+        {
+            ZoneHope zone = new GameObject(name).AddComponent<ZoneHope>();
+            zone.transform.position = center;
+            zone.Configure(id, displayName, radius);
+            return zone;
+        }
+
+        private static void BuildPenumbra(AscuaMaterials m)
+        {
+            GameObject root = new GameObject("Penumbra");
+            root.transform.position = MapCenter;
+            Penumbra penumbra = root.AddComponent<Penumbra>();
+
+            // 2 anillos x 24 tarjetas de niebla oscura; Penumbra las recoloca cada frame.
+            Transform wall = new GameObject("Muro_Penumbra").transform;
+            wall.SetParent(root.transform, false);
+            List<Transform> cards = new List<Transform>();
+            for (int i = 0; i < 48; i++)
+            {
+                GameObject card = Prim(PrimitiveType.Quad, "Niebla_Penumbra", wall, Vector3.zero, new Vector3(10f, 10f, 1f), m.PenumbraWall, Col.None, null, false);
+                card.GetComponent<MeshRenderer>().receiveShadows = false;
+                cards.Add(card.transform);
+            }
+            WireArray(penumbra, "wallCards", cards);
+        }
+
+        private static void BuildFireflies(AscuaMaterials m)
+        {
+            GameObject root = new GameObject("Luciernagas_Pool");
+            root.AddComponent<FireflyPool>();
+
+            // Todas se crean aquí, desactivadas: en juego solo se reciclan.
+            for (int i = 0; i < 8; i++)
+            {
+                GameObject firefly = new GameObject("Luciernaga_" + i);
+                firefly.transform.SetParent(root.transform, false);
+
+                SphereCollider trigger = firefly.AddComponent<SphereCollider>();
+                trigger.isTrigger = true;
+                trigger.radius = 0.7f;
+                Rigidbody body = firefly.AddComponent<Rigidbody>();
+                body.isKinematic = true;
+                body.useGravity = false;
+
+                GameObject glow = Prim(PrimitiveType.Sphere, "Brillo", firefly.transform, Vector3.zero, Vector3.one * 0.14f, m.Firefly, Col.None, null, false);
+
+                GameObject sparklesObject = new GameObject("Chispas");
+                sparklesObject.transform.SetParent(firefly.transform, false);
+                ParticleSystem sparkles = sparklesObject.AddComponent<ParticleSystem>();
+                ConfigureFireflyParticles(sparkles, m.FireflyParticle);
+
+                Firefly component = firefly.AddComponent<Firefly>();
+                Wire(component, "sparkles", sparkles);
+                Wire(component, "glow", glow.transform);
+
+                SetLayerRecursively(firefly, IgnoreRaycastLayer);
+                firefly.SetActive(false);
+            }
+        }
+
+        private static void ConfigureFireflyParticles(ParticleSystem ps, Material material)
+        {
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+            ParticleSystem.MainModule main = ps.main;
+            main.duration = 1f;
+            main.loop = true;
+            main.startLifetime = 1.2f;
+            main.startSpeed = 0.15f;
+            main.startSize = 0.07f;
+            main.startColor = AscuaPalette.Luciernaga;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 24;
+            main.playOnAwake = true;
+
+            ParticleSystem.EmissionModule emission = ps.emission;
+            emission.rateOverTime = 10f;
+
+            ParticleSystem.ShapeModule shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Sphere;
+            shape.radius = 0.15f;
+
+            ParticleSystem.ColorOverLifetimeModule colorOverLifetime = ps.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            Gradient gradient = new Gradient();
+            gradient.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.25f), new GradientAlphaKey(0f, 1f) });
+            colorOverLifetime.color = gradient;
+
+            ParticleSystemRenderer renderer = ps.GetComponent<ParticleSystemRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+
+        /// <summary>Hornea el NavMesh de toda la escena (solo capa Default) y lo guarda como asset.</summary>
+        private static void BakeNavMesh()
+        {
+            GameObject go = new GameObject("NavMesh");
+            NavMeshSurface surface = go.AddComponent<NavMeshSurface>();
+            surface.collectObjects = CollectObjects.All;
+            surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
+            surface.layerMask = LayerMask.GetMask("Default");
+            surface.BuildNavMesh();
+
+            AssetDatabase.DeleteAsset(NavMeshPath);
+            AssetDatabase.CreateAsset(surface.navMeshData, NavMeshPath);
         }
 
         private static void InvisibleWall(Transform parent, Vector3 position, Vector3 size)
@@ -453,11 +658,11 @@ namespace Ascua.EditorTools
         private static void BuildGroundMist(AscuaMaterials m)
         {
             Transform mist = new GameObject("Bruma_Baja").transform;
-            Vector3 center = new Vector3(0f, 0.35f, 4f);
-            Vector3 area = new Vector3(48f, 0f, 44f);
+            Vector3 center = new Vector3(-20f, 0.35f, 4f);
+            Vector3 area = new Vector3(88f, 0f, 44f);
             System.Random rng = new System.Random(21);
 
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 14; i++)
             {
                 Vector3 p = new Vector3(
                     center.x + ((float)rng.NextDouble() - 0.5f) * area.x,
@@ -581,27 +786,104 @@ namespace Ascua.EditorTools
             return player;
         }
 
-        private static void BuildMina(AscuaAssets assets)
+        private static void BuildMina(AscuaAssets assets, ZoneHope zone)
         {
             AscuaMaterials m = assets.Materials;
 
             // Mina: silueta pequeña, ropa neutra fría y bufanda roja emisiva.
             ChibiParts parts = BuildChibi("NPC_Mina", new Vector3(3.6f, 0.12f, -4.2f), 205f, 0.78f, 0.6f, m.MinaBody, assets.ChibiController, true);
 
-            Prim(PrimitiveType.Cylinder, "Bufanda", parts.Rig, new Vector3(0f, 0.6f, 0f), new Vector3(0.4f, 0.06f, 0.36f), m.MinaAccent, Col.None);
-            Prim(PrimitiveType.Cube, "BufandaCola", parts.Rig, new Vector3(0.1f, 0.45f, 0.17f), new Vector3(0.1f, 0.32f, 0.04f), m.MinaAccent, Col.None, Quaternion.Euler(12f, 0f, -8f));
+            GameObject scarf = Prim(PrimitiveType.Cylinder, "Bufanda", parts.Rig, new Vector3(0f, 0.6f, 0f), new Vector3(0.4f, 0.06f, 0.36f), m.MinaAccent, Col.None);
+            GameObject scarfTail = Prim(PrimitiveType.Cube, "BufandaCola", parts.Rig, new Vector3(0.1f, 0.45f, 0.17f), new Vector3(0.1f, 0.32f, 0.04f), m.MinaAccent, Col.None, Quaternion.Euler(12f, 0f, -8f));
             Prim(PrimitiveType.Sphere, "Gorro", parts.Head, new Vector3(0f, 0.5f, 0f), new Vector3(0.62f, 0.32f, 0.62f), m.MinaBody, Col.None);
 
-            CapsuleCollider capsule = parts.Root.AddComponent<CapsuleCollider>();
-            capsule.center = new Vector3(0f, 0.66f, 0f);
-            capsule.height = 1.32f;
-            capsule.radius = 0.3f;
+            Renderer[] accents = { scarf.GetComponent<Renderer>(), scarfTail.GetComponent<Renderer>() };
+            Transform[] patrol = CreateWaypoints("Waypoints_Mina", new[]
+            {
+                new Vector3(4f, 0.1f, -4f), new Vector3(7f, 0.1f, 4f), new Vector3(-3f, 0.1f, 7.5f),
+                new Vector3(-7.5f, 0.1f, -3f), new Vector3(1f, 0.1f, -8.5f)
+            });
 
-            parts.Root.AddComponent<NpcIdentity>().Configure("mina", "Mina", AscuaPalette.RojoMina);
-            HeadLookAt look = parts.Root.AddComponent<HeadLookAt>();
+            SetupNpc(parts, "mina", "Mina", AscuaPalette.RojoMina, accents, 1.32f, 0.3f);
+            CharacterAI ai = parts.Root.GetComponent<CharacterAI>();
+            ai.Configure(null, null, accents, AscuaPalette.RojoMina);
+
+            // Prefab reutilizable (sin referencias de escena); la instancia de la escena queda libre.
+            PrefabUtility.SaveAsPrefabAsset(parts.Root, AscuaAssetFactory.PrefabsFolder + "/NPC_Mina.prefab");
+            ai.Configure(zone, patrol, accents, AscuaPalette.RojoMina);
+        }
+
+        private static void BuildTeo(AscuaAssets assets, ZoneHope zone)
+        {
+            AscuaMaterials m = assets.Materials;
+            Color accent = AscuaPalette.TurquesaTeo;
+
+            // Teo Bravo: comerciante robusto (torso ancho, gorra) con delantal turquesa.
+            ChibiParts parts = BuildChibi("NPC_Teo", MercadoCenter + new Vector3(2f, 0.12f, 0f), 180f, 0.95f, 0.5f, m.TeoBody, assets.ChibiController, true);
+
+            Prim(PrimitiveType.Capsule, "Barriga", parts.Rig, new Vector3(0f, 0.22f, 0.02f), new Vector3(0.54f, 0.28f, 0.42f), m.TeoBody, Col.None);
+            GameObject apron = Prim(PrimitiveType.Cube, "Delantal", parts.Rig, new Vector3(0f, 0.16f, 0.22f), new Vector3(0.38f, 0.44f, 0.03f), m.TeoAccent, Col.None, Quaternion.Euler(-6f, 0f, 0f));
+            Prim(PrimitiveType.Cylinder, "Gorra", parts.Head, new Vector3(0f, 0.47f, 0f), new Vector3(0.5f, 0.06f, 0.5f), m.TeoBody, Col.None);
+            Prim(PrimitiveType.Cube, "Visera", parts.Head, new Vector3(0f, 0.44f, 0.27f), new Vector3(0.3f, 0.03f, 0.18f), m.TeoBody, Col.None);
+            GameObject capBand = Prim(PrimitiveType.Cylinder, "CintaGorra", parts.Head, new Vector3(0f, 0.43f, 0f), new Vector3(0.51f, 0.025f, 0.51f), m.TeoAccent, Col.None);
+
+            Renderer[] accents = { apron.GetComponent<Renderer>(), capBand.GetComponent<Renderer>() };
+            Vector3 c = MercadoCenter;
+            Transform[] patrol = CreateWaypoints("Waypoints_Teo", new[]
+            {
+                c + new Vector3(0f, 0.1f, 0f), c + new Vector3(0f, 0.1f, 8f), c + new Vector3(8f, 0.1f, 0f),
+                c + new Vector3(0f, 0.1f, -8f), c + new Vector3(-8f, 0.1f, 0f)
+            });
+
+            SetupNpc(parts, "teo", "Teo Bravo", accent, accents, 1.55f, 0.35f);
+            CharacterAI ai = parts.Root.GetComponent<CharacterAI>();
+            ai.Configure(null, null, accents, accent);
+
+            PrefabUtility.SaveAsPrefabAsset(parts.Root, AscuaAssetFactory.PrefabsFolder + "/NPC_Teo.prefab");
+            ai.Configure(zone, patrol, accents, accent);
+        }
+
+        /// <summary>Componentes comunes de un NPC: colisión, NavMeshAgent, identidad, mirada e IA.</summary>
+        private static void SetupNpc(ChibiParts parts, string id, string displayName, Color accent, Renderer[] accents, float height, float radius)
+        {
+            GameObject root = parts.Root;
+
+            CapsuleCollider capsule = root.AddComponent<CapsuleCollider>();
+            capsule.center = new Vector3(0f, height * 0.5f, 0f);
+            capsule.height = height;
+            capsule.radius = radius;
+
+            NavMeshAgent agent = root.AddComponent<NavMeshAgent>();
+            agent.radius = radius;
+            agent.height = height;
+            agent.speed = 1.1f;
+            agent.angularSpeed = 300f;
+            agent.acceleration = 6f;
+            agent.stoppingDistance = 0.3f;
+            agent.autoBraking = true;
+            agent.obstacleAvoidanceType = ObstacleAvoidanceType.LowQualityObstacleAvoidance;
+
+            root.AddComponent<NpcIdentity>().Configure(id, displayName, accent);
+            HeadLookAt look = root.AddComponent<HeadLookAt>();
             Wire(look, "head", parts.Head);
 
-            PrefabUtility.SaveAsPrefabAssetAndConnect(parts.Root, AscuaAssetFactory.PrefabsFolder + "/NPC_Mina.prefab", InteractionMode.AutomatedAction);
+            CharacterAI ai = root.AddComponent<CharacterAI>();
+            Wire(ai, "animator", parts.Animator);
+            Wire(ai, "visual", parts.Visual);
+
+            // Fuera de la capa Default: no recorta el NavMesh al hornear ni empuja la cámara.
+            SetLayerRecursively(root, IgnoreRaycastLayer);
+        }
+
+        private static Transform[] CreateWaypoints(string name, Vector3[] points)
+        {
+            Transform root = new GameObject(name).transform;
+            Transform[] result = new Transform[points.Length];
+            for (int i = 0; i < points.Length; i++)
+            {
+                result[i] = Pivot("Punto_" + i, root, points[i]);
+            }
+            return result;
         }
 
         private static void BuildThirdPersonCamera(Transform cameraTarget, PlayerInputReader input)
@@ -634,7 +916,7 @@ namespace Ascua.EditorTools
 
         // ================================================================== HUD
 
-        private static void BuildHud(GameObject player, Sprite flameSprite)
+        private static void BuildHud(GameObject player, Sprite flameSprite, NightManager night, ZoneHope[] zones)
         {
             Canvas canvas = CreateCanvas("HUD", 10);
             Transform root = canvas.transform;
@@ -703,10 +985,10 @@ namespace Ascua.EditorTools
             }
 
             // Ayuda de controles
-            RectTransform hint = UIRect("Ayuda", root, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-40f, 40f), new Vector2(620f, 120f));
+            RectTransform hint = UIRect("Ayuda", root, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-40f, 40f), new Vector2(760f, 150f));
             CanvasGroup hintGroup = hint.gameObject.AddComponent<CanvasGroup>();
             UIText("Texto", hint,
-                "WASD / stick  moverse  ·  Shift  correr\nMantener click izq. / F / RT  avivar el Farol\nQ · E / LB · RB  tamaño de la luz  ·  Rueda  distancia de cámara\nEsc  liberar ratón  ·  F3  FPS",
+                "Aviva el Farol DENTRO de cada zona para darle Esperanza · las luciérnagas recargan energía\nWASD / stick  moverse  ·  Shift  correr\nMantener click izq. / F / RT  avivar el Farol\nQ · E / LB · RB  tamaño de la luz  ·  Rueda  distancia de cámara\nEsc  liberar ratón  ·  F3  FPS",
                 17f, new Color(cold.r, cold.g, cold.b, 0.75f), TextAlignmentOptions.BottomRight,
                 Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero).lineSpacing = 12f;
 
@@ -729,6 +1011,121 @@ namespace Ascua.EditorTools
             Wire(hud, "fpsText", fps);
             Wire(hud, "hintGroup", hintGroup);
             Wire(hud, "fadeGroup", fade);
+
+            BuildHopeHud(canvas, night, zones);
+            BuildNightSummary(root, night);
+        }
+
+        /// <summary>Temporizador de noche (arriba al centro) y Esperanza por zona (arriba a la derecha).</summary>
+        private static void BuildHopeHud(Canvas canvas, NightManager night, ZoneHope[] zones)
+        {
+            Transform root = canvas.transform;
+            Color amber = AscuaPalette.Ambar;
+            Color cold = AscuaPalette.TextoFrio;
+            Color barBack = new Color(0.05f, 0.07f, 0.15f, 0.75f);
+
+            // --- Temporizador
+            RectTransform timer = UIRect("Noche", root, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -28f), new Vector2(440f, 70f));
+            TextMeshProUGUI nightLabel = UIText("Etiqueta", timer, "NOCHE 1", 18f, new Color(cold.r, cold.g, cold.b, 0.85f), TextAlignmentOptions.TopLeft,
+                new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, new Vector2(200f, 28f));
+            nightLabel.characterSpacing = 8f;
+            TextMeshProUGUI timerText = UIText("Tiempo", timer, "1:00", 30f, cold, TextAlignmentOptions.TopRight,
+                new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(160f, 40f));
+            timerText.fontStyle = FontStyles.Bold;
+
+            RectTransform timerBack = UIRect("BarraFondo", timer, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
+            timerBack.offsetMin = new Vector2(0f, 8f);
+            timerBack.offsetMax = new Vector2(0f, 16f);
+            Image timerBackImage = timerBack.gameObject.AddComponent<Image>();
+            timerBackImage.color = barBack;
+            timerBackImage.raycastTarget = false;
+            RectTransform timerFill = UIRect("Relleno", timerBack, Vector2.zero, Vector2.one, new Vector2(0f, 0.5f), Vector2.zero, Vector2.zero);
+            timerFill.offsetMin = Vector2.zero;
+            timerFill.offsetMax = Vector2.zero;
+            Image timerFillImage = timerFill.gameObject.AddComponent<Image>();
+            timerFillImage.color = cold;
+            timerFillImage.raycastTarget = false;
+
+            // --- Esperanza por zona
+            const float rowHeight = 46f;
+            RectTransform panel = UIRect("Esperanza", root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -70f), new Vector2(340f, 30f + rowHeight * zones.Length));
+            UIText("Titulo", panel, "ESPERANZA", 16f, new Color(cold.r, cold.g, cold.b, 0.7f), TextAlignmentOptions.TopRight,
+                new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(200f, 24f)).characterSpacing = 8f;
+
+            TextMeshProUGUI[] names = new TextMeshProUGUI[zones.Length];
+            TextMeshProUGUI[] values = new TextMeshProUGUI[zones.Length];
+            RectTransform[] fills = new RectTransform[zones.Length];
+            Image[] fillImages = new Image[zones.Length];
+
+            for (int i = 0; i < zones.Length; i++)
+            {
+                float top = -30f - i * rowHeight;
+                RectTransform row = UIRect("Zona_" + zones[i].ZoneId, panel, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, top), new Vector2(0f, rowHeight));
+
+                names[i] = UIText("Nombre", row, zones[i].DisplayName, 20f, cold, TextAlignmentOptions.TopLeft,
+                    new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, new Vector2(220f, 26f));
+                values[i] = UIText("Valor", row, "60", 20f, amber, TextAlignmentOptions.TopRight,
+                    new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(110f, 26f));
+                values[i].fontStyle = FontStyles.Bold;
+
+                RectTransform back = UIRect("BarraFondo", row, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
+                back.offsetMin = new Vector2(0f, 8f);
+                back.offsetMax = new Vector2(0f, 16f);
+                Image backImage = back.gameObject.AddComponent<Image>();
+                backImage.color = barBack;
+                backImage.raycastTarget = false;
+
+                fills[i] = UIRect("Relleno", back, Vector2.zero, new Vector2(0.6f, 1f), new Vector2(0f, 0.5f), Vector2.zero, Vector2.zero);
+                fills[i].offsetMin = Vector2.zero;
+                fills[i].offsetMax = Vector2.zero;
+                fillImages[i] = fills[i].gameObject.AddComponent<Image>();
+                fillImages[i].color = amber;
+                fillImages[i].raycastTarget = false;
+            }
+
+            HopeHUD hopeHud = canvas.gameObject.AddComponent<HopeHUD>();
+            Wire(hopeHud, "night", night);
+            Wire(hopeHud, "timerFill", timerFill);
+            Wire(hopeHud, "timerFillImage", timerFillImage);
+            Wire(hopeHud, "timerText", timerText);
+            Wire(hopeHud, "nightLabel", nightLabel);
+            WireArray(hopeHud, "zones", zones);
+            WireArray(hopeHud, "zoneNames", names);
+            WireArray(hopeHud, "zoneFills", fills);
+            WireArray(hopeHud, "zoneFillImages", fillImages);
+            WireArray(hopeHud, "zoneValues", values);
+        }
+
+        /// <summary>Pantalla de resumen de la noche (oculta hasta que termina).</summary>
+        private static void BuildNightSummary(Transform canvasRoot, NightManager night)
+        {
+            Color cold = AscuaPalette.TextoFrio;
+
+            RectTransform panel = UIRect("Resumen_Noche", canvasRoot, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            Image dim = panel.gameObject.AddComponent<Image>();
+            dim.color = new Color(0.02f, 0.03f, 0.07f, 0.82f);
+            CanvasGroup group = panel.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            group.interactable = false;
+            group.blocksRaycasts = false;
+
+            TextMeshProUGUI title = UIText("Titulo", panel, "Amanece en Vesper", 72f, AscuaPalette.Ambar, TextAlignmentOptions.Center,
+                new Vector2(0.5f, 0.66f), new Vector2(0.5f, 0.66f), Vector2.zero, new Vector2(1400f, 110f));
+            title.fontStyle = FontStyles.Bold;
+            title.characterSpacing = 6f;
+            TextMeshProUGUI body = UIText("Cuerpo", panel, "Zonas salvadas: 0/2", 32f, cold, TextAlignmentOptions.Center,
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1200f, 160f));
+
+            Button retry = UIButton("Boton_Reintentar", panel, "Reintentar", new Vector2(0.5f, 0.32f));
+            Button toTitle = UIButton("Boton_Titulo", panel, "Título", new Vector2(0.5f, 0.23f));
+
+            NightSummaryPanel summary = panel.gameObject.AddComponent<NightSummaryPanel>();
+            Wire(summary, "night", night);
+            Wire(summary, "group", group);
+            Wire(summary, "titleText", title);
+            Wire(summary, "bodyText", body);
+            Wire(summary, "retryButton", retry);
+            Wire(summary, "titleButton", toTitle);
         }
 
         // ================================================================== Título
@@ -948,7 +1345,7 @@ namespace Ascua.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        private static void WireArray(Object target, string propertyName, IList<Image> values)
+        private static void WireArray<T>(Object target, string propertyName, IList<T> values) where T : Object
         {
             SerializedObject so = new SerializedObject(target);
             SerializedProperty property = so.FindProperty(propertyName);

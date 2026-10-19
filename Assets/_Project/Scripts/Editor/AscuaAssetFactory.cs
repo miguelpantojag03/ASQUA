@@ -17,7 +17,10 @@ namespace Ascua.EditorTools
         public Material Skyline, SkylineWarm, SkylineCold, Moon;
         public Material IlseBody, LanternFrame, LanternCore;
         public Material MinaBody, MinaAccent;
-        public Material Mist;
+        public Material TeoBody, TeoAccent;
+        public Material AwningA, AwningB;
+        public Material Firefly, FireflyParticle;
+        public Material Mist, PenumbraWall;
         public Material[] Buildings;
     }
 
@@ -123,6 +126,11 @@ namespace Ascua.EditorTools
                 LanternCore = Lit("M_Farol_Brasa", amber, 0.3f, AscuaPalette.Hdr(amber, 2f)),
                 MinaBody = Lit("M_Mina_Base", Hex("#5B6479"), 0.25f),
                 MinaAccent = Lit("M_Mina_Acento", AscuaPalette.RojoMina, 0.3f, AscuaPalette.Hdr(AscuaPalette.RojoMina, 0.9f)),
+                TeoBody = Lit("M_Teo_Base", Hex("#56606E"), 0.25f),
+                TeoAccent = Lit("M_Teo_Acento", AscuaPalette.TurquesaTeo, 0.3f, AscuaPalette.Hdr(AscuaPalette.TurquesaTeo, 0.8f)),
+                AwningA = Lit("M_Toldo_A", Hex("#5A4A6A"), 0.1f),
+                AwningB = Lit("M_Toldo_B", Hex("#4A5A6A"), 0.1f),
+                Firefly = Lit("M_Luciernaga", AscuaPalette.Luciernaga, 0.2f, AscuaPalette.Hdr(AscuaPalette.Luciernaga, 3.5f)),
                 Buildings = new[]
                 {
                     Lit("M_Edificio_A", Hex("#39426B"), 0.15f),
@@ -156,6 +164,22 @@ namespace Ascua.EditorTools
             m.Mist.SetTexture("_BaseMap", fogTexture);
             m.Mist.SetColor("_BaseColor", new Color(0.55f, 0.62f, 0.85f, 0.25f));
             MakeTransparent(m.Mist, false, true);
+
+            // Muro de la Penumbra: misma textura suave, casi negra y más opaca.
+            m.PenumbraWall = GetOrCreateMaterial("M_Penumbra", UnlitShader);
+            m.PenumbraWall.SetTexture("_BaseMap", fogTexture);
+            m.PenumbraWall.SetColor("_BaseColor", new Color(0.04f, 0.05f, 0.12f, 0.9f));
+            MakeTransparent(m.PenumbraWall, false, true);
+
+            // Chispas de luciérnaga: partículas aditivas con un punto suave.
+            Shader particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            m.FireflyParticle = GetOrCreateMaterial("M_ParticulaLuciernaga", particleShader != null ? particleShader : UnlitShader);
+            m.FireflyParticle.SetTexture("_BaseMap", CreateSoftDotTexture());
+            m.FireflyParticle.SetColor("_BaseColor", Color.white);
+            MakeTransparent(m.FireflyParticle, false, true);
+            m.FireflyParticle.SetFloat("_Blend", 2f); // Aditivo en el shader de partículas de URP.
+            m.FireflyParticle.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            m.FireflyParticle.SetFloat("_DstBlend", (float)BlendMode.One);
 
             return m;
         }
@@ -402,6 +426,39 @@ namespace Ascua.EditorTools
                 h ^= h >> 16;
                 return (h & 0x7fffffff) / (float)int.MaxValue;
             }
+        }
+
+        /// <summary>Punto blanco de bordes suaves para partículas (64 px).</summary>
+        private static Texture2D CreateSoftDotTexture()
+        {
+            string path = TexturesFolder + "/T_PuntoSuave.png";
+            const int size = 64;
+            Color32[] pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + 0.5f) / size - 0.5f;
+                    float dy = (y + 0.5f) / size - 0.5f;
+                    float d = Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy) * 2f);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(d * d * 255f));
+                }
+            }
+
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            string fullPath = Path.Combine(Directory.GetParent(Application.dataPath).FullName, path);
+            File.WriteAllBytes(fullPath, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.alphaSource = TextureImporterAlphaSource.FromInput;
+            importer.alphaIsTransparency = true;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
         // ------------------------------------------------------------------ Ícono de llama

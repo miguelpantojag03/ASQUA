@@ -6,8 +6,8 @@ namespace Ascua.World
 {
     /// <summary>
     /// Encendido/apagado visual de una farola con Lerp de emisión y de su luz puntual.
-    /// No decide CUÁNDO encenderse: en la Fase 2 el sistema de Esperanza (ZoneHope)
-    /// solo tendrá que llamar a TurnOn() / TurnOff() / SetOn().
+    /// No decide CUÁNDO encenderse: ZoneHope llama a TurnOn() / TurnOff() / SetOn().
+    /// La Penumbra puede atenuarla (SetPenumbraDim) y una zona muerta la bloquea (SetLocked).
     /// </summary>
     [DisallowMultipleComponent]
     public class StreetLampToggle : MonoBehaviour
@@ -46,12 +46,16 @@ namespace Ascua.World
         private float level;
         private float targetLevel;
         private float noiseSeed;
+        private float penumbraDim;
+        private bool locked;
+        private bool dirty = true;
 
         public string ZoneId => zoneId;
         /// <summary>True si el objetivo actual es estar encendida.</summary>
         public bool IsOn => targetLevel > 0.5f;
         /// <summary>Nivel actual de encendido (0 = apagada, 1 = encendida).</summary>
         public float Level => level;
+        public bool IsLocked => locked;
 
         private void Awake()
         {
@@ -63,11 +67,20 @@ namespace Ascua.World
 
         private void Update()
         {
-            if (Mathf.Approximately(level, targetLevel)) return;
+            if (!Mathf.Approximately(level, targetLevel))
+            {
+                float duration = targetLevel > level ? turnOnDuration : turnOffDuration;
+                level = Mathf.MoveTowards(level, targetLevel, Time.deltaTime / Mathf.Max(0.01f, duration));
+                dirty = true;
+            }
 
-            float duration = targetLevel > level ? turnOnDuration : turnOffDuration;
-            level = Mathf.MoveTowards(level, targetLevel, Time.deltaTime / Mathf.Max(0.01f, duration));
-            ApplyVisuals();
+            if (dirty) ApplyVisuals();
+        }
+
+        /// <summary>Asigna la zona a la que pertenece (lo usa el constructor de escenas).</summary>
+        public void ConfigureZone(string id)
+        {
+            zoneId = id;
         }
 
         /// <summary>Enciende la farola con transición.</summary>
@@ -93,13 +106,12 @@ namespace Ascua.World
         /// <summary>Cambia el estado; instant = true salta la transición (útil al cargar partida).</summary>
         public void SetOn(bool on, bool instant)
         {
+            if (on && locked) return;
+
             bool wasOn = IsOn;
             targetLevel = on ? 1f : 0f;
-            if (instant)
-            {
-                level = targetLevel;
-                ApplyVisuals();
-            }
+            if (instant) level = targetLevel;
+            dirty = true;
 
             if (on && !wasOn)
             {
@@ -113,8 +125,25 @@ namespace Ascua.World
             }
         }
 
+        /// <summary>Bloquea la farola: no puede volver a encenderse (zona muerta esta noche).</summary>
+        public void SetLocked(bool value)
+        {
+            locked = value;
+        }
+
+        /// <summary>Atenuación visual por la Penumbra (0 = sin efecto, 1 = completamente apagada).</summary>
+        public void SetPenumbraDim(float amount)
+        {
+            float clamped = Mathf.Clamp01(amount);
+            if (Mathf.Approximately(clamped, penumbraDim)) return;
+            penumbraDim = clamped;
+            dirty = true;
+        }
+
         private void ApplyVisuals()
         {
+            dirty = false;
+
             // Lerp suavizado del nivel de encendido.
             float eased = level * level * (3f - 2f * level);
 
@@ -124,6 +153,8 @@ namespace Ascua.World
                 float noise = Mathf.PerlinNoise(Time.time * 18f, noiseSeed);
                 eased *= Mathf.Lerp(noise > 0.45f ? 1f : 0.15f, 1f, level);
             }
+
+            eased *= 1f - penumbraDim;
 
             if (glassRenderer != null)
             {

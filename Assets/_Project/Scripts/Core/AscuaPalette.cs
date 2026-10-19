@@ -19,6 +19,15 @@ namespace Ascua.Core
         // Rojo puro reservado EXCLUSIVAMENTE para Mina en todo el juego.
         public static readonly Color RojoMina = Hex("#E63946");
 
+        // Turquesa reservado para Teo Bravo: frío pero saturado, se separa del índigo y del ámbar.
+        public static readonly Color TurquesaTeo = Hex("#2EC4B6");
+
+        // Verde-amarillo pálido de las luciérnagas (energía), distinto del ámbar del Farol.
+        public static readonly Color Luciernaga = Hex("#D8FF8A");
+
+        // Penumbra: casi negro azulado.
+        public static readonly Color Penumbra = Hex("#0B0F24");
+
         // Tonos de apoyo para UI.
         public static readonly Color TextoFrio = Hex("#B8C4EC");
         public static readonly Color EnergiaBaja = Hex("#DB7340");
