@@ -6,6 +6,17 @@ using UnityEngine.SceneManagement;
 
 namespace Ascua.Core
 {
+    /// <summary>
+    /// Ritmo de la noche. Un solo selector ajusta duración, Esperanza de las zonas y Penumbra.
+    /// Personalizado = se respetan los valores escritos a mano en cada componente.
+    /// </summary>
+    public enum NightPacing
+    {
+        Sutil,
+        DemoRapida,
+        Personalizado
+    }
+
     /// <summary>Resultado de una noche, para la pantalla de resumen (y futuras mejoras entre noches).</summary>
     public struct NightResult
     {
@@ -24,8 +35,13 @@ namespace Ascua.Core
     {
         public static NightManager Instance { get; private set; }
 
+        [Header("Ritmo")]
+        [Tooltip("Sutil = juego final (60 s). Demo rápida = para enseñarlo en clase (30 s). Personalizado = valores a mano.")]
+        [SerializeField] private NightPacing pacing = NightPacing.Sutil;
+
+        [Header("Noche")]
         [SerializeField] private int nightNumber = 1;
-        [Tooltip("Duración de la noche en segundos.")]
+        [Tooltip("Duración de la noche en segundos (solo se usa tal cual en 'Personalizado').")]
         [SerializeField] private float nightDuration = 60f;
         [Tooltip("Termina la noche antes si todas las zonas mueren.")]
         [SerializeField] private bool endWhenAllZonesDead = true;
@@ -38,6 +54,7 @@ namespace Ascua.Core
         public event Action<NightManager> NightStarted;
         public event Action<NightResult> NightEnded;
 
+        public NightPacing Pacing => pacing;
         public int NightNumber => nightNumber;
         public float Duration => nightDuration;
         public float Elapsed { get; private set; }
@@ -51,6 +68,28 @@ namespace Ascua.Core
             Time.timeScale = 1f;
             if (playerInput == null) playerInput = FindFirstObjectByType<PlayerInputReader>();
             if (gameSession == null) gameSession = FindFirstObjectByType<GameSession>();
+            ApplyPacing();
+        }
+
+        /// <summary>
+        /// Vuelca el ritmo elegido en la noche, las zonas y la Penumbra.
+        /// Se ejecuta en Awake, antes de que zonas y Penumbra hagan su Start.
+        /// </summary>
+        private void ApplyPacing()
+        {
+            if (pacing == NightPacing.Personalizado) return;
+            bool demo = pacing == NightPacing.DemoRapida;
+
+            nightDuration = demo ? 30f : 60f;
+
+            foreach (ZoneHope zone in FindObjectsByType<ZoneHope>(FindObjectsSortMode.None))
+            {
+                if (demo) zone.ApplyPacing(45f, 2.2f, 5f);
+                else zone.ApplyPacing(60f, 1.5f, 4f);
+            }
+
+            Penumbra penumbra = FindFirstObjectByType<Penumbra>();
+            if (penumbra != null) penumbra.ApplyPacing(pacing);
         }
 
         private void Start()
@@ -118,10 +157,12 @@ namespace Ascua.Core
 
         private static bool AllZonesDead()
         {
-            if (ZoneHope.All.Count == 0) return false;
-            foreach (ZoneHope zone in ZoneHope.All)
+            // Bucle con índice: foreach sobre IReadOnlyList asignaría memoria en cada frame.
+            var zones = ZoneHope.All;
+            if (zones.Count == 0) return false;
+            for (int i = 0; i < zones.Count; i++)
             {
-                if (!zone.IsDead) return false;
+                if (!zones[i].IsDead) return false;
             }
             return true;
         }

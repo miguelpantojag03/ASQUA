@@ -209,6 +209,15 @@ namespace Ascua.EditorTools
                 .GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
             BuildHud(player, assets.FlameSprite, night, new[] { plazaZone, mercadoZone });
 
+            // --- Impacto al morir una zona: sacudida de cámara + sonido
+            GameObject feedback = new GameObject("Feedback_ZonaApagada");
+            CinemachineImpulseSource impulse = feedback.AddComponent<CinemachineImpulseSource>();
+            impulse.ImpulseDefinition.ImpulseShape = CinemachineImpulseDefinition.ImpulseShapes.Rumble;
+            impulse.ImpulseDefinition.ImpulseType = CinemachineImpulseDefinition.ImpulseTypes.Uniform;
+            impulse.ImpulseDefinition.ImpulseDuration = 0.8f;
+            ZoneDeathFeedback deathFeedback = feedback.AddComponent<ZoneDeathFeedback>();
+            Wire(deathFeedback, "impulseSource", impulse);
+
             // --- NavMesh (al final, con toda la geometría ya colocada)
             BakeNavMesh();
 
@@ -553,7 +562,10 @@ namespace Ascua.EditorTools
             List<Transform> cards = new List<Transform>();
             for (int i = 0; i < 48; i++)
             {
-                GameObject card = Prim(PrimitiveType.Quad, "Niebla_Penumbra", wall, Vector3.zero, new Vector3(10f, 10f, 1f), m.PenumbraWall, Col.None, null, false);
+                // Anillo interior (frente de avance) = bruma pálida; anillo exterior = negro azulado.
+                bool edge = i < 24;
+                GameObject card = Prim(PrimitiveType.Quad, edge ? "Penumbra_Borde" : "Penumbra_Nucleo", wall, Vector3.zero, new Vector3(10f, 10f, 1f),
+                    edge ? m.PenumbraEdge : m.PenumbraWall, Col.None, null, false);
                 card.GetComponent<MeshRenderer>().receiveShadows = false;
                 cards.Add(card.transform);
             }
@@ -906,6 +918,7 @@ namespace Ascua.EditorTools
             orbital.TrackerSettings = tracker;
 
             go.AddComponent<CinemachineRotationComposer>();
+            go.AddComponent<CinemachineImpulseListener>();
 
             CinemachineDeoccluder deoccluder = go.AddComponent<CinemachineDeoccluder>();
             deoccluder.CollideAgainst = LayerMask.GetMask("Default");
@@ -928,7 +941,7 @@ namespace Ascua.EditorTools
                 new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(40f, -30f), new Vector2(400f, 60f));
             logo.characterSpacing = 14f;
             logo.fontStyle = FontStyles.Bold;
-            UIText("Lugar", root, "Vesper · La Plaza", 18f, new Color(cold.r, cold.g, cold.b, 0.7f), TextAlignmentOptions.TopLeft,
+            UIText("Lugar", root, "Vesper · La Plaza y El Mercado", 20f, new Color(cold.r, cold.g, cold.b, 0.9f), TextAlignmentOptions.TopLeft,
                 new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(42f, -86f), new Vector2(400f, 30f));
 
             // Panel de energía:  [llama] FAROL ◆◆◆
@@ -984,14 +997,6 @@ namespace Ascua.EditorTools
                 pip.localRotation = Quaternion.Euler(0f, 0f, 45f);
             }
 
-            // Ayuda de controles
-            RectTransform hint = UIRect("Ayuda", root, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-40f, 40f), new Vector2(760f, 150f));
-            CanvasGroup hintGroup = hint.gameObject.AddComponent<CanvasGroup>();
-            UIText("Texto", hint,
-                "Aviva el Farol DENTRO de cada zona para darle Esperanza · las luciérnagas recargan energía\nWASD / stick  moverse  ·  Shift  correr\nMantener click izq. / F / RT  avivar el Farol\nQ · E / LB · RB  tamaño de la luz  ·  Rueda  distancia de cámara\nEsc  liberar ratón  ·  F3  FPS",
-                17f, new Color(cold.r, cold.g, cold.b, 0.75f), TextAlignmentOptions.BottomRight,
-                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero).lineSpacing = 12f;
-
             // FPS
             TextMeshProUGUI fps = UIText("FPS", root, "60 FPS", 18f, new Color(cold.r, cold.g, cold.b, 0.8f), TextAlignmentOptions.TopRight,
                 new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -30f), new Vector2(200f, 30f));
@@ -1009,11 +1014,55 @@ namespace Ascua.EditorTools
             Wire(hud, "flameCore", flameCoreImage);
             WireArray(hud, "radiusPips", pips);
             Wire(hud, "fpsText", fps);
-            Wire(hud, "hintGroup", hintGroup);
             Wire(hud, "fadeGroup", fade);
 
             BuildHopeHud(canvas, night, zones);
+            BuildToast(root);
+            BuildDebugPanel(root);
             BuildNightSummary(root, night);
+        }
+
+        /// <summary>Aviso central reutilizable ("El Mercado se apagó").</summary>
+        private static void BuildToast(Transform canvasRoot)
+        {
+            RectTransform panel = UIRect("Aviso", canvasRoot, new Vector2(0.5f, 0.72f), new Vector2(0.5f, 0.72f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000f, 120f));
+            Image background = panel.gameObject.AddComponent<Image>();
+            background.color = new Color(0.02f, 0.03f, 0.07f, 0.72f);
+            background.raycastTarget = false;
+            CanvasGroup group = panel.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            group.blocksRaycasts = false;
+
+            TextMeshProUGUI message = UIText("Mensaje", panel, "La zona se apagó", 54f, new Color(0.88f, 0.9f, 1f), TextAlignmentOptions.Center,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            message.fontStyle = FontStyles.Bold;
+            message.characterSpacing = 4f;
+
+            ZoneLostNotification toast = panel.gameObject.AddComponent<ZoneLostNotification>();
+            Wire(toast, "group", group);
+            Wire(toast, "messageText", message);
+            Wire(toast, "panel", panel);
+        }
+
+        /// <summary>Panel de depuración (F1), oculto por defecto.</summary>
+        private static void BuildDebugPanel(Transform canvasRoot)
+        {
+            RectTransform panel = UIRect("Debug_F1", canvasRoot, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(32f, 60f), new Vector2(640f, 440f));
+            Image background = panel.gameObject.AddComponent<Image>();
+            background.color = new Color(0.02f, 0.03f, 0.07f, 0.8f);
+            background.raycastTarget = false;
+            CanvasGroup group = panel.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            group.blocksRaycasts = false;
+
+            TextMeshProUGUI text = UIText("Texto", panel, "", 21f, AscuaPalette.TextoFrio, TextAlignmentOptions.TopLeft,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            text.margin = new Vector4(20f, 16f, 20f, 16f);
+            text.richText = true;
+
+            DebugPanel debug = panel.gameObject.AddComponent<DebugPanel>();
+            Wire(debug, "group", group);
+            Wire(debug, "text", text);
         }
 
         /// <summary>Temporizador de noche (arriba al centro) y Esperanza por zona (arriba a la derecha).</summary>
@@ -1024,18 +1073,19 @@ namespace Ascua.EditorTools
             Color cold = AscuaPalette.TextoFrio;
             Color barBack = new Color(0.05f, 0.07f, 0.15f, 0.75f);
 
-            // --- Temporizador
-            RectTransform timer = UIRect("Noche", root, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -28f), new Vector2(440f, 70f));
-            TextMeshProUGUI nightLabel = UIText("Etiqueta", timer, "NOCHE 1", 18f, new Color(cold.r, cold.g, cold.b, 0.85f), TextAlignmentOptions.TopLeft,
-                new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, new Vector2(200f, 28f));
+            // --- Temporizador (tamaños pensados para leerse en un proyector)
+            RectTransform timer = UIRect("Noche", root, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -24f), new Vector2(560f, 96f));
+            TextMeshProUGUI nightLabel = UIText("Etiqueta", timer, "NOCHE 1", 24f, new Color(cold.r, cold.g, cold.b, 0.9f), TextAlignmentOptions.TopLeft,
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -10f), new Vector2(260f, 34f));
             nightLabel.characterSpacing = 8f;
-            TextMeshProUGUI timerText = UIText("Tiempo", timer, "1:00", 30f, cold, TextAlignmentOptions.TopRight,
-                new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(160f, 40f));
+            nightLabel.fontStyle = FontStyles.Bold;
+            TextMeshProUGUI timerText = UIText("Tiempo", timer, "1:00", 46f, cold, TextAlignmentOptions.TopRight,
+                new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(200f, 56f));
             timerText.fontStyle = FontStyles.Bold;
 
             RectTransform timerBack = UIRect("BarraFondo", timer, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
-            timerBack.offsetMin = new Vector2(0f, 8f);
-            timerBack.offsetMax = new Vector2(0f, 16f);
+            timerBack.offsetMin = new Vector2(0f, 6f);
+            timerBack.offsetMax = new Vector2(0f, 20f);
             Image timerBackImage = timerBack.gameObject.AddComponent<Image>();
             timerBackImage.color = barBack;
             timerBackImage.raycastTarget = false;
@@ -1046,11 +1096,28 @@ namespace Ascua.EditorTools
             timerFillImage.color = cold;
             timerFillImage.raycastTarget = false;
 
-            // --- Esperanza por zona
-            const float rowHeight = 46f;
-            RectTransform panel = UIRect("Esperanza", root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -70f), new Vector2(340f, 30f + rowHeight * zones.Length));
-            UIText("Titulo", panel, "ESPERANZA", 16f, new Color(cold.r, cold.g, cold.b, 0.7f), TextAlignmentOptions.TopRight,
-                new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(200f, 24f)).characterSpacing = 8f;
+            // --- Esperanza por zona.
+            // Panel anclado arriba a la derecha con VerticalLayoutGroup + ContentSizeFitter:
+            // cada zona nueva (Fase 3) añade una fila y el panel crece hacia abajo sin recolocar nada.
+            RectTransform panel = UIRect("Esperanza", root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32f, -64f), new Vector2(470f, 0f));
+            Image panelBack = panel.gameObject.AddComponent<Image>();
+            panelBack.color = new Color(0.02f, 0.03f, 0.08f, 0.55f);
+            panelBack.raycastTarget = false;
+            VerticalLayoutGroup layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(20, 20, 14, 16);
+            layout.spacing = 10f;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            ContentSizeFitter fitter = panel.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            TextMeshProUGUI hopeTitle = UIText("Titulo", panel, "ESPERANZA", 20f, new Color(cold.r, cold.g, cold.b, 0.75f), TextAlignmentOptions.Right,
+                new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 28f));
+            hopeTitle.characterSpacing = 10f;
+            hopeTitle.gameObject.AddComponent<LayoutElement>().preferredHeight = 28f;
 
             TextMeshProUGUI[] names = new TextMeshProUGUI[zones.Length];
             TextMeshProUGUI[] values = new TextMeshProUGUI[zones.Length];
@@ -1059,18 +1126,18 @@ namespace Ascua.EditorTools
 
             for (int i = 0; i < zones.Length; i++)
             {
-                float top = -30f - i * rowHeight;
-                RectTransform row = UIRect("Zona_" + zones[i].ZoneId, panel, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, top), new Vector2(0f, rowHeight));
+                RectTransform row = UIRect("Zona_" + zones[i].ZoneId, panel, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(0f, 68f));
+                row.gameObject.AddComponent<LayoutElement>().preferredHeight = 68f;
 
-                names[i] = UIText("Nombre", row, zones[i].DisplayName, 20f, cold, TextAlignmentOptions.TopLeft,
-                    new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, new Vector2(220f, 26f));
-                values[i] = UIText("Valor", row, "60", 20f, amber, TextAlignmentOptions.TopRight,
-                    new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(110f, 26f));
+                names[i] = UIText("Nombre", row, zones[i].DisplayName, 30f, cold, TextAlignmentOptions.TopLeft,
+                    new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, new Vector2(280f, 40f));
+                values[i] = UIText("Valor", row, "60", 32f, amber, TextAlignmentOptions.TopRight,
+                    new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(150f, 40f));
                 values[i].fontStyle = FontStyles.Bold;
 
                 RectTransform back = UIRect("BarraFondo", row, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
-                back.offsetMin = new Vector2(0f, 8f);
-                back.offsetMax = new Vector2(0f, 16f);
+                back.offsetMin = new Vector2(0f, 2f);
+                back.offsetMax = new Vector2(0f, 20f);
                 Image backImage = back.gameObject.AddComponent<Image>();
                 backImage.color = barBack;
                 backImage.raycastTarget = false;

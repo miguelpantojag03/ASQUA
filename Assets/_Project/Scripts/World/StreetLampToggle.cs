@@ -49,6 +49,7 @@ namespace Ascua.World
         private float penumbraDim;
         private bool locked;
         private bool dirty = true;
+        private float slowOffDuration;
 
         public string ZoneId => zoneId;
         /// <summary>True si el objetivo actual es estar encendida.</summary>
@@ -69,12 +70,24 @@ namespace Ascua.World
         {
             if (!Mathf.Approximately(level, targetLevel))
             {
-                float duration = targetLevel > level ? turnOnDuration : turnOffDuration;
+                float offDuration = slowOffDuration > 0f ? slowOffDuration : turnOffDuration;
+                float duration = targetLevel > level ? turnOnDuration : offDuration;
                 level = Mathf.MoveTowards(level, targetLevel, Time.deltaTime / Mathf.Max(0.01f, duration));
                 dirty = true;
             }
+            else if (slowOffDuration > 0f && level <= 0f)
+            {
+                slowOffDuration = 0f;
+            }
 
             if (dirty) ApplyVisuals();
+        }
+
+        /// <summary>Apagado lento y tembloroso (muerte de una zona).</summary>
+        public void TurnOff(float fadeDuration)
+        {
+            slowOffDuration = Mathf.Max(0.01f, fadeDuration);
+            SetOn(false, false);
         }
 
         /// <summary>Asigna la zona a la que pertenece (lo usa el constructor de escenas).</summary>
@@ -107,6 +120,7 @@ namespace Ascua.World
         public void SetOn(bool on, bool instant)
         {
             if (on && locked) return;
+            if (on) slowOffDuration = 0f;
 
             bool wasOn = IsOn;
             targetLevel = on ? 1f : 0f;
@@ -152,6 +166,13 @@ namespace Ascua.World
             {
                 float noise = Mathf.PerlinNoise(Time.time * 18f, noiseSeed);
                 eased *= Mathf.Lerp(noise > 0.45f ? 1f : 0.15f, 1f, level);
+            }
+
+            // Apagado lento: la farola chisporrotea mientras muere.
+            if (slowOffDuration > 0f && targetLevel < level)
+            {
+                float noise = Mathf.PerlinNoise(Time.time * 16f, noiseSeed);
+                eased *= noise > 0.4f ? 1f : 0.2f;
             }
 
             eased *= 1f - penumbraDim;

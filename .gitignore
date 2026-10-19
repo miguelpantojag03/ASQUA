@@ -43,3 +43,6 @@ desktop.ini
 *.app
 crashlytics-build.properties
 sysinfo.txt
+
+# Capturas de la prueba automática (Ascua > Prueba automática)
+/[Cc]apturas/
