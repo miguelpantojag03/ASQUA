@@ -6,9 +6,11 @@ using UnityEngine.Events;
 namespace Ascua.World
 {
     /// <summary>
-    /// Ventana que se "reenciende" si el Farol activo la ilumina durante unos segundos.
-    /// Pensada para que ZoneHope (Fase 2) escuche AnyWindowLit / Lit y sume Esperanza
-    /// por zona (ZoneId). Extinguish() queda disponible para la Penumbra.
+    /// Ventana que se enciende y se apaga con transición de emisión.
+    /// Dos modos:
+    ///  - Iluminación directa (Fase 1): se enciende si el Farol la ilumina unos segundos.
+    ///  - Controlada por Esperanza (Fase 2): ZoneHope decide cuándo encenderla o apagarla.
+    /// La Penumbra puede atenuarla (SetPenumbraDim) y una zona muerta la bloquea (SetLocked).
     /// </summary>
     [RequireComponent(typeof(Renderer))]
     public class WindowLight : MonoBehaviour
@@ -18,14 +20,18 @@ namespace Ascua.World
         [Header("Identidad")]
         [SerializeField] private string zoneId = "Plaza";
 
-        [Header("Encendido")]
+        [Header("Encendido por iluminación directa (si no la controla una zona)")]
         [Tooltip("Segundos de iluminación continua necesarios para encenderla.")]
         [SerializeField, Min(0.1f)] private float requiredLitTime = 2f;
         [Tooltip("Carga perdida por segundo cuando deja de iluminarse.")]
         [SerializeField] private float chargeDecayPerSecond = 0.6f;
+        [SerializeField] private bool startLit = false;
+
+        [Header("Transiciones")]
         [Tooltip("Duración del Lerp de emisión al encenderse.")]
         [SerializeField] private float igniteDuration = 1.4f;
-        [SerializeField] private bool startLit = false;
+        [Tooltip("Duración del Lerp de emisión al apagarse.")]
+        [SerializeField] private float extinguishDuration = 0.9f;
 
         [Header("Aspecto")]
         [SerializeField] private Color litColor = new Color(1f, 0.769f, 0.42f);
@@ -41,7 +47,7 @@ namespace Ascua.World
         [SerializeField] private UnityEvent onLit = new UnityEvent();
         [SerializeField] private UnityEvent onExtinguished = new UnityEvent();
 
-        /// <summary>Se dispara cuando CUALQUIER ventana se enciende (útil para ZoneHope).</summary>
+        /// <summary>Se dispara cuando CUALQUIER ventana se enciende.</summary>
         public static event Action<WindowLight> AnyWindowLit;
         public static event Action<WindowLight> AnyWindowExtinguished;
 
@@ -51,12 +57,17 @@ namespace Ascua.World
         private Renderer windowRenderer;
         private MaterialPropertyBlock propertyBlock;
         private float charge;
-        private float igniteProgress;
+        private float level;          // 0 = apagada, 1 = encendida del todo
         private bool isLit;
+        private bool hopeControlled;
+        private bool locked;
+        private float penumbraDim;
         private float noiseSeed;
 
         public string ZoneId => zoneId;
         public bool IsLit => isLit;
+        public bool IsLocked => locked;
+        public bool IsHopeControlled => hopeControlled;
         public float ChargeProgress => isLit ? 1f : charge / requiredLitTime;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -75,7 +86,7 @@ namespace Ascua.World
             if (startLit)
             {
                 isLit = true;
-                igniteProgress = 1f;
+                level = 1f;
                 charge = requiredLitTime;
             }
             ApplyVisuals();
@@ -83,45 +94,72 @@ namespace Ascua.World
 
         private void Update()
         {
-            if (isLit)
+            // Transición de nivel hacia encendida/apagada.
+            float target = isLit ? 1f : 0f;
+            if (!Mathf.Approximately(level, target))
             {
-                if (igniteProgress < 1f) igniteProgress = Mathf.MoveTowards(igniteProgress, 1f, Time.deltaTime / igniteDuration);
-                ApplyVisuals();
-                return;
+                float duration = isLit ? igniteDuration : extinguishDuration;
+                level = Mathf.MoveTowards(level, target, Time.deltaTime / Mathf.Max(0.01f, duration));
             }
 
-            Vector3 samplePoint = transform.position + transform.forward * sampleOffset;
-            bool illuminated = IlluminationRegistry.IsPointIlluminated(samplePoint, out _);
+            if (!hopeControlled && !isLit && !locked)
+            {
+                // Modo Fase 1: cargar con la luz del Farol.
+                Vector3 samplePoint = transform.position + transform.forward * sampleOffset;
+                bool illuminated = IlluminationRegistry.IsPointIlluminated(samplePoint, out _);
+                charge = illuminated
+                    ? charge + Time.deltaTime
+                    : Mathf.Max(0f, charge - chargeDecayPerSecond * Time.deltaTime);
 
-            charge = illuminated
-                ? charge + Time.deltaTime
-                : Mathf.Max(0f, charge - chargeDecayPerSecond * Time.deltaTime);
+                if (charge >= requiredLitTime) Ignite();
+            }
 
-            if (charge >= requiredLitTime) Ignite();
-            else ApplyVisuals();
+            ApplyVisuals();
         }
 
-        /// <summary>Enciende la ventana inmediatamente (con transición).</summary>
+        /// <summary>Asigna la zona a la que pertenece (lo usa el constructor de escenas).</summary>
+        public void ConfigureZone(string id)
+        {
+            zoneId = id;
+        }
+
+        /// <summary>Si es true, la ventana deja de cargarse con el Farol y obedece solo a ZoneHope.</summary>
+        public void SetHopeControlled(bool value)
+        {
+            hopeControlled = value;
+            if (value) charge = 0f;
+        }
+
+        /// <summary>Bloquea la ventana: no puede volver a encenderse (zona muerta esta noche).</summary>
+        public void SetLocked(bool value)
+        {
+            locked = value;
+        }
+
+        /// <summary>Atenuación visual por la Penumbra (0 = sin efecto, 1 = completamente apagada).</summary>
+        public void SetPenumbraDim(float amount)
+        {
+            penumbraDim = Mathf.Clamp01(amount);
+        }
+
+        /// <summary>Enciende la ventana (con transición). No hace nada si está bloqueada.</summary>
         public void Ignite()
         {
-            if (isLit) return;
+            if (isLit || locked) return;
             isLit = true;
             charge = requiredLitTime;
-            igniteProgress = 0f;
 
             Lit?.Invoke(this);
             AnyWindowLit?.Invoke(this);
             onLit?.Invoke();
         }
 
-        /// <summary>Apaga la ventana (lo usará la Penumbra en fases futuras).</summary>
+        /// <summary>Apaga la ventana (con transición).</summary>
         public void Extinguish()
         {
             if (!isLit) return;
             isLit = false;
             charge = 0f;
-            igniteProgress = 0f;
-            ApplyVisuals();
 
             Extinguished?.Invoke(this);
             AnyWindowExtinguished?.Invoke(this);
@@ -130,25 +168,21 @@ namespace Ascua.World
 
         private void ApplyVisuals()
         {
-            float emission;
-            float glow;
+            // Lerp suavizado entre la pista de carga y la emisión completa.
+            float eased = level * level * (3f - 2f * level);
+            float alive = 1f + (Mathf.PerlinNoise(Time.time * 1.3f, noiseSeed) - 0.5f) * 0.06f;
 
-            if (isLit)
+            float hint = 0f;
+            if (!hopeControlled && !isLit)
             {
-                // Lerp desde la pista de carga hasta la emisión completa.
-                float eased = igniteProgress * igniteProgress * (3f - 2f * igniteProgress);
-                float alive = 1f + (Mathf.PerlinNoise(Time.time * 1.3f, noiseSeed) - 0.5f) * 0.06f;
-                emission = Mathf.Lerp(chargeHintIntensity, litEmissionIntensity, eased) * alive;
-                glow = glowLightIntensity * eased * alive;
-            }
-            else
-            {
-                // Mientras carga: brillo tenue y tembloroso, como una mecha que prende.
                 float p = charge / requiredLitTime;
                 float flicker = 0.75f + 0.25f * Mathf.PerlinNoise(Time.time * 9f, noiseSeed);
-                emission = chargeHintIntensity * p * p * flicker;
-                glow = glowLightIntensity * 0.15f * p * p;
+                hint = chargeHintIntensity * p * p * flicker;
             }
+
+            float visibility = 1f - penumbraDim;
+            float emission = Mathf.Max(hint, litEmissionIntensity * eased * alive) * visibility;
+            float glow = glowLightIntensity * eased * alive * visibility;
 
             windowRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetColor(EmissionColorId, litColor * emission);
