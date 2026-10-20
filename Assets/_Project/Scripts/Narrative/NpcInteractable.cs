@@ -12,7 +12,7 @@ namespace Ascua.Narrative
     /// Sin misiones pendientes, usa su diálogo de ambiente.
     /// </summary>
     [RequireComponent(typeof(NpcIdentity))]
-    public class NpcInteractable : MonoBehaviour
+    public class NpcInteractable : MonoBehaviour, IInteractable
     {
         private static readonly List<NpcInteractable> all = new List<NpcInteractable>();
 
@@ -30,6 +30,13 @@ namespace Ascua.Narrative
         public Color AccentColor => identity != null ? identity.AccentColor : Color.white;
         public Vector3 TalkPoint => transform.position + Vector3.up * talkHeight;
         public bool CanInteract => interactable && isActiveAndEnabled;
+
+        // IInteractable: hablar se hace manteniendo E un instante (evita abrir diálogos sin querer).
+        public Vector3 InteractionPoint => transform.position;
+        public string InteractionVerb => "Hablar con";
+        public string InteractionName => DisplayName;
+        public float InteractionHoldTime => 0.35f;
+        public float InteractionRadius => 2.8f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
@@ -54,11 +61,13 @@ namespace Ascua.Narrative
         private void OnEnable()
         {
             if (!all.Contains(this)) all.Add(this);
+            InteractableRegistry.Register(this);
         }
 
         private void OnDisable()
         {
             all.Remove(this);
+            InteractableRegistry.Unregister(this);
         }
 
         public void SetInteractable(bool value)

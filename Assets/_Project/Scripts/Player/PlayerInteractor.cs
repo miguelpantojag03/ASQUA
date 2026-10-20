@@ -1,4 +1,5 @@
 using Ascua.Controls;
+using Ascua.Core;
 using Ascua.Narrative;
 using Ascua.UI;
 using UnityEngine;
@@ -6,22 +7,19 @@ using UnityEngine;
 namespace Ascua.Player
 {
     /// <summary>
-    /// Detecta al personaje con quien se puede hablar más cercano y muestra el aviso
-    /// "Mantén E · Hablar con Mina" (InteractionPrompt del HUD). Al mantener E el tiempo
-    /// suficiente, abre la conversación.
+    /// Elige lo más cercano con lo que se puede interactuar (personajes y objetos recogibles, vía
+    /// InteractableRegistry) y muestra su aviso: "Mantén E · Hablar con Mina" o "E · Recoger Postal".
+    /// Hablar requiere mantener la tecla un instante; recoger es una pulsación.
     /// </summary>
     public class PlayerInteractor : MonoBehaviour
     {
         [SerializeField] private PlayerInputReader input;
-        [SerializeField] private float interactRadius = 2.8f;
-        [Tooltip("Segundos que hay que mantener E (evita abrir diálogos por accidente).")]
-        [SerializeField] private float holdTime = 0.35f;
 
-        private NpcInteractable current;
+        private IInteractable current;
         private float holdTimer;
         private bool waitForRelease;
 
-        public NpcInteractable Current => current;
+        public IInteractable Current => current;
 
         private void Awake()
         {
@@ -32,7 +30,7 @@ namespace Ascua.Player
         {
             InteractionPrompt prompt = InteractionPrompt.Instance;
             DialogueRunner runner = DialogueRunner.Instance;
-            if (runner != null && runner.IsOpen)
+            if ((runner != null && runner.IsOpen) || GameSession.IsModalOpen)
             {
                 if (prompt != null) prompt.Hide();
                 current = null;
@@ -40,15 +38,22 @@ namespace Ascua.Player
                 return;
             }
 
-            NpcInteractable nearest = FindNearest();
+            IInteractable nearest = FindNearest();
             if (nearest != current)
             {
                 current = nearest;
                 holdTimer = 0f;
                 if (prompt != null)
                 {
-                    if (current != null) prompt.Show("Mantén  E  ·  Hablar con " + current.DisplayName);
-                    else prompt.Hide();
+                    if (current != null)
+                    {
+                        string key = current.InteractionHoldTime > 0f ? "Mantén  E  ·  " : "E  ·  ";
+                        prompt.Show(key + current.InteractionVerb + " " + current.InteractionName);
+                    }
+                    else
+                    {
+                        prompt.Hide();
+                    }
                 }
             }
             if (input != null) input.BlockRadiusUp = current != null;
@@ -62,33 +67,38 @@ namespace Ascua.Player
             else if (!waitForRelease)
             {
                 holdTimer += Time.unscaledDeltaTime;
-                if (holdTimer >= holdTime)
+                if (holdTimer >= current.InteractionHoldTime)
                 {
                     holdTimer = 0f;
                     waitForRelease = true;
-                    current.Interact(transform);
+                    IInteractable target = current;
+                    current = null; // Se recalcula el siguiente frame (el objeto puede desaparecer).
+                    if (prompt != null) prompt.Hide();
+                    target.Interact(transform);
+                    return;
                 }
             }
 
-            if (prompt != null) prompt.SetFill(holdTimer / holdTime);
+            if (prompt != null) prompt.SetFill(current.InteractionHoldTime > 0f ? holdTimer / current.InteractionHoldTime : 0f);
         }
 
-        private NpcInteractable FindNearest()
+        private IInteractable FindNearest()
         {
-            NpcInteractable best = null;
-            float bestDistance = interactRadius * interactRadius;
-            var all = NpcInteractable.All;
+            IInteractable best = null;
+            float bestDistance = float.MaxValue;
+            var all = InteractableRegistry.All;
             for (int i = 0; i < all.Count; i++)
             {
-                NpcInteractable npc = all[i];
-                if (!npc.CanInteract) continue;
-                Vector3 offset = npc.transform.position - transform.position;
+                IInteractable candidate = all[i];
+                if (candidate == null || !candidate.CanInteract) continue;
+                Vector3 offset = candidate.InteractionPoint - transform.position;
                 offset.y = 0f;
                 float d = offset.sqrMagnitude;
-                if (d < bestDistance)
+                float r = candidate.InteractionRadius;
+                if (d <= r * r && d < bestDistance)
                 {
                     bestDistance = d;
-                    best = npc;
+                    best = candidate;
                 }
             }
             return best;

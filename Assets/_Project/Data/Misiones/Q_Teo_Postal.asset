@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77dec953110fcae48b7efd4632c03438, type: 3}
+  m_Name: Q_Teo_Postal
+  m_EditorClassIdentifier: 
+  questId: teo_postal
+  giverNpcId: teo
+  title: Una postal para Mina
+  description: "Teo encontr\xF3 una postal de la abuela de Mina. Rec\xF3gela en su
+    puesto y ll\xE9vasela a Mina."
+  type: 5
+  shortInstruction: "Recoge la postal del puesto de Teo y ll\xE9vasela a Mina."
+  prerequisite: {fileID: 11400000, guid: 24f24310fe6e281468883764e591ea77, type: 2}
+  targetZoneId: Plaza
+  hopeThreshold: 50
+  holdSeconds: 20
+  requiredCount: 3
+  collectRadiusMultiplier: 1.8
+  escortNpcId: mina
+  escortDestinationId: 
+  escortMaxDistance: 8
+  escortGraceSeconds: 6
+  deliverItemId: postal_abuela
+  deliverItemName: la postal
+  deliverToNpcId: mina
+  rewardEnergy: 15
+  rewardHope: 10
+  rewardHopeZoneId: Plaza
+  rewardBond: 1
+  penaltyHope: 0
+  penaltyZoneId: 
+  failIfTargetZoneDies: 1
+  offerDialogue: {fileID: 11400000, guid: 740676c169244a749a2275016d4fb019, type: 2}
+  inProgressDialogue: {fileID: 11400000, guid: 31b9ec2eb301b014f86f83a45b97ed3f, type: 2}
+  completedDialogue: {fileID: 11400000, guid: d33b8aaceaa53914da746758f3566a84, type: 2}

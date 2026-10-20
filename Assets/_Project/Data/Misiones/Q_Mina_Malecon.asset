@@ -18,6 +18,7 @@ MonoBehaviour:
   description: "Acompa\xF1a a Mina hasta el malec\xF3n sin alejarte de ella y antes
     de que llegue la Penumbra."
   type: 2
+  shortInstruction: "Camina junto a Mina hasta el malec\xF3n. No te alejes de ella."
   prerequisite: {fileID: 11400000, guid: 3c183bbd34db64c4ca8f157dd84352fd, type: 2}
   targetZoneId: Plaza
   hopeThreshold: 50
@@ -28,6 +29,9 @@ MonoBehaviour:
   escortDestinationId: malecon_mina
   escortMaxDistance: 8
   escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
   rewardEnergy: 15
   rewardHope: 10
   rewardHopeZoneId: Plaza

@@ -56,12 +56,16 @@ namespace Ascua.Narrative
         private PlayerInputReader playerInput;
         private CharacterAI talkingCharacter;
         private float targetAlpha;
+        private float baseBodySize = 30f;
+        private float baseSpeakerSize = 30f;
 
         public bool IsOpen => open;
 
         private void Awake()
         {
             Instance = this;
+            if (bodyText != null) baseBodySize = bodyText.fontSize;
+            if (speakerText != null) baseSpeakerSize = speakerText.fontSize;
             if (group != null)
             {
                 group.alpha = 0f;
@@ -189,6 +193,10 @@ namespace Ascua.Narrative
             bool isPlayer = line.speaker == playerName;
             speakerText.text = line.speaker;
             speakerText.color = isPlayer ? playerColor : npc != null && line.speaker == npc.DisplayName ? npc.AccentColor : defaultColor;
+            // Accesibilidad: tamaño de texto elegido en el menú de pausa.
+            float scale = AccessibilitySettings.DialogueTextScale;
+            bodyText.fontSize = baseBodySize * scale;
+            speakerText.fontSize = baseSpeakerSize * scale;
             bodyText.text = line.text;
             bodyText.maxVisibleCharacters = 0;
             visibleChars = 0f;

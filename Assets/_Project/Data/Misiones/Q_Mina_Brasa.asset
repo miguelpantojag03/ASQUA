@@ -18,6 +18,8 @@ MonoBehaviour:
   description: "Brasa, la chispa de Mina, se escondi\xF3 entre las luci\xE9rnagas.
     Re\xFAne tres en La Plaza para que vuelva siguiendo su luz."
   type: 1
+  shortInstruction: "Recoge 3 luci\xE9rnagas en La Plaza. Se esconden donde no hay
+    luz."
   prerequisite: {fileID: 0}
   targetZoneId: Plaza
   hopeThreshold: 50
@@ -28,6 +30,9 @@ MonoBehaviour:
   escortDestinationId: 
   escortMaxDistance: 8
   escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
   rewardEnergy: 20
   rewardHope: 0
   rewardHopeZoneId: 

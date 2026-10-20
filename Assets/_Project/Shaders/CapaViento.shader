@@ -16,6 +16,11 @@ Shader "Ascua/CapaViento"
         _WindSpeed ("Viento: velocidad", Range(0, 8)) = 2.2
         _WindFrequency ("Viento: frecuencia espacial", Range(0, 10)) = 3
         _Flick ("Latigazo (lo anima el script, 0-1)", Range(0, 1)) = 0
+        _DetailMap ("Trama de tela", 2D) = "white" {}
+        _DetailStrength ("Fuerza de la trama", Range(0, 1)) = 0.45
+        _DetailTiling ("Repetición de la trama", Float) = 6
+        [HDR] _SeamColor ("Costura luminosa (bordes)", Color) = (1.6, 1.2, 0.6, 1)
+        _SeamWidth ("Ancho de la costura", Range(0.005, 0.2)) = 0.045
     }
 
     SubShader
@@ -42,6 +47,8 @@ Shader "Ascua/CapaViento"
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_DetailMap);
+            SAMPLER(sampler_DetailMap);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
@@ -55,6 +62,11 @@ Shader "Ascua/CapaViento"
                 float _WindSpeed;
                 float _WindFrequency;
                 float _Flick;
+                float4 _DetailMap_ST;
+                float _DetailStrength;
+                float _DetailTiling;
+                float4 _SeamColor;
+                float _SeamWidth;
             CBUFFER_END
 
             struct Attributes
@@ -71,6 +83,7 @@ Shader "Ascua/CapaViento"
                 float3 normalWS : TEXCOORD1;
                 float3 positionWS : TEXCOORD2;
                 float fogFactor : TEXCOORD3;
+                float2 rawUV : TEXCOORD4;
             };
 
             Varyings vert(Attributes input)
@@ -90,6 +103,7 @@ Shader "Ascua/CapaViento"
                 output.positionCS = TransformWorldToHClip(positionWS);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                output.rawUV = input.uv;
                 output.fogFactor = ComputeFogFactor(output.positionCS.z);
                 return output;
             }
@@ -112,10 +126,15 @@ Shader "Ascua/CapaViento"
                 LIGHT_LOOP_END
 
                 float noise = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv * 3.0).r;
-                float3 albedo = _BaseColor.rgb * lerp(1.0, noise, _NoiseStrength);
+                float weave = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, input.rawUV * _DetailTiling).r;
+                float3 albedo = _BaseColor.rgb * lerp(1.0, noise, _NoiseStrength) * lerp(1.0, weave, _DetailStrength);
                 float rim = pow(1.0 - saturate(dot(normalWS, viewWS)), _RimPower);
 
-                float3 color = albedo * lighting + _EmissionColor.rgb + _RimColor.rgb * rim * _RimIntensity;
+                // Costura luminosa: bordes laterales y bajo de la capa (uv.x = 0/1, uv.y = 0).
+                float edge = min(min(input.rawUV.x, 1.0 - input.rawUV.x), input.rawUV.y);
+                float seam = 1.0 - smoothstep(_SeamWidth * 0.5, _SeamWidth, edge);
+
+                float3 color = albedo * lighting + _EmissionColor.rgb + _RimColor.rgb * rim * _RimIntensity + _SeamColor.rgb * seam;
                 color = MixFog(color, input.fogFactor);
                 return half4(color, _BaseColor.a);
             }

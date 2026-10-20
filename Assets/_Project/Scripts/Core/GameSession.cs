@@ -13,6 +13,9 @@ namespace Ascua.Core
         [SerializeField] private bool lockCursorOnStart = true;
 
         private static int modalCount;
+
+        /// <summary>Si hay menú de pausa, él gestiona Esc (este script solo bloquea el cursor con clic).</summary>
+        public static bool EscapeHandledExternally { get; set; }
         private static bool lockWhenModalsClose = true;
 
         /// <summary>True si hay al menos una ventana modal abierta.</summary>
@@ -39,7 +42,7 @@ namespace Ascua.Core
             Keyboard keyboard = Keyboard.current;
             Mouse mouse = Mouse.current;
 
-            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame && !EscapeHandledExternally)
             {
                 SetCursorLocked(false);
             }

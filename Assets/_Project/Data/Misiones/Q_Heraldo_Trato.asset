@@ -18,6 +18,7 @@ MonoBehaviour:
   description: "Misi\xF3n inversa: aceptar llena tu Farol al instante, pero El Mercado
     pierde 35 de Esperanza."
   type: 4
+  shortInstruction: "Escucha la oferta del Heraldo\u2026 o al\xE9jate de \xE9l."
   prerequisite: {fileID: 0}
   targetZoneId: Plaza
   hopeThreshold: 50
@@ -28,6 +29,9 @@ MonoBehaviour:
   escortDestinationId: 
   escortMaxDistance: 8
   escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
   rewardEnergy: 60
   rewardHope: 0
   rewardHopeZoneId: 

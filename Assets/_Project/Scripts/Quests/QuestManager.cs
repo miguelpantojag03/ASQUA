@@ -31,6 +31,8 @@ namespace Ascua.Quests
         private readonly Dictionary<string, int> bonds = new Dictionary<string, int>();
         private readonly Dictionary<string, int> bondsAtNightStart = new Dictionary<string, int>();
 
+        private readonly List<string> completedThisNight = new List<string>();
+        private QuestRuntime trackedQuest;
         private NightQuestSet currentSet;
         private PlayerEnergy playerEnergy;
         private Transform player;
@@ -90,11 +92,16 @@ namespace Ascua.Quests
             GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
             player = playerObject != null ? playerObject.transform : null;
 
+            completedThisNight.Clear();
+            trackedQuest = null;
+
             if (set != null)
             {
                 foreach (Quest quest in set.quests)
                 {
-                    if (quest != null) quests.Add(new QuestRuntime(quest, QuestState.Bloqueada));
+                    // Lo ya cumplido en noches anteriores no se repite.
+                    if (quest == null || GameProgress.IsQuestCompleted(quest.questId)) continue;
+                    quests.Add(new QuestRuntime(quest, QuestState.Bloqueada));
                 }
             }
 
@@ -112,11 +119,105 @@ namespace Ascua.Quests
             }
         }
 
+        /// <summary>Partida nueva (desde el título): sin Vínculos ni misiones.</summary>
+        public void ResetAll()
+        {
+            bonds.Clear();
+            bondsAtNightStart.Clear();
+            quests.Clear();
+            completedThisNight.Clear();
+            trackedQuest = null;
+        }
+
         /// <summary>Al reintentar una noche, los Vínculos vuelven a como estaban al empezarla.</summary>
         public void RevertNightProgress()
         {
             bonds.Clear();
             foreach (KeyValuePair<string, int> pair in bondsAtNightStart) bonds[pair.Key] = pair.Value;
+            foreach (string questId in completedThisNight) GameProgress.UnmarkQuest(questId);
+            completedThisNight.Clear();
+        }
+
+        // ================================================================== Objetivo actual (HUD y flecha)
+
+        /// <summary>
+        /// La misión que el HUD muestra como "objetivo actual": primero una por entregar, luego la última
+        /// aceptada que siga activa, luego cualquier activa y, si no hay, la primera disponible (sin Tratos).
+        /// </summary>
+        public QuestRuntime TrackedQuest
+        {
+            get
+            {
+                QuestRuntime firstActive = null;
+                QuestRuntime firstAvailable = null;
+                for (int i = 0; i < quests.Count; i++)
+                {
+                    QuestRuntime q = quests[i];
+                    if (q.State == QuestState.PorEntregar) return q;
+                    if (q.State == QuestState.Activa && firstActive == null) firstActive = q;
+                    if (q.State == QuestState.Disponible && firstAvailable == null && q.Data.type != QuestType.TratoHeraldo) firstAvailable = q;
+                }
+                if (trackedQuest != null && trackedQuest.State == QuestState.Activa) return trackedQuest;
+                return firstActive ?? firstAvailable;
+            }
+        }
+
+        /// <summary>Dónde está el objetivo de una misión ahora mismo (para la flecha del HUD).</summary>
+        public bool TryGetObjectivePosition(QuestRuntime q, out Vector3 position)
+        {
+            position = Vector3.zero;
+            if (q == null) return false;
+            Quest data = q.Data;
+
+            if (q.State == QuestState.Disponible) return TryGetNpcPosition(data.giverNpcId, out position);
+            if (q.State == QuestState.PorEntregar) return TryGetNpcPosition(data.TurnInNpcId, out position);
+            if (q.State != QuestState.Activa) return false;
+
+            switch (data.type)
+            {
+                case QuestType.RescateEsperanza:
+                    ZoneHope zone = ZoneHope.Find(data.targetZoneId);
+                    if (zone == null) return false;
+                    position = zone.Center;
+                    return true;
+
+                case QuestType.Recoleccion:
+                    ZoneHope collectZone = ZoneHope.Find(data.targetZoneId);
+                    if (fireflyPool != null && fireflyPool.TryGetNearestActive(player != null ? player.position : Vector3.zero,
+                            collectZone != null ? collectZone.Center : (Vector3?)null,
+                            collectZone != null ? collectZone.Radius * data.collectRadiusMultiplier : 0f, out position)) return true;
+                    if (collectZone == null) return false;
+                    position = collectZone.Center;
+                    return true;
+
+                case QuestType.Escolta:
+                    QuestPoint destination = QuestPoint.Find(data.escortDestinationId);
+                    if (destination == null) return false;
+                    position = destination.transform.position;
+                    return true;
+
+                case QuestType.Entrega:
+                    for (int i = 0; i < PickupItem.All.Count; i++)
+                    {
+                        PickupItem item = PickupItem.All[i];
+                        if (item.ItemId == data.deliverItemId && item.IsAvailable)
+                        {
+                            position = item.transform.position;
+                            return true;
+                        }
+                    }
+                    return false;
+
+                default:
+                    return TryGetNpcPosition(data.giverNpcId, out position);
+            }
+        }
+
+        private static bool TryGetNpcPosition(string npcId, out Vector3 position)
+        {
+            NpcInteractable npc = NpcInteractable.Find(npcId);
+            position = npc != null ? npc.transform.position : Vector3.zero;
+            return npc != null && npc.CanInteract;
         }
 
         // ================================================================== Consultas
@@ -147,7 +248,10 @@ namespace Ascua.Quests
             for (int i = 0; i < quests.Count; i++)
             {
                 QuestRuntime q = quests[i];
-                if (q.Data.giverNpcId != npcId) continue;
+                // Las entregas se resuelven hablando con el destinatario, no con quien la dio.
+                bool isTurnIn = q.State == QuestState.PorEntregar && q.Data.TurnInNpcId == npcId;
+                bool isGiver = q.State != QuestState.PorEntregar && q.Data.giverNpcId == npcId;
+                if (!isTurnIn && !isGiver) continue;
                 int priority = q.State == QuestState.PorEntregar ? 3 : q.State == QuestState.Activa ? 2 : q.State == QuestState.Disponible ? 1 : 0;
                 if (priority > bestPriority)
                 {
@@ -181,6 +285,7 @@ namespace Ascua.Quests
 
             q.Timer = 0f;
             q.Count = 0;
+            trackedQuest = q;
             SetState(q, QuestState.Activa);
 
             switch (q.Data.type)
@@ -237,6 +342,12 @@ namespace Ascua.Quests
         {
             if (q == null || q.State != QuestState.PorEntregar) return;
 
+            // Entregar: el objeto sale del inventario.
+            if (q.Data.type == QuestType.Entrega && Ascua.Player.PickupSystem.Instance != null)
+            {
+                Ascua.Player.PickupSystem.Instance.Remove(q.Data.deliverItemId);
+            }
+
             GrantRewards(q);
             SetState(q, QuestState.Completada);
             EventBus.RaiseCelebration("mision");
@@ -291,6 +402,9 @@ namespace Ascua.Quests
                 {
                     case QuestType.RescateEsperanza: UpdateRescue(q, dt); break;
                     case QuestType.Escolta: UpdateEscort(q, dt); break;
+                    case QuestType.Entrega:
+                        if (Ascua.Player.PickupSystem.Instance != null && Ascua.Player.PickupSystem.Instance.Has(q.Data.deliverItemId)) ObjectiveMet(q);
+                        break;
                 }
 
                 if (refreshTexts && q.State == QuestState.Activa) UpdateProgressText(q);
@@ -386,7 +500,8 @@ namespace Ascua.Quests
                 if (npc != null) npc.HoldPosition();
             }
             UpdateProgressText(q);
-            Toast("Objetivo cumplido · vuelve con " + GetNpcName(q.Data.giverNpcId));
+            string who = GetNpcName(q.Data.TurnInNpcId);
+            Toast(q.Data.type == QuestType.Entrega ? "Llévaselo a " + who : "Objetivo cumplido · vuelve con " + who);
         }
 
         private void Fail(QuestRuntime q, string reason)
@@ -428,6 +543,13 @@ namespace Ascua.Quests
                 if (npc != null) npc.StopEscort();
             }
 
+            if (state == QuestState.Completada)
+            {
+                // Persistente: no se repetirá en noches siguientes (salvo que se reintente esta noche).
+                GameProgress.MarkQuestCompleted(q.Data.questId);
+                completedThisNight.Add(q.Data.questId);
+            }
+
             QuestStateChanged?.Invoke(q);
             EventBus.RaiseQuestStateChanged(q.Data.questId, state.ToString());
             if (state == QuestState.Completada) RefreshLocks();
@@ -460,7 +582,9 @@ namespace Ascua.Quests
                     q.ProgressText = "Habla con " + GetNpcName(data.giverNpcId);
                     break;
                 case QuestState.PorEntregar:
-                    q.ProgressText = "Vuelve con " + GetNpcName(data.giverNpcId);
+                    q.ProgressText = data.type == QuestType.Entrega
+                        ? "Lleva " + data.deliverItemName + " a " + GetNpcName(data.TurnInNpcId)
+                        : "Vuelve con " + GetNpcName(data.giverNpcId);
                     break;
                 case QuestState.Completada:
                     q.ProgressText = "Completada";
@@ -500,6 +624,9 @@ namespace Ascua.Quests
                     float distance = Vector3.Distance(player.position, npc.transform.position);
                     string warning = distance > data.escortMaxDistance ? "  ¡acércate!" : "";
                     return "Acompaña a " + GetNpcName(data.escortNpcId) + " · " + Mathf.RoundToInt(npc.EscortProgress01 * 100f) + "% del camino" + warning;
+
+                case QuestType.Entrega:
+                    return "Recoge " + data.deliverItemName;
 
                 default:
                     return "Habla con " + GetNpcName(data.giverNpcId);

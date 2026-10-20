@@ -27,12 +27,19 @@ Material:
         m_Texture: {fileID: 2800000, guid: 0137223d275f2814d8f882e06e773675, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _DetailMap:
+        m_Texture: {fileID: 2800000, guid: 3f140845d786c424db26894b5fe54db7, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _DetailStrength: 0.45
+    - _DetailTiling: 6
     - _Flick: 0
     - _NoiseStrength: 0.4
     - _RimIntensity: 0.9
     - _RimPower: 3
+    - _SeamWidth: 0.045
     - _WindFrequency: 3
     - _WindSpeed: 2.2
     - _WindStrength: 0.06
@@ -40,5 +47,6 @@ Material:
     - _BaseColor: {r: 1, g: 0.8901961, b: 0.627451, a: 0.9}
     - _EmissionColor: {r: 0.22, g: 0.17803922, b: 0.09411766, a: 1}
     - _RimColor: {r: 1.2, g: 1, b: 0.6, a: 1}
+    - _SeamColor: {r: 1.6, g: 1.2, b: 0.6, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

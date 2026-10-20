@@ -18,6 +18,7 @@ MonoBehaviour:
   description: "Mant\xE9n la Esperanza de El Mercado en 55 o m\xE1s durante 20 segundos
     mientras Teo reparte sus velas."
   type: 0
+  shortInstruction: "Mant\xE9n El Mercado con Esperanza 55 o m\xE1s durante 20 segundos."
   prerequisite: {fileID: 0}
   targetZoneId: Mercado
   hopeThreshold: 55
@@ -28,6 +29,9 @@ MonoBehaviour:
   escortDestinationId: 
   escortMaxDistance: 8
   escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
   rewardEnergy: 20
   rewardHope: 15
   rewardHopeZoneId: Mercado

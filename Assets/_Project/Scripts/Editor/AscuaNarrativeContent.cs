@@ -12,6 +12,9 @@ namespace Ascua.EditorTools
         public NightQuestSet Night1;
         public Quest MinaBrasa, MinaMalecon, TeoVelas, TeoUltimasVelas, HeraldoTrato;
         public DialogueSequence MinaIdle, TeoIdle, HeraldoIdle;
+        public Quest TeoPostal;
+        public DialogueSequence TeoGift;
+        public DiaryPage[] Pages;
     }
 
     /// <summary>
@@ -26,6 +29,7 @@ namespace Ascua.EditorTools
         private const string QuestsFolder = DataFolder + "/Misiones";
         private const string NightsFolder = DataFolder + "/Noches";
         public const string Night1Path = NightsFolder + "/Noche_01_LoQueTodaviaBrilla.asset";
+        private const string PagesFolder = DataFolder + "/Diario";
 
         private const string Ilse = "Ilse";
         private const string Mina = "Mina";
@@ -261,6 +265,78 @@ namespace Ascua.EditorTools
                 q.completedDialogue = dealDone;
             });
 
+            // ============================================================ Teo · La postal (Entrega: Lleva X a Y)
+            DialogueSequence postalOffer = Dialogue("teo_postal_oferta", new[]
+            {
+                L(Teo, "Mira lo que apareció entre mis cajas: una postal. Es de la abuela de Mina, conozco esa letra."),
+                L(Teo, "Siempre le escribía desde el puerto, aunque vivieran a dos calles."),
+                L(Teo, "Yo ya no llego hasta la plaza con estas rodillas. ¿Se la llevas tú?"),
+                L(Ilse, "Claro. ¿Dónde está?"),
+                L(Teo, "Sobre el mostrador de mi puesto. Cógela con cuidado, que el papel ya no aguanta mucho.")
+            }, Accept("Se la llevaré"), Decline("Ahora no"));
+            DialogueSequence postalProgress = Dialogue("teo_postal_progreso", new[]
+            {
+                L(Teo, "¿Todavía la tienes? Mina vive pegada a la fuente. No tiene pérdida."),
+                L(Teo, "Dile que es de parte de Teo. Bueno… y de su abuela.")
+            });
+            DialogueSequence postalDone = Dialogue("mina_postal_entrega", new[]
+            {
+                L(Mina, "¿Una postal? …Es su letra. «Para mi chispa: hoy el mar estaba de buen humor.»"),
+                L(Mina, "Me llamaba así. Chispa. Por eso Brasa se llama Brasa."),
+                L(Ilse, "Teo la guardó todo este tiempo."),
+                L(Mina, "Dale las gracias. No… mejor se las doy yo. Mañana. Si hay mañana.")
+            });
+            n.TeoPostal = QuestAsset("Q_Teo_Postal", q =>
+            {
+                q.questId = "teo_postal";
+                q.giverNpcId = "teo";
+                q.title = "Una postal para Mina";
+                q.description = "Teo encontró una postal de la abuela de Mina. Recógela en su puesto y llévasela a Mina.";
+                q.type = QuestType.Entrega;
+                q.shortInstruction = "Recoge la postal del puesto de Teo y llévasela a Mina.";
+                q.deliverItemId = "postal_abuela";
+                q.deliverItemName = "la postal";
+                q.deliverToNpcId = "mina";
+                q.prerequisite = n.TeoUltimasVelas;
+                q.rewardEnergy = 15f;
+                q.rewardHope = 10f;
+                q.rewardHopeZoneId = "Plaza";
+                q.rewardBond = 1;
+                q.offerDialogue = postalOffer;
+                q.inProgressDialogue = postalProgress;
+                q.completedDialogue = postalDone;
+            });
+
+            // ============================================================ Teo · Regalo del Farol grande
+            n.TeoGift = Dialogue("teo_regalo_farol", new[]
+            {
+                L(Teo, "Espera, no te vayas todavía. Tengo algo para ti."),
+                L(Teo, "Era del farol de mi padre. El cristal grande, el de las noches de temporal."),
+                L(Teo, "Yo ya no salgo a alumbrar a nadie. Pero tú sí."),
+                L(Ilse, "Pesa… y brilla distinto."),
+                L(Teo, "Así se ve más lejos. Úsalo cuando la noche apriete.")
+            });
+
+            // ============================================================ Diario de Ilse (3 de 12)
+            AscuaAssetFactory.EnsureFolder(PagesFolder);
+            n.Pages = new[]
+            {
+                Page("pagina_01", 1, "Lo primero que recuerdo",
+                    "No recuerdo mi cara. Recuerdo el peso del farol y que alguien me dijo: «mientras alumbres, no te vas del todo».\n\nEscribo esto para no olvidarlo también."),
+                Page("pagina_02", 2, "El callejón de los faroleros",
+                    "Por aquí pasaban los faroleros con sus pértigas. Dejaban una marca de hollín en cada esquina, como quien firma.\n\nTodavía se ven, si acercas la luz. Alguien estuvo aquí antes que yo, haciendo lo mismo."),
+                Page("pagina_03", 3, "Desde arriba",
+                    "Desde el tejado del quiosco se ve toda la bahía. Las luces de Vesper parecen pocas desde aquí.\n\nPero no están todas apagadas. Todavía no.")
+            };
+
+            // ============================================================ Actualización suave de datos existentes
+            // Solo rellena campos vacíos: nunca pisa lo que hayas escrito a mano.
+            FillInstruction(n.MinaBrasa, "Recoge 3 luciérnagas en La Plaza. Se esconden donde no hay luz.");
+            FillInstruction(n.MinaMalecon, "Camina junto a Mina hasta el malecón. No te alejes de ella.");
+            FillInstruction(n.TeoVelas, "Mantén El Mercado con Esperanza 55 o más durante 20 segundos.");
+            FillInstruction(n.TeoUltimasVelas, "Habla con Teo y elige a dónde van sus velas.");
+            FillInstruction(n.HeraldoTrato, "Escucha la oferta del Heraldo… o aléjate de él.");
+
             // ============================================================ Noche 1 (el "nivel")
             n.Night1 = Load<NightQuestSet>(Night1Path, set =>
             {
@@ -286,7 +362,32 @@ namespace Ascua.EditorTools
                 set.heraldoChaseSpeed = 1.3f;
             });
 
+            // Si el set ya existía, se le añade la misión nueva (sin tocar el resto).
+            if (!n.Night1.quests.Contains(n.TeoPostal))
+            {
+                n.Night1.quests.Add(n.TeoPostal);
+                EditorUtility.SetDirty(n.Night1);
+            }
+
             return n;
+        }
+
+        private static void FillInstruction(Quest quest, string instruction)
+        {
+            if (quest == null || !string.IsNullOrEmpty(quest.shortInstruction)) return;
+            quest.shortInstruction = instruction;
+            EditorUtility.SetDirty(quest);
+        }
+
+        private static DiaryPage Page(string id, int number, string title, string text)
+        {
+            return Load<DiaryPage>($"{PagesFolder}/P_{number:00}_{id}.asset", p =>
+            {
+                p.pageId = id;
+                p.number = number;
+                p.title = title;
+                p.text = text;
+            });
         }
 
         // ------------------------------------------------------------------ Utilidades

@@ -38,6 +38,13 @@ namespace Ascua.Characters
         [Header("Efecto sobre Ilse")]
         [SerializeField] private float drainRadius = 2.4f;
         [SerializeField] private float energyDrainPerSecond = 8f;
+        [Tooltip("Velocidad de Ilse cerca del Heraldo (0-1).")]
+        [SerializeField, Range(0.2f, 1f)] private float slowFactor = 0.6f;
+        [Tooltip("Segundos que el dash libera del abrazo del Heraldo.")]
+        [SerializeField] private float dashReleaseSeconds = 1.5f;
+
+        private Ascua.Player.PlayerController playerController;
+        private float lastDashTime = -10f;
 
         [Header("Repulsión y Trato")]
         [SerializeField] private float repelDuration = 5f;
@@ -83,12 +90,22 @@ namespace Ascua.Characters
         private void OnEnable()
         {
             EventBus.QuestStateChanged += OnQuestStateChanged;
+            EventBus.PlayerDashed += OnPlayerDashed;
         }
 
         private void OnDisable()
         {
             EventBus.QuestStateChanged -= OnQuestStateChanged;
+            EventBus.PlayerDashed -= OnPlayerDashed;
         }
+
+        private void OnPlayerDashed(Vector3 position)
+        {
+            lastDashTime = Time.time;
+        }
+
+        /// <summary>Distancia actual a Ilse (o infinito si no está presente). La usa la música de tensión.</summary>
+        public float DistanceToPlayer => IsPresent && player != null ? Vector3.Distance(transform.position, player.position) : float.MaxValue;
 
         /// <summary>Ajustes de la noche (los aplica NightManager desde el NightQuestSet).</summary>
         public void Configure(bool enabledThisNight, float appearAt, float speed)
@@ -105,6 +122,7 @@ namespace Ascua.Characters
             {
                 player = playerObject.transform;
                 playerEnergy = playerObject.GetComponent<PlayerEnergy>();
+                playerController = playerObject.GetComponent<Ascua.Player.PlayerController>();
             }
             SetVisible(false);
             agent.enabled = false;
@@ -152,8 +170,14 @@ namespace Ascua.Characters
                     break;
             }
 
-            // Junto al Heraldo, el Farol se vacía.
-            if ((state == State.Persiguiendo || state == State.Acechando) && distance <= drainRadius && playerEnergy != null)
+            // Junto al Heraldo, el Farol se vacía y los pasos pesan. Esquivar (dash) rompe su abrazo un momento.
+            bool hunting = state == State.Persiguiendo || state == State.Acechando;
+            bool released = Time.time - lastDashTime < dashReleaseSeconds;
+            if (hunting && !released && distance <= drainRadius * 1.5f && playerController != null)
+            {
+                playerController.ApplySlow(slowFactor);
+            }
+            if (hunting && !released && distance <= drainRadius && playerEnergy != null && (playerController == null || !playerController.IsDashing))
             {
                 playerEnergy.Consume(energyDrainPerSecond * dt);
             }

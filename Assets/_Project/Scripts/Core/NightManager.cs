@@ -80,7 +80,11 @@ namespace Ascua.Core
             if (gameSession == null) gameSession = FindFirstObjectByType<GameSession>();
 
             if (questSet != null) ApplyQuestSet(questSet);
-            else ApplyPacing();
+            else
+            {
+                ApplyPacing();
+                nightNumber = Mathf.Max(nightNumber, GameProgress.CurrentNight);
+            }
         }
 
         /// <summary>
@@ -89,13 +93,21 @@ namespace Ascua.Core
         /// </summary>
         private void ApplyQuestSet(NightQuestSet set)
         {
-            nightNumber = set.nightNumber;
+            // La noche real la lleva GameProgress (el set puede reutilizarse en noches siguientes).
+            nightNumber = Mathf.Max(set.nightNumber, GameProgress.CurrentNight);
             nightDuration = Mathf.Max(10f, set.nightDuration);
+
+            // Cada noche extra con el mismo set, la oscuridad aprieta un poco más.
+            int extraNights = Mathf.Max(0, nightNumber - set.nightNumber);
+            float decay = set.hopeDecayPerSecond * (1f + set.decayIncreasePerNight * extraNights);
 
             foreach (ZoneHope zone in FindObjectsByType<ZoneHope>(FindObjectsSortMode.None))
             {
-                zone.ApplyPacing(set.startHope, set.hopeDecayPerSecond, set.hopeRisePerSecond);
+                zone.ApplyPacing(set.startHope, decay, set.hopeRisePerSecond);
             }
+
+            PenumbraSurge surge = FindFirstObjectByType<PenumbraSurge>();
+            if (surge != null) surge.Configure(set.surgeEnabled, set.surgeAt, set.surgeSeconds, set.surgeMeters, set.surgeDecayMultiplier);
 
             Penumbra penumbra = FindFirstObjectByType<Penumbra>();
             if (penumbra != null) penumbra.ApplyCustom(set.penumbraStartRadius, set.penumbraEndRadius, set.fastPenumbraCurve);
@@ -181,6 +193,8 @@ namespace Ascua.Core
                 }
             }
 
+            LastSummary = NightSummary.Capture(nightNumber, endedEarly);
+
             // Pausa: se congela todo lo que usa Time.deltaTime; la UI usa tiempo sin escalar.
             Time.timeScale = 0f;
             if (playerInput != null) playerInput.SetGameplayEnabled(false);
@@ -204,6 +218,20 @@ namespace Ascua.Core
             Time.timeScale = 1f;
             SceneManager.LoadScene(titleSceneName);
         }
+
+        /// <summary>
+        /// Pasa a la noche siguiente: avanza GameProgress y recarga la escena. Las mejoras elegidas
+        /// (PlayerUpgrades), los Vínculos y las misiones ya cumplidas se conservan.
+        /// </summary>
+        public void StartNextNight()
+        {
+            Time.timeScale = 1f;
+            GameProgress.AdvanceNight();
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        }
+
+        /// <summary>Resumen de la noche recién terminada (para la UI y, en la Fase 4, el AIDirector).</summary>
+        public NightSummary LastSummary { get; private set; }
 
         private static bool AllZonesDead()
         {

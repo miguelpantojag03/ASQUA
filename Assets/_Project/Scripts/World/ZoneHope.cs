@@ -55,7 +55,14 @@ namespace Ascua.World
         private readonly List<StreetLampToggle> lamps = new List<StreetLampToggle>();
         private readonly List<float> lampThresholds = new List<float>();
 
+        /// <summary>Multiplicador global de la caída (lo sube la ráfaga de la Penumbra).</summary>
+        public static float GlobalDecayMultiplier { get; set; } = 1f;
+
+        /// <summary>(zona, nivel 1-4) cuando la Esperanza cruza 25/50/75/100 hacia arriba.</summary>
+        public event Action<ZoneHope, int> HopeLevelReached;
+
         private float hope;
+        private int hopeLevel;
         private bool isDead;
         private bool isIlluminated;
         private float penumbraOverlap;
@@ -91,6 +98,7 @@ namespace Ascua.World
         {
             all.Clear();
             AnyZoneDied = null;
+            GlobalDecayMultiplier = 1f;
         }
 
         /// <summary>Configuración rápida desde el constructor de escenas.</summary>
@@ -125,6 +133,8 @@ namespace Ascua.World
         private void Start()
         {
             hope = Mathf.Clamp(startHope, 0f, maxHope);
+            hopeLevel = Mathf.FloorToInt(hope / maxHope * 4f + 0.001f);
+            GlobalDecayMultiplier = 1f;
             CollectLights();
             ApplyThresholds(true);
             HopeChanged?.Invoke(this, hope);
@@ -145,7 +155,7 @@ namespace Ascua.World
 
             float rate = illuminated
                 ? risePerSecond
-                : -decayPerSecond * Mathf.Lerp(1f, penumbraDecayMultiplier, penumbraOverlap);
+                : -decayPerSecond * Mathf.Lerp(1f, penumbraDecayMultiplier, penumbraOverlap) * GlobalDecayMultiplier;
 
             SetHope(hope + rate * Time.deltaTime);
         }
@@ -166,7 +176,31 @@ namespace Ascua.World
             HopeChanged?.Invoke(this, hope);
 
             if (hope <= 0f) Die();
-            else ApplyThresholds(false);
+            else
+            {
+                ApplyThresholds(false);
+                CheckHopeLevel();
+            }
+        }
+
+        /// <summary>
+        /// Micro-recompensa: al subir de nivel (cada 25%) avisa una vez. Para volver a avisar del mismo
+        /// nivel, la Esperanza tiene que bajar 5 puntos por debajo (evita repeticiones al oscilar).
+        /// </summary>
+        private void CheckHopeLevel()
+        {
+            float levelSize = maxHope / 4f;
+            int level = Mathf.FloorToInt(hope / levelSize + 0.001f);
+            if (level > hopeLevel)
+            {
+                hopeLevel = level;
+                HopeLevelReached?.Invoke(this, level);
+                Ascua.Core.EventBus.RaiseHopeLevelReached(zoneId, level, Center);
+            }
+            else if (hope < hopeLevel * levelSize - 5f)
+            {
+                hopeLevel = Mathf.Max(0, hopeLevel - 1);
+            }
         }
 
         private bool IsLitByAnySource()

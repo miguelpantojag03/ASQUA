@@ -53,8 +53,10 @@ namespace Ascua.World
 
         private void OnZoneDied(ZoneHope zone)
         {
-            if (impulseSource != null) impulseSource.GenerateImpulseWithForce(impulseForce);
-            if (audioSource != null && deathClip != null) audioSource.PlayOneShot(deathClip, volume);
+            // Accesibilidad: la sacudida se puede desactivar en el menú de pausa.
+            if (impulseSource != null && Ascua.Core.AccessibilitySettings.CameraShake) impulseSource.GenerateImpulseWithForce(impulseForce);
+            // Si hay AudioManager, el acorde grave lo pone él (en el grupo de Efectos y con subtítulo).
+            if (Ascua.Audio.AudioManager.Instance == null && audioSource != null && deathClip != null) audioSource.PlayOneShot(deathClip, volume);
         }
 
         /// <summary>

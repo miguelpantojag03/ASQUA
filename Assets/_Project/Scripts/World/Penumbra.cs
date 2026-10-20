@@ -91,7 +91,8 @@ namespace Ascua.World
                 : Mathf.Clamp01(Time.timeSinceLevelLoad / fallbackDuration);
 
             Advance = Mathf.Clamp01(advanceCurve.Evaluate(progress));
-            currentRadius = Mathf.Lerp(startRadius, endRadius, Advance);
+            // La ráfaga (PenumbraSurge) empuja el muro unos metros más hacia dentro durante unos segundos.
+            currentRadius = Mathf.Max(endRadius * 0.6f, Mathf.Lerp(startRadius, endRadius, Advance) - surgeOffset);
 
             RenderSettings.fogDensity = Mathf.Lerp(startFogDensity, fogDensityAtEnd, Advance);
             RenderSettings.fogColor = Color.Lerp(startFogColor, fogColorAtEnd, Advance);
@@ -124,6 +125,14 @@ namespace Ascua.World
                     break;
             }
             currentRadius = startRadius;
+        }
+
+        private float surgeOffset;
+
+        /// <summary>Metros extra de avance (ráfaga de urgencia). 0 = ritmo normal.</summary>
+        public void SetSurgeOffset(float meters)
+        {
+            surgeOffset = Mathf.Max(0f, meters);
         }
 
         /// <summary>Valores a medida (los usa el NightQuestSet de cada noche).</summary>

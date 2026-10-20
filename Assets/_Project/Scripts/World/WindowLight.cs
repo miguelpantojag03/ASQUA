@@ -34,8 +34,8 @@ namespace Ascua.World
         [SerializeField] private float extinguishDuration = 0.9f;
 
         [Header("Aspecto")]
-        [SerializeField] private Color litColor = new Color(1f, 0.769f, 0.42f);
-        [SerializeField] private float litEmissionIntensity = 3.2f;
+        [SerializeField] private Color litColor = new Color(1f, 0.66f, 0.32f);
+        [SerializeField] private float litEmissionIntensity = 2.4f;
         [Tooltip("Emisión máxima mientras se va cargando (pista visual para el jugador).")]
         [SerializeField] private float chargeHintIntensity = 0.7f;
         [Tooltip("Distancia hacia fuera del muro desde donde se comprueba la luz.")]

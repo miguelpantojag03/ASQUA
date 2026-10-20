@@ -15,7 +15,9 @@ namespace Ascua.Quests
         /// <summary>Hablar y elegir: la elección completa la misión y aplica sus efectos.</summary>
         Dialogo,
         /// <summary>"Misión inversa" del Heraldo: aceptar da un beneficio inmediato y penaliza otra zona.</summary>
-        TratoHeraldo
+        TratoHeraldo,
+        /// <summary>"Lleva X a Y": recoger un objeto (PickupItem) y entregárselo a un personaje.</summary>
+        Entrega
     }
 
     /// <summary>Estado de una misión durante la noche (vive en QuestManager, nunca en el asset).</summary>
@@ -47,6 +49,8 @@ namespace Ascua.Quests
         public string title = "Nueva misión";
         [TextArea(2, 4)] public string description;
         public QuestType type = QuestType.Recoleccion;
+        [Tooltip("UNA frase, UNA acción. Es lo que se ve siempre en el HUD mientras la misión está activa.")]
+        public string shortInstruction;
         [Tooltip("Misión que debe estar completada antes de que esta aparezca (cadenas). Vacío = disponible desde el inicio.")]
         public Quest prerequisite;
 
@@ -69,6 +73,14 @@ namespace Ascua.Quests
         public float escortMaxDistance = 8f;
         [Tooltip("Segundos que se tolera estar lejos antes de fallar.")]
         public float escortGraceSeconds = 6f;
+
+        [Header("Objetivo · Entrega (Lleva X a Y)")]
+        [Tooltip("Id del PickupItem que hay que recoger.")]
+        public string deliverItemId;
+        [Tooltip("Nombre del objeto tal cual se muestra.")]
+        public string deliverItemName;
+        [Tooltip("A quién se entrega (id de NpcIdentity). Vacío = a quien dio la misión.")]
+        public string deliverToNpcId;
 
         [Header("Recompensa")]
         public float rewardEnergy;
@@ -95,5 +107,8 @@ namespace Ascua.Quests
 
         /// <summary>Diálogo y Trato se completan en el momento de elegir, sin objetivo en el mundo.</summary>
         public bool CompletesOnChoice => type == QuestType.Dialogo || type == QuestType.TratoHeraldo;
+
+        /// <summary>Con quién hay que hablar para entregarla.</summary>
+        public string TurnInNpcId => type == QuestType.Entrega && !string.IsNullOrEmpty(deliverToNpcId) ? deliverToNpcId : giverNpcId;
     }
 }
