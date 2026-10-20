@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a88d24fd4be5b8b47a4cf23ae78f10ec, type: 3}
+  m_Name: D_mina_brasa_oferta
+  m_EditorClassIdentifier: 
+  dialogueId: mina_brasa_oferta
+  lines:
+  - speaker: Mina
+    text: "\xBFT\xFA tambi\xE9n llevas luz? Entonces quiz\xE1 puedas ayudarme."
+  - speaker: Mina
+    text: "Brasa se escap\xF3 cuando se apag\xF3 la \xFAltima farola de la plaza."
+  - speaker: Mina
+    text: "Es peque\xF1ita. Una chispa que cabe en las manos\u2026 y que siempre
+      va detr\xE1s de las luci\xE9rnagas."
+  - speaker: Ilse
+    text: "Si junto algunas, \xBFvendr\xE1 sigui\xE9ndolas?"
+  - speaker: Mina
+    text: "Con tres, seguro. Sola le da miedo la oscuridad. Como a m\xED."
+  choices:
+  - label: "Las buscar\xE9"
+    action: 1
+    hopeDelta: 0
+    hopeZoneId: 
+    energyDelta: 0
+    bondDelta: 0
+    toast: 
+  - label: Ahora no puedo
+    action: 2
+    hopeDelta: 0
+    hopeZoneId: 
+    energyDelta: 0
+    bondDelta: 0
+    toast: 

@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b41d040cf55ca149a30616185a8516c, type: 3}
+  m_Name: Noche_01_LoQueTodaviaBrilla
+  m_EditorClassIdentifier: 
+  setId: noche_01
+  nightNumber: 1
+  title: "Noche 1 \xB7 Lo que todav\xEDa brilla"
+  designNotes: "Primera noche de prueba. Presenta los 4 tipos de misi\xF3n y el primer
+    Trato.\nTensi\xF3n: La Plaza (Mina) y El Mercado (Teo) piden cosas a la vez;
+    el Heraldo ofrece un atajo que castiga al Mercado.\nCadena: Brasa -> Malec\xF3n
+    (Mina) y Velas -> \xDAltimas velas (Teo)."
+  quests:
+  - {fileID: 11400000, guid: 3c183bbd34db64c4ca8f157dd84352fd, type: 2}
+  - {fileID: 11400000, guid: c5aaff563401eaa498eefb1dfcab5da2, type: 2}
+  - {fileID: 11400000, guid: 0344e694fc3db334c91f245f17caf414, type: 2}
+  - {fileID: 11400000, guid: 24f24310fe6e281468883764e591ea77, type: 2}
+  - {fileID: 11400000, guid: efcd95425d043d84089eeff4a1c8c733, type: 2}
+  nightDuration: 240
+  startHope: 70
+  hopeDecayPerSecond: 0.6
+  hopeRisePerSecond: 4
+  penumbraStartRadius: 60
+  penumbraEndRadius: 16
+  fastPenumbraCurve: 0
+  fireflySpawnInterval: 5
+  fireflyMaxActive: 5
+  heraldoEnabled: 1
+  heraldoAppearAt: 0.25
+  heraldoChaseSpeed: 1.3

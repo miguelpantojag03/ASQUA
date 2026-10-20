@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a88d24fd4be5b8b47a4cf23ae78f10ec, type: 3}
+  m_Name: D_mina_malecon_completada
+  m_EditorClassIdentifier: 
+  dialogueId: mina_malecon_completada
+  lines:
+  - speaker: Mina
+    text: "Mira, Brasa. Ah\xED est\xE1. Todo negro, pero se mueve. Respira."
+  - speaker: Mina
+    text: "La abuela ten\xEDa raz\xF3n: hay luces dentro. Peque\xF1itas. Muy lejos."
+  - speaker: Ilse
+    text: "Son las que todav\xEDa no se apagaron."
+  - speaker: Mina
+    text: "Entonces vamos a cuidarlas. T\xFA las de arriba, yo las de aqu\xED."
+  - speaker: Mina
+    text: Gracias por caminar conmigo. Ya no me da tanto miedo volver.
+  choices: []
