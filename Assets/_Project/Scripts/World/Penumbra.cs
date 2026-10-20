@@ -126,6 +126,15 @@ namespace Ascua.World
             currentRadius = startRadius;
         }
 
+        /// <summary>Valores a medida (los usa el NightQuestSet de cada noche).</summary>
+        public void ApplyCustom(float start, float end, bool fastCurve)
+        {
+            startRadius = start;
+            endRadius = end;
+            advanceCurve = fastCurve ? DemoCurve() : SubtleCurve();
+            currentRadius = startRadius;
+        }
+
         /// <summary>Lenta al principio; se nota en el último tercio de la noche.</summary>
         public static AnimationCurve SubtleCurve()
         {

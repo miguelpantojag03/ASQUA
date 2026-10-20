@@ -31,6 +31,8 @@ namespace Ascua.EditorTools
         public RuntimeAnimatorController ChibiController;
         public VolumeProfile VolumeProfile;
         public Sprite FlameSprite;
+        public CharacterAssets Character;
+        public NarrativeAssets Narrative;
     }
 
     /// <summary>
@@ -56,8 +58,8 @@ namespace Ascua.EditorTools
         public const string LegLPath = "Rig/LegL";
         public const string LegRPath = "Rig/LegR";
 
-        private static Shader LitShader => Shader.Find("Universal Render Pipeline/Lit");
-        private static Shader UnlitShader => Shader.Find("Universal Render Pipeline/Unlit");
+        internal static Shader LitShader => Shader.Find("Universal Render Pipeline/Lit");
+        internal static Shader UnlitShader => Shader.Find("Universal Render Pipeline/Unlit");
 
         public static AscuaAssets CreateAll()
         {
@@ -69,6 +71,8 @@ namespace Ascua.EditorTools
                 VolumeProfile = CreateVolumeProfile(),
                 FlameSprite = CreateFlameSprite()
             };
+            assets.Character = AscuaCharacterAssets.Create(assets.Materials);
+            assets.Narrative = AscuaNarrativeContent.CreateAll();
             AssetDatabase.SaveAssets();
             return assets;
         }
@@ -190,9 +194,9 @@ namespace Ascua.EditorTools
             return m;
         }
 
-        private static Color Hex(string hex) => AscuaPalette.Hex(hex);
+        internal static Color Hex(string hex) => AscuaPalette.Hex(hex);
 
-        private static Material GetOrCreateMaterial(string name, Shader shader)
+        internal static Material GetOrCreateMaterial(string name, Shader shader)
         {
             string path = $"{MaterialsFolder}/{name}.mat";
             Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -208,7 +212,7 @@ namespace Ascua.EditorTools
             return material;
         }
 
-        private static Material Lit(string name, Color baseColor, float smoothness, Color? emission = null, float metallic = 0f)
+        internal static Material Lit(string name, Color baseColor, float smoothness, Color? emission = null, float metallic = 0f)
         {
             Material material = GetOrCreateMaterial(name, LitShader);
             material.SetColor("_BaseColor", baseColor);
@@ -233,7 +237,7 @@ namespace Ascua.EditorTools
         }
 
         /// <summary>Configura un material URP (Lit o Unlit) como transparente con mezcla alfa.</summary>
-        private static void MakeTransparent(Material material, bool zWrite, bool twoSided)
+        internal static void MakeTransparent(Material material, bool zWrite, bool twoSided)
         {
             material.SetFloat("_Surface", 1f);
             material.SetFloat("_Blend", 0f);
@@ -364,7 +368,7 @@ namespace Ascua.EditorTools
             normalTexture = SaveTexture("T_RuidoSuperficie_N", size, normal, true);
         }
 
-        private static Texture2D SaveTexture(string name, int size, Color32[] pixels, bool isNormalMap)
+        internal static Texture2D SaveTexture(string name, int size, Color32[] pixels, bool isNormalMap)
         {
             string path = $"{TexturesFolder}/{name}.png";
             Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
@@ -540,15 +544,28 @@ namespace Ascua.EditorTools
             AnimationClip walk = CreateClip("Chibi_Walk", new Gait { Period = 1f, LegAmp = 28f, ArmAmp = 22f, ArmOut = 8f, Bob = 0.035f, Lean = 4f, Roll = 2.5f, HeadNod = 2f });
             AnimationClip run = CreateClip("Chibi_Run", new Gait { Period = 0.62f, LegAmp = 48f, ArmAmp = 45f, ArmOut = 12f, Bob = 0.07f, Lean = 12f, Roll = 4f, HeadNod = 3f });
 
-            // Si ya existe se reutiliza para no romper referencias en escenas y prefabs.
+            AnimationClip start = CreateOneShotClip("Chibi_Arranque", 0.32f, ArranquePose);
+            AnimationClip celebrate = CreateOneShotClip("Chibi_Celebracion", 0.9f, CelebracionPose);
+
+            // Si ya existe con los estados de la Fase 3 se reutiliza (no rompe referencias);
+            // si es el de la Fase 1/2 (sin "Celebrar"), se rehace.
             string path = AnimationFolder + "/AC_Chibi.controller";
             AnimatorController existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                foreach (AnimatorControllerParameter parameter in existing.parameters)
+                {
+                    if (parameter.name == "Celebrar") return existing;
+                }
+                AssetDatabase.DeleteAsset(path);
+            }
 
             AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(path);
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
+            controller.AddParameter("Arrancar", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("Celebrar", AnimatorControllerParameterType.Trigger);
 
-            controller.CreateBlendTreeInController("Locomocion", out BlendTree tree, 0);
+            AnimatorState locomotion = controller.CreateBlendTreeInController("Locomocion", out BlendTree tree, 0);
             tree.blendType = BlendTreeType.Simple1D;
             tree.blendParameter = "Speed";
             tree.useAutomaticThresholds = false;
@@ -556,8 +573,117 @@ namespace Ascua.EditorTools
             tree.AddChild(walk, 0.5f);
             tree.AddChild(run, 1f);
 
+            AnimatorStateMachine machine = controller.layers[0].stateMachine;
+
+            // Anticipación: medio paso con pequeño impulso antes del ciclo de caminar.
+            AnimatorState startState = machine.AddState("Arranque");
+            startState.motion = start;
+            AnimatorStateTransition toStart = locomotion.AddTransition(startState);
+            toStart.AddCondition(AnimatorConditionMode.If, 0f, "Arrancar");
+            toStart.hasExitTime = false;
+            toStart.duration = 0.05f;
+            AnimatorStateTransition fromStart = startState.AddTransition(locomotion);
+            fromStart.hasExitTime = true;
+            fromStart.exitTime = 0.9f;
+            fromStart.duration = 0.12f;
+
+            // Celebración: levanta el Farol con un saltito (desde cualquier estado).
+            AnimatorState celebrateState = machine.AddState("Celebracion");
+            celebrateState.motion = celebrate;
+            AnimatorStateTransition toCelebrate = machine.AddAnyStateTransition(celebrateState);
+            toCelebrate.AddCondition(AnimatorConditionMode.If, 0f, "Celebrar");
+            toCelebrate.hasExitTime = false;
+            toCelebrate.duration = 0.08f;
+            toCelebrate.canTransitionToSelf = false;
+            AnimatorStateTransition fromCelebrate = celebrateState.AddTransition(locomotion);
+            fromCelebrate.hasExitTime = true;
+            fromCelebrate.exitTime = 0.92f;
+            fromCelebrate.duration = 0.15f;
+
             EditorUtility.SetDirty(controller);
             return controller;
+        }
+
+        /// <summary>Pose del rig en un instante t (0-1) de un gesto.</summary>
+        private struct GesturePose
+        {
+            public float HipsOffset, Lean, HeadPitch, LegL, LegR, ArmLPitch, ArmLRoll, ArmRPitch, ArmRRoll;
+        }
+
+        /// <summary>Medio paso de anticipación: se agacha, impulsa y entra inclinada al caminar.</summary>
+        private static GesturePose ArranquePose(float t)
+        {
+            float s = Mathf.Sin(Mathf.PI * t);
+            return new GesturePose
+            {
+                HipsOffset = t < 0.45f ? -0.05f * Mathf.Sin(Mathf.PI * t / 0.45f) : 0.035f * Mathf.Sin(Mathf.PI * (t - 0.45f) / 0.55f),
+                Lean = t < 0.4f ? 10f * Mathf.Sin(Mathf.PI * 0.5f * t / 0.4f) : Mathf.Lerp(10f, 4f, (t - 0.4f) / 0.6f),
+                HeadPitch = -6f * s,
+                LegL = -18f * s,
+                LegR = 10f * s,
+                ArmLPitch = 15f * s,
+                ArmLRoll = -8f,
+                ArmRPitch = -12f * s,
+                ArmRRoll = 8f
+            };
+        }
+
+        /// <summary>Celebración corta: saltito, mirada arriba y brazo del Farol en alto.</summary>
+        private static GesturePose CelebracionPose(float t)
+        {
+            float raise = t < 0.25f ? t / 0.25f : t < 0.65f ? 1f : 1f - (t - 0.65f) / 0.35f;
+            raise = raise * raise * (3f - 2f * raise);
+            float hop = Mathf.Sin(Mathf.PI * Mathf.Clamp01((t - 0.1f) / 0.35f));
+            return new GesturePose
+            {
+                HipsOffset = 0.06f * hop,
+                Lean = -4f * raise,
+                HeadPitch = -14f * raise,
+                LegL = 0f,
+                LegR = 0f,
+                ArmLPitch = -35f * raise,
+                ArmLRoll = -7f - 12f * raise,
+                ArmRPitch = -160f * raise,
+                ArmRRoll = 8f + 10f * raise
+            };
+        }
+
+        /// <summary>Crea (o regenera) un clip de un solo uso a partir de una función de pose.</summary>
+        private static AnimationClip CreateOneShotClip(string name, float duration, System.Func<float, GesturePose> pose)
+        {
+            string path = $"{AnimationFolder}/{name}.anim";
+            AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+            bool isNew = clip == null;
+            if (isNew) clip = new AnimationClip { name = name, frameRate = 30f };
+            else clip.ClearCurves();
+            const int samples = 16;
+            const float tau = Mathf.PI * 2f;
+
+            // AddCurves trabaja con fase 0-2π: se convierte a t 0-1.
+            AddCurves(clip, RigPath, duration, samples,
+                p => new Vector3(0f, HipsHeight + pose(p / tau).HipsOffset, 0f),
+                p => Quaternion.Euler(pose(p / tau).Lean, 0f, 0f));
+            AddCurves(clip, HeadPath, duration, samples, null, p => Quaternion.Euler(pose(p / tau).HeadPitch, 0f, 0f));
+            AddCurves(clip, LegLPath, duration, samples, null, p => Quaternion.Euler(pose(p / tau).LegL, 0f, 0f));
+            AddCurves(clip, LegRPath, duration, samples, null, p => Quaternion.Euler(pose(p / tau).LegR, 0f, 0f));
+            AddCurves(clip, ArmLPath, duration, samples, null, p =>
+            {
+                GesturePose g = pose(p / tau);
+                return Quaternion.Euler(g.ArmLPitch, 0f, g.ArmLRoll);
+            });
+            AddCurves(clip, ArmRPath, duration, samples, null, p =>
+            {
+                GesturePose g = pose(p / tau);
+                return Quaternion.Euler(g.ArmRPitch, 0f, g.ArmRRoll);
+            });
+
+            if (isNew) AssetDatabase.CreateAsset(clip, path);
+
+            AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
+            settings.loopTime = false;
+            AnimationUtility.SetAnimationClipSettings(clip, settings);
+            EditorUtility.SetDirty(clip);
+            return clip;
         }
 
         private static AnimationClip CreateClip(string name, Gait g)

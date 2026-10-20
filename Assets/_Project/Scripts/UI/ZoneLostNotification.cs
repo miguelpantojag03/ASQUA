@@ -25,6 +25,9 @@ namespace Ascua.UI
         [SerializeField] private float fadeInDuration = 0.35f;
         [SerializeField] private float defaultHoldDuration = 2.6f;
         [SerializeField] private float fadeOutDuration = 0.9f;
+        [Tooltip("Duración de un aviso cuando hay otros esperando detrás.")]
+        [SerializeField] private float busyHoldDuration = 1.1f;
+        [SerializeField] private int maxQueued = 3;
 
         [Header("Zonas")]
         [SerializeField] private bool announceZoneLoss = true;
@@ -63,6 +66,8 @@ namespace Ascua.UI
         public void Show(string message, float holdSeconds = -1f)
         {
             if (string.IsNullOrEmpty(message)) return;
+            // Nunca más de 3 en espera: si se acumulan, se descartan los más viejos (ya no son noticia).
+            while (queue.Count >= maxQueued) queue.Dequeue();
             queue.Enqueue((message, holdSeconds > 0f ? holdSeconds : defaultHoldDuration));
         }
 
@@ -97,7 +102,9 @@ namespace Ascua.UI
 
                 case Phase.Hold:
                     timer += dt;
-                    if (timer >= currentHold) { phase = Phase.FadeOut; timer = 0f; }
+                    // Si hay más avisos esperando, este se queda menos tiempo.
+                    float hold = queue.Count > 0 ? Mathf.Min(currentHold, busyHoldDuration) : currentHold;
+                    if (timer >= hold) { phase = Phase.FadeOut; timer = 0f; }
                     break;
 
                 case Phase.FadeOut:

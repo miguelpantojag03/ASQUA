@@ -62,6 +62,17 @@ namespace Ascua.World
 
         public static IReadOnlyList<ZoneHope> All => all;
 
+        /// <summary>Busca una zona por id (Plaza, Mercado...). Null si no existe.</summary>
+        public static ZoneHope Find(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            for (int i = 0; i < all.Count; i++)
+            {
+                if (all[i].zoneId == id) return all[i];
+            }
+            return null;
+        }
+
         public string ZoneId => zoneId;
         public string DisplayName => displayName;
         public float Radius => radius;

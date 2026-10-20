@@ -1,6 +1,9 @@
+using System.Linq;
 using System.Text;
 using Ascua.Characters;
 using Ascua.Core;
+using Ascua.Narrative;
+using Ascua.Quests;
 using Ascua.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -75,6 +78,37 @@ namespace Ascua.EditorTools
             FireflyPool pool = Object.FindFirstObjectByType<FireflyPool>();
             int fireflies = pool != null ? pool.GetComponentsInChildren<Firefly>(true).Length : 0;
             ok &= Check(sb, fireflies > 0, $"Pool de luciérnagas con {fireflies} luciérnagas pre-creadas");
+
+            // --- Fase 3: misiones, diálogo, Heraldo
+            NightManager night = Object.FindFirstObjectByType<NightManager>();
+            NightQuestSet set = night != null ? night.QuestSet : null;
+            ok &= Check(sb, set != null && set.quests.Count > 0, $"NightManager con set de misiones ({(set != null ? set.title + ", " + set.quests.Count + " misiones" : "ninguno")})");
+            if (set != null)
+            {
+                foreach (Quest quest in set.quests)
+                {
+                    bool hasOffer = quest != null && quest.offerDialogue != null && quest.offerDialogue.HasChoices;
+                    bool giverExists = quest != null && Object.FindObjectsByType<NpcInteractable>(FindObjectsSortMode.None).Any(n => n.GetComponent<NpcIdentity>().NpcId == quest.giverNpcId);
+                    ok &= Check(sb, hasOffer && giverExists, $"Misión '{(quest != null ? quest.title : "null")}' ({quest?.type}): diálogo de oferta con elecciones y NPC '{quest?.giverNpcId}' en escena");
+                }
+            }
+            ok &= Check(sb, Object.FindFirstObjectByType<QuestManager>() != null, "QuestManager presente");
+            ok &= Check(sb, Object.FindFirstObjectByType<DialogueRunner>() != null, "DialogueRunner (caja de diálogo) presente");
+            ok &= Check(sb, Object.FindFirstObjectByType<Heraldo_AI>() != null, "Heraldo presente");
+
+            QuestPoint malecon = Object.FindObjectsByType<QuestPoint>(FindObjectsSortMode.None).FirstOrDefault(p => p.PointId == "malecon_mina");
+            CharacterAI mina = Object.FindObjectsByType<CharacterAI>(FindObjectsSortMode.None).FirstOrDefault(c => c.name == "NPC_Mina");
+            bool escortReachable = false;
+            if (malecon != null && mina != null && NavMesh.SamplePosition(malecon.transform.position, out NavMeshHit end, 1f, NavMesh.AllAreas))
+            {
+                NavMeshPath escortPath = new NavMeshPath();
+                escortReachable = NavMesh.CalculatePath(mina.transform.position, end.position, NavMesh.AllAreas, escortPath) && escortPath.status == NavMeshPathStatus.PathComplete;
+            }
+            ok &= Check(sb, escortReachable, "Destino de escolta 'malecon_mina' alcanzable por Mina");
+
+            Shader body = Shader.Find("Ascua/RecuerdoTranslucido");
+            Shader cape = Shader.Find("Ascua/CapaViento");
+            ok &= Check(sb, body != null && body.isSupported && cape != null && cape.isSupported, "Shaders de Ilse (cuerpo translúcido y capa con viento) compilados y soportados");
 
             report = sb.ToString();
             return ok;
