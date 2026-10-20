@@ -119,6 +119,9 @@ namespace Ascua.UI
             for (int i = 0; i < radiusPips.Length; i++)
             {
                 if (radiusPips[i] == null) continue;
+                // El 4º rombo (Farol grande) solo aparece cuando Teo lo regala.
+                bool unlocked = lantern == null || i < lantern.UnlockedCount;
+                radiusPips[i].gameObject.SetActive(unlocked);
                 radiusPips[i].color = i <= index ? pipOnColor : pipOffColor;
             }
         }

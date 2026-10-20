@@ -93,15 +93,37 @@ namespace Ascua.Characters
             return null;
         }
 
+        private static readonly int CelebrateHash = Animator.StringToHash("Celebrar");
+        private float shiverSeed;
+
         private void OnEnable()
         {
             if (!all.Contains(this)) all.Add(this);
+            Ascua.Core.EventBus.HopeLevelReached += OnHopeLevel;
+            Ascua.Core.EventBus.PenumbraSurge += OnSurge;
         }
 
         private void OnDisable()
         {
             all.Remove(this);
+            Ascua.Core.EventBus.HopeLevelReached -= OnHopeLevel;
+            Ascua.Core.EventBus.PenumbraSurge -= OnSurge;
         }
+
+        /// <summary>Reacción en tiempo real: su barrio gana Esperanza → un saltito de alegría.</summary>
+        private void OnHopeLevel(string zoneId, int level, Vector3 position)
+        {
+            if (zone == null || zone.ZoneId != zoneId || Mood == CharacterMood.Collapsed || mode == Mode.Talking) return;
+            if (animator != null) animator.SetTrigger(CelebrateHash);
+        }
+
+        /// <summary>La ráfaga de la Penumbra los asusta: se encogen un momento.</summary>
+        private void OnSurge(bool started)
+        {
+            surgeFear = started ? 1f : 0f;
+        }
+
+        private float surgeFear;
 
         // ------------------------------------------------------------------ Escolta / conversación
 
@@ -177,6 +199,7 @@ namespace Ascua.Characters
         {
             agent = GetComponent<NavMeshAgent>();
             identity = GetComponent<NpcIdentity>();
+            shiverSeed = UnityEngine.Random.value * 10f;
             propertyBlock = new MaterialPropertyBlock();
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (visual == null && animator != null) visual = animator.transform;
@@ -228,13 +251,16 @@ namespace Ascua.Characters
         {
             // La postura se aplica sobre 'Visual', que el Animator no toca.
             float target = Mood == CharacterMood.Collapsed ? 1f : Mood == CharacterMood.Worried ? 0.5f : 0f;
+            target = Mathf.Max(target, surgeFear * 0.45f);
             posture = Mathf.MoveTowards(posture, target, postureSpeed * Time.deltaTime);
             if (visual == null) return;
 
             float eased = posture * posture * (3f - 2f * posture);
             visual.localScale = new Vector3(visualBaseScale.x, visualBaseScale.y * Mathf.Lerp(1f, 0.62f, eased), visualBaseScale.z);
             visual.localPosition = visualBasePosition;
-            visual.localRotation = Quaternion.Euler(Mathf.Lerp(0f, 16f, eased), 0f, 0f);
+            // Preocupados o asustados, tiemblan un poco (se nota sin hablarles).
+            float shiver = Mood == CharacterMood.Worried || surgeFear > 0f ? Mathf.Sin(Time.time * 23f + shiverSeed) * 1.8f : 0f;
+            visual.localRotation = Quaternion.Euler(Mathf.Lerp(0f, 16f, eased), 0f, shiver);
 
             ApplyAccent(Mathf.Lerp(1f, 0.25f, eased));
         }

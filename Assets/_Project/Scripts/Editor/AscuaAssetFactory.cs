@@ -33,6 +33,8 @@ namespace Ascua.EditorTools
         public Sprite FlameSprite;
         public CharacterAssets Character;
         public NarrativeAssets Narrative;
+        public AudioAssets Audio;
+        public VolumeProfile PhotoFilterProfile;
     }
 
     /// <summary>
@@ -73,6 +75,8 @@ namespace Ascua.EditorTools
             };
             assets.Character = AscuaCharacterAssets.Create(assets.Materials);
             assets.Narrative = AscuaNarrativeContent.CreateAll();
+            assets.Audio = AscuaAudioFactory.CreateAll();
+            assets.PhotoFilterProfile = CreatePhotoFilterProfile();
             AssetDatabase.SaveAssets();
             return assets;
         }
@@ -546,6 +550,7 @@ namespace Ascua.EditorTools
 
             AnimationClip start = CreateOneShotClip("Chibi_Arranque", 0.32f, ArranquePose);
             AnimationClip celebrate = CreateOneShotClip("Chibi_Celebracion", 0.9f, CelebracionPose);
+            AnimationClip pick = CreateOneShotClip("Chibi_Recoger", 0.5f, RecogerPose);
 
             // Si ya existe con los estados de la Fase 3 se reutiliza (no rompe referencias);
             // si es el de la Fase 1/2 (sin "Celebrar"), se rehace.
@@ -555,7 +560,7 @@ namespace Ascua.EditorTools
             {
                 foreach (AnimatorControllerParameter parameter in existing.parameters)
                 {
-                    if (parameter.name == "Celebrar") return existing;
+                    if (parameter.name == "Recoger") return existing;
                 }
                 AssetDatabase.DeleteAsset(path);
             }
@@ -564,6 +569,7 @@ namespace Ascua.EditorTools
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
             controller.AddParameter("Arrancar", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Celebrar", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("Recoger", AnimatorControllerParameterType.Trigger);
 
             AnimatorState locomotion = controller.CreateBlendTreeInController("Locomocion", out BlendTree tree, 0);
             tree.blendType = BlendTreeType.Simple1D;
@@ -599,6 +605,19 @@ namespace Ascua.EditorTools
             fromCelebrate.hasExitTime = true;
             fromCelebrate.exitTime = 0.92f;
             fromCelebrate.duration = 0.15f;
+
+            // Recoger: la mano se extiende hacia el objeto (desde cualquier estado).
+            AnimatorState pickState = machine.AddState("Recoger");
+            pickState.motion = pick;
+            AnimatorStateTransition toPick = machine.AddAnyStateTransition(pickState);
+            toPick.AddCondition(AnimatorConditionMode.If, 0f, "Recoger");
+            toPick.hasExitTime = false;
+            toPick.duration = 0.06f;
+            toPick.canTransitionToSelf = false;
+            AnimatorStateTransition fromPick = pickState.AddTransition(locomotion);
+            fromPick.hasExitTime = true;
+            fromPick.exitTime = 0.9f;
+            fromPick.duration = 0.12f;
 
             EditorUtility.SetDirty(controller);
             return controller;
@@ -645,6 +664,24 @@ namespace Ascua.EditorTools
                 ArmLRoll = -7f - 12f * raise,
                 ArmRPitch = -160f * raise,
                 ArmRRoll = 8f + 10f * raise
+            };
+        }
+
+        /// <summary>Recoger: se inclina un poco y extiende la mano derecha hacia delante y abajo.</summary>
+        private static GesturePose RecogerPose(float t)
+        {
+            float reach = Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.85f));
+            return new GesturePose
+            {
+                HipsOffset = -0.04f * reach,
+                Lean = 14f * reach,
+                HeadPitch = 12f * reach,
+                LegL = -6f * reach,
+                LegR = 4f * reach,
+                ArmLPitch = 8f * reach,
+                ArmLRoll = -8f,
+                ArmRPitch = -62f * reach,
+                ArmRRoll = 8f - 4f * reach
             };
         }
 
@@ -791,17 +828,17 @@ namespace Ascua.EditorTools
             }
 
             Bloom bloom = AddComponent<Bloom>(profile);
-            bloom.threshold.Override(0.85f);
-            bloom.intensity.Override(1.1f);
-            bloom.scatter.Override(0.72f);
+            bloom.threshold.Override(0.92f);
+            bloom.intensity.Override(0.9f);
+            bloom.scatter.Override(0.65f);
             bloom.tint.Override(new Color(1f, 0.86f, 0.72f));
 
             Tonemapping tonemapping = AddComponent<Tonemapping>(profile);
             tonemapping.mode.Override(TonemappingMode.Neutral);
 
             ColorAdjustments color = AddComponent<ColorAdjustments>(profile);
-            color.postExposure.Override(0.15f);
-            color.contrast.Override(12f);
+            color.postExposure.Override(0.45f);
+            color.contrast.Override(10f);
             color.colorFilter.Override(new Color(0.92f, 0.95f, 1f));
             color.saturation.Override(-8f);
 
@@ -817,8 +854,8 @@ namespace Ascua.EditorTools
             Vignette vignette = AddComponent<Vignette>(profile);
             vignette.color.Override(Hex("#070A1A"));
             vignette.center.Override(new Vector2(0.5f, 0.5f));
-            vignette.intensity.Override(0.36f);
-            vignette.smoothness.Override(0.42f);
+            vignette.intensity.Override(0.28f);
+            vignette.smoothness.Override(0.4f);
 
             FilmGrain grain = AddComponent<FilmGrain>(profile);
             grain.type.Override(FilmGrainLookup.Medium3);
@@ -828,6 +865,26 @@ namespace Ascua.EditorTools
             ChromaticAberration aberration = AddComponent<ChromaticAberration>(profile);
             aberration.intensity.Override(0.06f);
 
+            EditorUtility.SetDirty(profile);
+            return profile;
+        }
+
+        /// <summary>Perfil del modo foto: ajustes de color y viñeta que PhotoMode modifica según el filtro.</summary>
+        private static VolumeProfile CreatePhotoFilterProfile()
+        {
+            string path = SettingsFolder + "/VP_ModoFoto_Filtros.asset";
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(path);
+            if (profile != null) return profile;
+
+            profile = ScriptableObject.CreateInstance<VolumeProfile>();
+            AssetDatabase.CreateAsset(profile, path);
+            ColorAdjustments color = AddComponent<ColorAdjustments>(profile);
+            color.saturation.Override(0f);
+            color.colorFilter.Override(Color.white);
+            color.contrast.Override(0f);
+            Vignette vignette = AddComponent<Vignette>(profile);
+            vignette.intensity.Override(0.3f);
+            vignette.smoothness.Override(0.45f);
             EditorUtility.SetDirty(profile);
             return profile;
         }

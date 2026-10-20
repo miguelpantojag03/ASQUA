@@ -95,6 +95,33 @@ namespace Ascua.World
             }
         }
 
+        /// <summary>
+        /// Luciérnaga activa más cercana a 'from' (opcionalmente solo dentro de un círculo).
+        /// La usa la flecha de objetivo en las misiones de Recolección.
+        /// </summary>
+        public bool TryGetNearestActive(Vector3 from, Vector3? areaCenterFilter, float areaRadius, out Vector3 position)
+        {
+            position = Vector3.zero;
+            float best = float.MaxValue;
+            for (int i = 0; i < active.Count; i++)
+            {
+                Vector3 p = active[i].transform.position;
+                if (areaCenterFilter.HasValue)
+                {
+                    Vector3 offset = p - areaCenterFilter.Value;
+                    offset.y = 0f;
+                    if (offset.sqrMagnitude > areaRadius * areaRadius) continue;
+                }
+                float d = (p - from).sqrMagnitude;
+                if (d < best)
+                {
+                    best = d;
+                    position = p;
+                }
+            }
+            return best < float.MaxValue;
+        }
+
         /// <summary>Hace aparecer una luciérnaga en un punto concreto (eventos de misión, pruebas, IA).</summary>
         public bool SpawnAt(Vector3 position)
         {

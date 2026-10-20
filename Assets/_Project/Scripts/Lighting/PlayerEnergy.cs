@@ -51,7 +51,8 @@ namespace Ascua.Lighting
         private void Update()
         {
             if (Time.time - lastConsumeTime < regenDelay || current >= maxEnergy) return;
-            SetEnergy(current + regenPerSecond * Time.deltaTime);
+            // Las mejoras de "Brasa viva" aceleran la recuperación.
+            SetEnergy(current + regenPerSecond * Ascua.Player.PlayerUpgrades.RegenMultiplier * Time.deltaTime);
         }
 
         /// <summary>Consume energía. Devuelve false si no se pudo consumir.</summary>

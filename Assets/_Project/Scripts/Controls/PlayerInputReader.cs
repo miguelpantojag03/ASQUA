@@ -36,6 +36,8 @@ namespace Ascua.Controls
         private InputAction zoomPadAction;
         private InputAction interactAction;
         private InputAction pulseAction;
+        private InputAction jumpAction;
+        private InputAction dashAction;
 
         /// <summary>Movimiento normalizado (x = lateral, y = adelante).</summary>
         public Vector2 Move { get; private set; }
@@ -53,6 +55,10 @@ namespace Ascua.Controls
         public bool InteractHeld { get; private set; }
         /// <summary>Pulso de luz pulsado este frame (R / botón Y).</summary>
         public bool PulsePressed { get; private set; }
+        /// <summary>Saltar pulsado este frame (Espacio / botón A).</summary>
+        public bool JumpPressed { get; private set; }
+        /// <summary>Esquivar pulsado este frame (Ctrl / botón B).</summary>
+        public bool DashPressed { get; private set; }
         /// <summary>
         /// Cerca de un NPC la tecla E sirve para hablar: mientras sea true, E no cambia el tamaño del Farol
         /// (Q y los bumpers siguen funcionando).
@@ -102,10 +108,9 @@ namespace Ascua.Controls
             lookMouseAction = gameplayMap.AddAction("LookMouse", InputActionType.Value, "<Mouse>/delta", expectedControlLayout: "Vector2");
             lookStickAction = gameplayMap.AddAction("LookStick", InputActionType.Value, "<Gamepad>/rightStick", expectedControlLayout: "Vector2");
 
-            // Correr: Shift, L3 o B/Círculo.
+            // Correr: Shift o L3 (gasta Stamina).
             sprintAction = gameplayMap.AddAction("Sprint", InputActionType.Button, "<Keyboard>/leftShift");
             sprintAction.AddBinding("<Gamepad>/leftStickPress");
-            sprintAction.AddBinding("<Gamepad>/buttonEast");
 
             // Farol activo: click izquierdo, F o gatillo derecho.
             lanternAction = gameplayMap.AddAction("Lantern", InputActionType.Button, "<Mouse>/leftButton");
@@ -125,13 +130,21 @@ namespace Ascua.Controls
                 .With("Negative", "<Gamepad>/dpad/up")
                 .With("Positive", "<Gamepad>/dpad/down");
 
-            // Interactuar (mantener): E o botón A / Cruz.
+            // Interactuar / recoger: E o botón X / Cuadrado.
             interactAction = gameplayMap.AddAction("Interact", InputActionType.Button, "<Keyboard>/e");
-            interactAction.AddBinding("<Gamepad>/buttonSouth");
+            interactAction.AddBinding("<Gamepad>/buttonWest");
 
             // Pulso de luz: R o botón Y / Triángulo.
             pulseAction = gameplayMap.AddAction("Pulse", InputActionType.Button, "<Keyboard>/r");
             pulseAction.AddBinding("<Gamepad>/buttonNorth");
+
+            // Saltar: Espacio o botón A / Cruz.
+            jumpAction = gameplayMap.AddAction("Jump", InputActionType.Button, "<Keyboard>/space");
+            jumpAction.AddBinding("<Gamepad>/buttonSouth");
+
+            // Esquivar: Ctrl izquierdo o botón B / Círculo.
+            dashAction = gameplayMap.AddAction("Dash", InputActionType.Button, "<Keyboard>/leftCtrl");
+            dashAction.AddBinding("<Gamepad>/buttonEast");
         }
 
         private void Update()
@@ -158,6 +171,8 @@ namespace Ascua.Controls
             RadiusUpPressed = radiusUpAction.WasPressedThisFrame() && !(BlockRadiusUp && Keyboard.current != null && Keyboard.current.eKey.isPressed);
             InteractHeld = interactAction.IsPressed();
             PulsePressed = pulseAction.WasPressedThisFrame();
+            JumpPressed = jumpAction.WasPressedThisFrame();
+            DashPressed = dashAction.WasPressedThisFrame();
             RadiusDownPressed = radiusDownAction.WasPressedThisFrame();
 
             // La rueda se trata como pasos discretos (los valores crudos varían según plataforma).
@@ -190,6 +205,8 @@ namespace Ascua.Controls
             ZoomDelta = 0f;
             InteractHeld = false;
             PulsePressed = false;
+            JumpPressed = false;
+            DashPressed = false;
         }
     }
 }

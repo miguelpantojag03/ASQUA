@@ -13,8 +13,10 @@ namespace Ascua.EditorTools
         public Material Pulse;
         public Material HeraldoBody, HeraldoCape, HeraldoLantern, HeraldoEyes;
         public Material Indicator, CandleWax, CandleFlame;
+        public Material Brooch, GoldenFirefly, Paper, Postal, Soot;
         public Mesh CapeMesh, HoodMesh;
-        public Sprite WhiteSprite;
+        public Sprite WhiteSprite, ArrowSprite, VignetteSprite;
+        public Texture2D Fabric;
     }
 
     /// <summary>
@@ -84,6 +86,23 @@ namespace Ascua.EditorTools
             c.CapeMesh = SaveMesh(CreateCapeMesh(), "MESH_Capa");
             c.HoodMesh = SaveMesh(CreateHoodMesh(), "MESH_Capucha");
             c.WhiteSprite = CreateWhiteSprite();
+
+            // --- Ronda de mejoras: textura de tela real y detalles de silueta.
+            // Diagnóstico: el cuerpo nunca tuvo textura (solo color + 35% de ruido), por eso parecía un placeholder.
+            c.Fabric = CreateFabricTexture();
+            ApplyFabric(c.IlseBody, c.Fabric, 0.3f, 5f, 0.58f, 1.1f);
+            ApplyFabric(c.IlseCape, c.Fabric, 0.45f, 6f, -1f, -1f);
+            ApplyFabric(c.IlseHood, c.Fabric, 0.45f, 6f, -1f, -1f);
+            if (c.IlseHood.HasProperty("_SeamWidth")) c.IlseHood.SetFloat("_SeamWidth", 0.06f);
+            if (c.HeraldoCape.HasProperty("_SeamColor")) c.HeraldoCape.SetColor("_SeamColor", AscuaPalette.Hdr(violet, 1.8f));
+
+            c.Brooch = AscuaAssetFactory.Lit("M_Ilse_Broche", AscuaPalette.Ambar, 0.6f, AscuaPalette.Hdr(AscuaPalette.Ambar, 3.5f), 0.5f);
+            c.GoldenFirefly = AscuaAssetFactory.Lit("M_LuciernagaDorada", AscuaPalette.Hex("#FFD86B"), 0.4f, AscuaPalette.Hdr(AscuaPalette.Hex("#FFD86B"), 5f));
+            c.Paper = AscuaAssetFactory.Lit("M_PaginaDiario", AscuaPalette.Hex("#EFE6D2"), 0.2f, AscuaPalette.Hdr(AscuaPalette.Hex("#FFE9C2"), 0.6f));
+            c.Postal = AscuaAssetFactory.Lit("M_Postal", AscuaPalette.Hex("#D9C7A6"), 0.25f, AscuaPalette.Hdr(AscuaPalette.Hex("#FFE0B0"), 0.5f));
+            c.Soot = AscuaAssetFactory.Lit("M_Hollin", AscuaPalette.Hex("#0B0C12"), 0.05f);
+            c.ArrowSprite = CreateArrowSprite();
+            c.VignetteSprite = CreateVignetteSprite();
             return c;
         }
 
@@ -229,6 +248,103 @@ namespace Ascua.EditorTools
             EditorUtility.SetDirty(existing);
             Object.DestroyImmediate(mesh);
             return existing;
+        }
+
+        /// <summary>Asigna la trama de tela. alpha/rimIntensity &lt; 0 = no tocar.</summary>
+        private static void ApplyFabric(Material material, Texture2D fabric, float strength, float tiling, float alpha, float rimIntensity)
+        {
+            if (material == null || !material.HasProperty("_DetailMap")) return;
+            material.SetTexture("_DetailMap", fabric);
+            material.SetFloat("_DetailStrength", strength);
+            material.SetFloat("_DetailTiling", tiling);
+            if (alpha >= 0f)
+            {
+                Color c = material.GetColor("_BaseColor");
+                c.a = alpha;
+                material.SetColor("_BaseColor", c);
+            }
+            if (rimIntensity >= 0f && material.HasProperty("_RimIntensity")) material.SetFloat("_RimIntensity", rimIntensity);
+            EditorUtility.SetDirty(material);
+        }
+
+        /// <summary>Trama de tela tileable: hilos cruzados (sarga) con variación suave. Escala de grises.</summary>
+        private static Texture2D CreateFabricTexture()
+        {
+            const int size = 128;
+            Color32[] pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (float)x / size;
+                    float v = (float)y / size;
+                    // Sarga: diagonales finas + trama horizontal/vertical alterna (periódica en 0-1).
+                    float diagonal = 0.5f + 0.5f * Mathf.Sin((u + v) * Mathf.PI * 2f * 16f);
+                    float warp = 0.5f + 0.5f * Mathf.Sin(u * Mathf.PI * 2f * 32f);
+                    float weft = 0.5f + 0.5f * Mathf.Sin(v * Mathf.PI * 2f * 32f);
+                    float thread = (x / 4 + y / 4) % 2 == 0 ? warp : weft;
+                    float value = 0.62f + 0.22f * thread + 0.16f * diagonal;
+                    byte g = (byte)(Mathf.Clamp01(value) * 255f);
+                    pixels[y * size + x] = new Color32(g, g, g, 255);
+                }
+            }
+            return AscuaAssetFactory.SaveTexture("T_TramaTela", size, pixels, false);
+        }
+
+        /// <summary>Flecha (triángulo) blanca apuntando hacia arriba para el indicador de objetivo.</summary>
+        private static Sprite CreateArrowSprite()
+        {
+            const int size = 64;
+            Color32[] pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + 0.5f) / size - 0.5f;
+                    float v = (y + 0.5f) / size;
+                    // Triángulo: ancho máximo abajo, punta arriba, con una muesca para que parezca flecha.
+                    float halfWidth = 0.42f * (1f - v);
+                    float notch = v < 0.25f ? Mathf.Abs(u) < 0.42f * (0.25f - v) * 2.4f ? -1f : 0f : 0f;
+                    float d = halfWidth - Mathf.Abs(u) + notch;
+                    float alpha = Mathf.Clamp01(d * size * 0.75f) * (v > 0.04f && v < 0.96f ? 1f : 0f);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                }
+            }
+            return SaveSprite("UI_Flecha", size, pixels);
+        }
+
+        /// <summary>Viñeta: transparente en el centro, opaca hacia los bordes (ráfaga de la Penumbra).</summary>
+        private static Sprite CreateVignetteSprite()
+        {
+            const int size = 128;
+            Color32[] pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + 0.5f) / size - 0.5f;
+                    float dy = (y + 0.5f) / size - 0.5f;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy) * 2f;
+                    float alpha = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((d - 0.45f) / 0.65f));
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                }
+            }
+            return SaveSprite("UI_Vineta", size, pixels);
+        }
+
+        private static Sprite SaveSprite(string name, int size, Color32[] pixels)
+        {
+            string path = $"{AscuaAssetFactory.TexturesFolder}/{name}.png";
+            AscuaAssetFactory.SaveTexture(name, size, pixels, false);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.alphaSource = TextureImporterAlphaSource.FromInput;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
 
         /// <summary>Sprite blanco de 4x4 para barras rellenables (Image tipo Filled).</summary>

@@ -28,10 +28,18 @@ namespace Ascua.Lighting
         [SerializeField] private Light fillLight;
 
         [Header("Radios del Farol (m) y consumo (energía/s)")]
-        [Tooltip("Radio JUGABLE: hasta dónde reacciona el mundo (ventanas, etc.).")]
-        [SerializeField] private float[] radii = { 4.5f, 7f, 10.5f };
-        [SerializeField] private float[] drainPerSecond = { 6f, 10f, 16f };
+        [Tooltip("Radio JUGABLE: hasta dónde reacciona el mundo (ventanas, etc.). El 4º es el Farol grande (regalo de Teo).")]
+        [SerializeField] private float[] radii = { 4.5f, 7f, 10.5f, 14f };
+        [SerializeField] private float[] drainPerSecond = { 6f, 10f, 16f, 21f };
         [SerializeField] private int startRadiusIndex = 1;
+        [Tooltip("Tamaños disponibles sin el Farol grande.")]
+        [SerializeField] private int baseLevels = 3;
+
+        [Header("Transición al cambiar de tamaño")]
+        [Tooltip("Cuánto se pasa de largo el halo al expandirse (efecto 'respiración').")]
+        [SerializeField] private float resizeOvershoot = 0.18f;
+        [SerializeField] private float resizeFlash = 0.6f;
+        [SerializeField] private float resizeDecay = 3.5f;
 
         [Header("Luz principal")]
         [SerializeField] private Color lightColor = new Color(1f, 0.769f, 0.42f);
@@ -40,8 +48,8 @@ namespace Ascua.Lighting
         [Tooltip("El halo visible se extiende más allá del radio jugable: range de la Light = radio x este factor.")]
         [SerializeField] private float lightRangeMultiplier = 1.5f;
         [SerializeField] private float idleIntensity = 0.8f;
-        [Tooltip("Intensidad activa por tamaño (pequeño / medio / grande).")]
-        [SerializeField] private float[] activeIntensities = { 2.0f, 2.4f, 2.8f };
+        [Tooltip("Intensidad activa por tamaño (pequeño / medio / grande / Farol grande).")]
+        [SerializeField] private float[] activeIntensities = { 2.0f, 2.4f, 2.8f, 3.2f };
         [Tooltip("Velocidad de transición reposo <-> activo (1/s).")]
         [SerializeField] private float rampSpeed = 5f;
         [SerializeField] private float rangeSmoothing = 8f;
@@ -76,13 +84,18 @@ namespace Ascua.Lighting
         private float blend;
         private float currentRange;
         private float noiseSeed;
+        private float resizePulse;
+        private int resizeDirection;
 
         public event Action<int> RadiusChanged;
         public event Action<bool> ActiveChanged;
 
         public int RadiusIndex { get; private set; }
         public int RadiusCount => radii.Length;
-        public float CurrentRadiusSetting => radii[RadiusIndex];
+        /// <summary>Tamaños disponibles ahora (3, o 4 con el Farol grande).</summary>
+        public int UnlockedCount => Mathf.Min(radii.Length, baseLevels + (PlayerUpgrades.LargeLanternUnlocked ? 1 : 0));
+        /// <summary>Radio jugable del tamaño actual, con las mejoras aplicadas.</summary>
+        public float CurrentRadiusSetting => radii[RadiusIndex] * PlayerUpgrades.RadiusMultiplier;
         public bool IsActive { get; private set; }
         public float ActivationBlend => blend;
 
@@ -107,12 +120,20 @@ namespace Ascua.Lighting
         private void OnEnable()
         {
             IlluminationRegistry.Register(this);
+            PlayerUpgrades.Changed += OnUpgradesChanged;
         }
 
         private void OnDisable()
         {
             IlluminationRegistry.Unregister(this);
+            PlayerUpgrades.Changed -= OnUpgradesChanged;
             SetActive(false);
+        }
+
+        private void OnUpgradesChanged()
+        {
+            // Avisar a la UI de que puede haber un tamaño nuevo disponible.
+            RadiusChanged?.Invoke(RadiusIndex);
         }
 
         private void Start()
@@ -132,7 +153,7 @@ namespace Ascua.Lighting
             bool active = input != null && input.LanternHeld && energy != null && energy.CanConsume;
             if (active)
             {
-                energy.Consume(GetDrain(RadiusIndex) * Time.deltaTime);
+                energy.Consume(GetDrain(RadiusIndex) * PlayerUpgrades.DrainMultiplier * Time.deltaTime);
                 active = energy.CanConsume;
             }
             SetActive(active);
@@ -140,16 +161,22 @@ namespace Ascua.Lighting
             blend = Mathf.MoveTowards(blend, active ? 1f : 0f, rampSpeed * Time.deltaTime);
             float eased = blend * blend * (3f - 2f * blend);
 
-            float targetRange = Mathf.Lerp(idleRange, radii[RadiusIndex], eased);
+            float targetRange = Mathf.Lerp(idleRange, CurrentRadiusSetting, eased);
             currentRange = Mathf.Lerp(currentRange, targetRange, 1f - Mathf.Exp(-rangeSmoothing * Time.deltaTime));
 
             float flicker = ComputeFlicker();
 
+            // "Respiración" al cambiar de tamaño: el halo se pasa un poco y vuelve, con un destello breve.
+            resizePulse = Mathf.MoveTowards(resizePulse, 0f, resizeDecay * Time.deltaTime);
+            float pulseShape = Mathf.Sin(resizePulse * Mathf.PI);
+            float overshoot = 1f + resizeOvershoot * pulseShape * (resizeDirection >= 0 ? 1f : -0.5f);
+            float flash = 1f + resizeFlash * pulseShape;
+
             if (lanternLight != null)
             {
                 lanternLight.color = lightColor;
-                lanternLight.range = currentRange * lightRangeMultiplier;
-                lanternLight.intensity = Mathf.Lerp(idleIntensity, GetActiveIntensity(RadiusIndex), eased) * flicker;
+                lanternLight.range = currentRange * lightRangeMultiplier * overshoot;
+                lanternLight.intensity = Mathf.Lerp(idleIntensity, GetActiveIntensity(RadiusIndex), eased) * flicker * flash;
             }
 
             if (fillLight != null)
@@ -169,13 +196,16 @@ namespace Ascua.Lighting
             UpdateSway();
         }
 
-        /// <summary>Cambia el tamaño del Farol (0 = pequeño, 2 = grande).</summary>
+        /// <summary>Cambia el tamaño del Farol (0 = pequeño ... 3 = Farol grande, si está desbloqueado).</summary>
         public void SetRadiusIndex(int index)
         {
-            int clamped = Mathf.Clamp(index, 0, radii.Length - 1);
+            int clamped = Mathf.Clamp(index, 0, UnlockedCount - 1);
             if (clamped == RadiusIndex) return;
+            resizeDirection = clamped > RadiusIndex ? 1 : -1;
+            resizePulse = 1f;
             RadiusIndex = clamped;
             RadiusChanged?.Invoke(clamped);
+            Ascua.Core.EventBus.RaiseLanternResized(clamped);
         }
 
         private float GetDrain(int index)

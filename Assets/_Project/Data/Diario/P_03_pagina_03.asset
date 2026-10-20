@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa6c690a072cdda458226800676fcf56, type: 3}
+  m_Name: P_03_pagina_03
+  m_EditorClassIdentifier: 
+  pageId: pagina_03
+  number: 3
+  title: Desde arriba
+  text: "Desde el tejado del quiosco se ve toda la bah\xEDa. Las luces de Vesper
+    parecen pocas desde aqu\xED.\n\nPero no est\xE1n todas apagadas. Todav\xEDa no."

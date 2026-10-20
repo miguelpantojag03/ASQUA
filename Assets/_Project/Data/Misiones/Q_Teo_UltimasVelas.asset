@@ -18,6 +18,7 @@ MonoBehaviour:
   description: "Teo te pregunta a d\xF3nde llevar sus \xFAltimas velas. Tu elecci\xF3n
     decide qu\xE9 zona recibe Esperanza."
   type: 3
+  shortInstruction: "Habla con Teo y elige a d\xF3nde van sus velas."
   prerequisite: {fileID: 11400000, guid: 0344e694fc3db334c91f245f17caf414, type: 2}
   targetZoneId: Plaza
   hopeThreshold: 50
@@ -28,6 +29,9 @@ MonoBehaviour:
   escortDestinationId: 
   escortMaxDistance: 8
   escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
   rewardEnergy: 0
   rewardHope: 0
   rewardHopeZoneId: 

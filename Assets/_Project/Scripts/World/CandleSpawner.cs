@@ -5,26 +5,31 @@ using UnityEngine.AI;
 namespace Ascua.World
 {
     /// <summary>
-    /// Pool de velas de Teo (habilidad de Vínculo). Las velas existen en la escena desactivadas;
-    /// cuando la habilidad está activa, cada intervalo enciende una en un punto caminable de su zona.
+    /// Pool de velas de Teo (habilidad de Vínculo). Las velas son PickupItem de tipo Vela que existen
+    /// en la escena desactivados; con la habilidad activa, cada intervalo aparece una en un punto
+    /// caminable de El Mercado, y Ilse la recoge con E (energía + Esperanza para el Mercado).
     /// </summary>
     public class CandleSpawner : MonoBehaviour
     {
         [SerializeField] private float interval = 30f;
         [SerializeField] private float radius = 9f;
+        [SerializeField] private float lifetime = 45f;
         [SerializeField] private bool activeOnStart = false;
 
-        private readonly Queue<CandlePickup> available = new Queue<CandlePickup>();
-        private readonly List<CandlePickup> active = new List<CandlePickup>();
+        private readonly List<PickupItem> candles = new List<PickupItem>();
+        private readonly List<float> spawnTimes = new List<float>();
         private bool spawning;
         private float timer;
 
+        public bool IsActive => spawning;
+
         private void Awake()
         {
-            foreach (CandlePickup candle in GetComponentsInChildren<CandlePickup>(true))
+            foreach (PickupItem candle in GetComponentsInChildren<PickupItem>(true))
             {
                 candle.gameObject.SetActive(false);
-                available.Enqueue(candle);
+                candles.Add(candle);
+                spawnTimes.Add(-999f);
             }
             spawning = activeOnStart;
         }
@@ -38,25 +43,26 @@ namespace Ascua.World
 
         private void Update()
         {
+            // Las velas que nadie recoge se consumen solas.
+            for (int i = 0; i < candles.Count; i++)
+            {
+                if (candles[i].gameObject.activeSelf && Time.time - spawnTimes[i] > lifetime) candles[i].gameObject.SetActive(false);
+            }
+
             if (!spawning) return;
             timer += Time.deltaTime;
-            if (timer < interval || available.Count == 0) return;
-            timer = 0f;
+            if (timer < interval) return;
+
+            int free = candles.FindIndex(c => !c.gameObject.activeSelf);
+            if (free < 0) return;
 
             Vector2 offset = Random.insideUnitCircle * radius;
             Vector3 candidate = transform.position + new Vector3(offset.x, 0f, offset.y);
             if (!NavMesh.SamplePosition(candidate, out NavMeshHit hit, 3f, NavMesh.AllAreas)) return;
 
-            CandlePickup candle = available.Dequeue();
-            active.Add(candle);
-            candle.Activate(this, hit.position);
-        }
-
-        public void Release(CandlePickup candle)
-        {
-            if (!active.Remove(candle)) return;
-            candle.gameObject.SetActive(false);
-            available.Enqueue(candle);
+            timer = 0f;
+            spawnTimes[free] = Time.time;
+            candles[free].ResetPickup(hit.position + Vector3.up * 0.05f);
         }
     }
 }

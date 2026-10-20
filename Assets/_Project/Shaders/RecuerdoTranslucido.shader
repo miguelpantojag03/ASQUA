@@ -12,6 +12,9 @@ Shader "Ascua/RecuerdoTranslucido"
         _RimPower ("Dureza del borde", Range(0.5, 8)) = 2.6
         _RimIntensity ("Intensidad del borde", Range(0, 5)) = 1.6
         _RimOpacity ("Opacidad extra en el borde", Range(0, 1)) = 0.35
+        _DetailMap ("Trama de tela", 2D) = "white" {}
+        _DetailStrength ("Fuerza de la trama", Range(0, 1)) = 0.35
+        _DetailTiling ("Repetición de la trama", Float) = 5
     }
 
     SubShader
@@ -38,6 +41,8 @@ Shader "Ascua/RecuerdoTranslucido"
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_DetailMap);
+            SAMPLER(sampler_DetailMap);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
@@ -48,6 +53,9 @@ Shader "Ascua/RecuerdoTranslucido"
                 float _RimPower;
                 float _RimIntensity;
                 float _RimOpacity;
+                float4 _DetailMap_ST;
+                float _DetailStrength;
+                float _DetailTiling;
             CBUFFER_END
 
             struct Attributes
@@ -97,7 +105,8 @@ Shader "Ascua/RecuerdoTranslucido"
                 LIGHT_LOOP_END
 
                 float noise = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).r;
-                float3 albedo = _BaseColor.rgb * lerp(1.0, noise, _NoiseStrength);
+                float weave = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, input.uv * _DetailTiling).r;
+                float3 albedo = _BaseColor.rgb * lerp(1.0, noise, _NoiseStrength) * lerp(1.0, weave, _DetailStrength);
 
                 // Fresnel: el borde de la silueta brilla, como un recuerdo que se deshace.
                 float rim = pow(1.0 - saturate(dot(normalWS, viewWS)), _RimPower);

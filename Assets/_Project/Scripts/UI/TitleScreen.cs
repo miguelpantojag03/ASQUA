@@ -85,6 +85,10 @@ namespace Ascua.UI
         {
             if (loading) return;
             loading = true;
+            // "Jugar" desde el título empieza una partida nueva: noche 1, sin mejoras ni Vínculos.
+            GameProgress.ResetAll();
+            Ascua.Player.PlayerUpgrades.ResetAll();
+            if (Ascua.Quests.QuestManager.Instance != null) Ascua.Quests.QuestManager.Instance.ResetAll();
             StartCoroutine(LoadGameplay());
         }
 

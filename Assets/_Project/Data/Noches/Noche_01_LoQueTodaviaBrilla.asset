@@ -25,6 +25,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 0344e694fc3db334c91f245f17caf414, type: 2}
   - {fileID: 11400000, guid: 24f24310fe6e281468883764e591ea77, type: 2}
   - {fileID: 11400000, guid: efcd95425d043d84089eeff4a1c8c733, type: 2}
+  - {fileID: 11400000, guid: a0b1bc382facd8e47a08606205ce354a, type: 2}
   nightDuration: 240
   startHope: 70
   hopeDecayPerSecond: 0.6
@@ -34,6 +35,12 @@ MonoBehaviour:
   fastPenumbraCurve: 0
   fireflySpawnInterval: 5
   fireflyMaxActive: 5
+  surgeEnabled: 1
+  surgeAt: 0.55
+  surgeSeconds: 10
+  surgeMeters: 7
+  surgeDecayMultiplier: 1.7
+  decayIncreasePerNight: 0.15
   heraldoEnabled: 1
   heraldoAppearAt: 0.25
   heraldoChaseSpeed: 1.3

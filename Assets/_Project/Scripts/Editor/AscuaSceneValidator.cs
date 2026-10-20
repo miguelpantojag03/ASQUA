@@ -1,9 +1,12 @@
 using System.Linq;
 using System.Text;
+using Ascua.Audio;
 using Ascua.Characters;
 using Ascua.Core;
 using Ascua.Narrative;
+using Ascua.Player;
 using Ascua.Quests;
+using Ascua.UI;
 using Ascua.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -110,8 +113,122 @@ namespace Ascua.EditorTools
             Shader cape = Shader.Find("Ascua/CapaViento");
             ok &= Check(sb, body != null && body.isSupported && cape != null && cape.isSupported, "Shaders de Ilse (cuerpo translúcido y capa con viento) compilados y soportados");
 
+            ok &= ValidateImprovements(sb, set);
+
             report = sb.ToString();
             return ok;
+        }
+
+        // ================================================================== Ronda de mejoras
+
+        private static bool ValidateImprovements(StringBuilder sb, NightQuestSet set)
+        {
+            bool ok = true;
+
+            // Jugador: movilidad y recogida con todas sus referencias.
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            ok &= Check(sb, player != null && player.GetComponent<PlayerStamina>() != null, "Ilse tiene PlayerStamina (sprint con stamina)");
+            ok &= RefsOk(sb, player != null ? player.GetComponent<PlayerJump>() : null);
+            ok &= RefsOk(sb, player != null ? player.GetComponent<PlayerMantle>() : null);
+            ok &= RefsOk(sb, player != null ? player.GetComponent<PlayerDash>() : null);
+            ok &= RefsOk(sb, player != null ? player.GetComponent<PickupSystem>() : null);
+            ok &= RefsOk(sb, player != null ? player.GetComponent<PlayerController>() : null, "cameraTransform");
+
+            // UI y sistemas nuevos: ninguna referencia vacía.
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<PauseMenu>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<CodexUI>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<PhotoMode>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<NightSummaryPanel>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<ObjectiveTrackerUI>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<ObjectiveArrow>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<TutorialHints>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<StaminaUI>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<InventoryUI>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<SubtitleUI>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<NightEvent>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<PenumbraSurge>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<BondPerks>(), "candleSpawner", "fireflyPool");
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<AudioManager>(), "mixer", "musicGroup", "ambientGroup", "sfxGroup");
+            foreach (ZoneHope zone in Object.FindObjectsByType<ZoneHope>(FindObjectsSortMode.None))
+            {
+                ZoneAmbientLight fill = zone.GetComponentInChildren<ZoneAmbientLight>();
+                ok &= Check(sb, fill != null && zone.GetComponent<HopeFeedback>() != null, $"Zona '{zone.DisplayName}': luz de relleno fría + chispas de Esperanza");
+            }
+
+            AudioManager audio = Object.FindFirstObjectByType<AudioManager>();
+            bool hasMixer = audio != null && new SerializedObject(audio).FindProperty("mixer").objectReferenceValue != null;
+            sb.AppendLine(hasMixer ? "OK    Audio Mixer AM_Ascua conectado (Musica/Ambiente/Efectos)" : "AVISO Sin Audio Mixer: el volumen se aplica en cada AudioSource");
+
+            // Objetos recogibles.
+            PickupItem[] pickups = Object.FindObjectsByType<PickupItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            int pages = pickups.Count(p => KindOf(p) == PickupKind.PaginaDiario);
+            int golden = pickups.Count(p => KindOf(p) == PickupKind.LuciernagaDorada);
+            int candles = pickups.Count(p => KindOf(p) == PickupKind.Vela);
+            ok &= Check(sb, pages >= 3 && golden >= 2 && candles == 3, $"Recogibles: {pages} páginas del Diario, {golden} luciérnagas doradas, {candles} velas de Teo");
+
+            CodexUI codex = Object.FindFirstObjectByType<CodexUI>();
+            int codexPages = codex != null ? new SerializedObject(codex).FindProperty("pages").arraySize : 0;
+            ok &= Check(sb, codexPages >= 3, $"Diario de Ilse con {codexPages} páginas escritas (el resto se muestra como ???)");
+
+            // Misión de entrega: su objeto existe en la escena.
+            Quest delivery = set != null ? set.quests.FirstOrDefault(q => q != null && q.type == QuestType.Entrega) : null;
+            bool itemInScene = delivery != null && pickups.Any(p => new SerializedObject(p).FindProperty("itemId").stringValue == delivery.deliverItemId);
+            ok &= Check(sb, itemInScene, $"Misión de entrega '{delivery?.title}': '{delivery?.deliverItemName}' está en la escena y va a '{delivery?.deliverToNpcId}'");
+
+            // Atajos: al menos 2, con su trigger y alturas que se pueden trepar.
+            ExplorationShortcut[] shortcuts = Object.FindObjectsByType<ExplorationShortcut>(FindObjectsSortMode.None);
+            bool triggers = shortcuts.All(s => s.GetComponent<BoxCollider>() != null && s.GetComponent<BoxCollider>().isTrigger);
+            ok &= Check(sb, shortcuts.Length >= 2 && triggers, $"{shortcuts.Length} atajos de exploración con trigger");
+
+            Physics.SyncTransforms();
+            float alleyWall = TopHeight(new Vector3(0f, 5f, 15.1f));
+            ok &= Check(sb, alleyWall > 0.35f && alleyWall < 1.7f, $"Callejón: cajas de {alleyWall:0.00} m (trepables: 0.35-1.7 m)");
+            float crate = TopHeight(new Vector3(-27.85f, 5f, -11f));
+            float roof = TopHeight(new Vector3(-30f, 5f, -11f));
+            ok &= Check(sb, crate > 0.35f && crate < 1.1f && roof - crate < 1.7f && roof - crate > 0.35f,
+                $"Quiosco: caja {crate:0.00} m (salto/trepar) y tejado a {roof:0.00} m (+{roof - crate:0.00} m desde la caja)");
+
+            return ok;
+        }
+
+        private static PickupKind KindOf(PickupItem item)
+        {
+            return (PickupKind)new SerializedObject(item).FindProperty("kind").enumValueIndex;
+        }
+
+        /// <summary>Altura del primer suelo bajo un punto (solo geometría Default).</summary>
+        private static float TopHeight(Vector3 from)
+        {
+            return Physics.Raycast(from, Vector3.down, out RaycastHit hit, 10f, LayerMask.GetMask("Default"), QueryTriggerInteraction.Ignore) ? hit.point.y : -1f;
+        }
+
+        /// <summary>Comprueba que un componente existe y no tiene referencias de objeto vacías (salvo las opcionales).</summary>
+        private static bool RefsOk(StringBuilder sb, Component component, params string[] optional)
+        {
+            if (component == null) return Check(sb, false, "Falta un componente de la ronda de mejoras");
+            SerializedProperty it = new SerializedObject(component).GetIterator();
+            System.Collections.Generic.List<string> missing = new System.Collections.Generic.List<string>();
+            bool enter = true;
+            while (it.NextVisible(enter))
+            {
+                enter = false;
+                if (it.name == "m_Script" || optional.Contains(it.name)) continue;
+                if (it.propertyType == SerializedPropertyType.ObjectReference && it.objectReferenceValue == null) missing.Add(it.name);
+                if (it.isArray && it.propertyType == SerializedPropertyType.Generic)
+                {
+                    for (int i = 0; i < it.arraySize; i++)
+                    {
+                        SerializedProperty e = it.GetArrayElementAtIndex(i);
+                        if (e.propertyType == SerializedPropertyType.ObjectReference && e.objectReferenceValue == null)
+                        {
+                            missing.Add(it.name + "[" + i + "]");
+                            break;
+                        }
+                    }
+                }
+            }
+            string detail = missing.Count == 0 ? "completas" : "vacías: " + string.Join(", ", missing);
+            return Check(sb, missing.Count == 0, $"{component.GetType().Name} en '{component.name}': referencias {detail}");
         }
 
         private static bool Check(StringBuilder sb, bool condition, string message)

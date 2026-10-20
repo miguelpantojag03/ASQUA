@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa6c690a072cdda458226800676fcf56, type: 3}
+  m_Name: P_02_pagina_02
+  m_EditorClassIdentifier: 
+  pageId: pagina_02
+  number: 2
+  title: "El callej\xF3n de los faroleros"
+  text: "Por aqu\xED pasaban los faroleros con sus p\xE9rtigas. Dejaban una marca
+    de holl\xEDn en cada esquina, como quien firma.\n\nTodav\xEDa se ven, si acercas
+    la luz. Alguien estuvo aqu\xED antes que yo, haciendo lo mismo."

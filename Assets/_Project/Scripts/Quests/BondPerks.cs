@@ -1,4 +1,6 @@
 using Ascua.Core;
+using Ascua.Narrative;
+using Ascua.Player;
 using Ascua.UI;
 using Ascua.World;
 using UnityEngine;
@@ -15,9 +17,13 @@ namespace Ascua.Quests
     {
         [SerializeField] private int unlockLevel = 3;
 
-        [Header("Teo · Velas")]
+        [Header("Teo · Velas y Farol grande")]
         [SerializeField] private string teoId = "teo";
         [SerializeField] private CandleSpawner candleSpawner;
+        [Tooltip("Teo regala el cristal grande del farol de su padre: desbloquea el 4º tamaño del Farol.")]
+        [SerializeField] private DialogueSequence teoGiftDialogue;
+
+        private bool giftPending;
 
         [Header("Mina · Luciérnagas")]
         [SerializeField] private string minaId = "mina";
@@ -56,6 +62,23 @@ namespace Ascua.Quests
             Apply(npcId, level, true);
         }
 
+        private void Update()
+        {
+            if (!giftPending) return;
+            DialogueRunner runner = DialogueRunner.Instance;
+            if (runner == null || runner.IsOpen) return;
+
+            giftPending = false;
+            PlayerUpgrades.UnlockLargeLantern();
+            NpcInteractable teo = NpcInteractable.Find(teoId);
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (teo != null) runner.Play(teoGiftDialogue, teo, null, player != null ? player.transform : null);
+            Toast("Farol grande · pulsa E (o RB) para el 4º tamaño de luz");
+        }
+
+        /// <summary>Para pruebas e IA: fuerza la entrega pendiente del regalo.</summary>
+        public bool GiftPending => giftPending;
+
         private void Apply(string npcId, int level, bool announce)
         {
             bool unlocked = level >= unlockLevel;
@@ -65,6 +88,13 @@ namespace Ascua.Quests
                 teoActive = unlocked;
                 if (candleSpawner != null) candleSpawner.SetActive(unlocked);
                 if (unlocked && announce) Toast("Vínculo con Teo · dejará velas en El Mercado");
+
+                // El regalo de Teo: se entrega con su propio diálogo justo después de la conversación actual.
+                if (unlocked && !PlayerUpgrades.LargeLanternUnlocked)
+                {
+                    if (announce && teoGiftDialogue != null) giftPending = true;
+                    else PlayerUpgrades.UnlockLargeLantern();
+                }
             }
             else if (npcId == minaId && unlocked != minaActive)
             {

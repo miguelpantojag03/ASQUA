@@ -29,7 +29,7 @@ namespace Ascua.EditorTools
     /// los prefabs de Ilse, Mina y Teo, el NavMesh y la configuración del proyecto ("Ascua").
     /// Menú: Ascua > Construir juego.
     /// </summary>
-    public static class AscuaSceneBuilder
+    public static partial class AscuaSceneBuilder
     {
         private const string TitleScenePath = AscuaAssetFactory.ScenesFolder + "/Title.unity";
         private const string PlazaScenePath = AscuaAssetFactory.ScenesFolder + "/Plaza.unity";
@@ -159,10 +159,10 @@ namespace Ascua.EditorTools
 
             // --- Atmósfera, luz de luna y Volume
             AtmosphereSettings atmosphere = new GameObject("Atmosfera").AddComponent<AtmosphereSettings>();
-            atmosphere.Configure(AscuaPalette.Niebla, 0.028f,
-                new Color(0.16f, 0.2f, 0.38f), new Color(0.1f, 0.12f, 0.25f), new Color(0.05f, 0.06f, 0.12f), mainCamera);
+            atmosphere.Configure(AscuaPalette.Niebla, 0.022f,
+                new Color(0.22f, 0.27f, 0.48f), new Color(0.15f, 0.18f, 0.34f), new Color(0.08f, 0.09f, 0.17f), mainCamera);
 
-            CreateDirectionalLight("Luna", Quaternion.Euler(35f, 20f, 0f), AscuaPalette.Hex("#8FA3E0"), 0.25f, 0.7f);
+            CreateDirectionalLight("Luna", Quaternion.Euler(35f, 20f, 0f), AscuaPalette.Hex("#8FA3E0"), 0.4f, 0.7f);
             CreateGlobalVolume(assets.VolumeProfile);
 
             // --- Entorno estático
@@ -193,6 +193,8 @@ namespace Ascua.EditorTools
             // --- Sistemas de la noche: zonas, Penumbra, temporizador y luciérnagas
             ZoneHope plazaZone = BuildZone("Zona_Plaza", PlazaZone, "La Plaza", PlazaCenter, 14f);
             ZoneHope mercadoZone = BuildZone("Zona_Mercado", MercadoZone, "El Mercado", MercadoCenter, 13f);
+            BuildZoneExtras(plazaZone, 14f, m);
+            BuildZoneExtras(mercadoZone, 13f, m);
             BuildPenumbra(m);
             NightManager night = new GameObject("NightManager").AddComponent<NightManager>();
             // El set de misiones es el "nivel" de esta noche (Fase 3).
@@ -203,8 +205,11 @@ namespace Ascua.EditorTools
 
             // --- Misiones: gestor persistente, habilidades de Vínculo, velas de Teo y puntos de misión
             new GameObject("QuestManager").AddComponent<QuestManager>();
-            new GameObject("BondPerks").AddComponent<BondPerks>();
+            BondPerks perks = new GameObject("BondPerks").AddComponent<BondPerks>();
+            Wire(perks, "teoGiftDialogue", FreshAsset<DialogueSequence>("D_teo_regalo_farol"));
             BuildCandles(assets);
+            BuildPickups(assets);
+            BuildExplorationShortcuts(assets);
             new GameObject("Punto_Malecon_Mina").AddComponent<QuestPoint>().Configure("malecon_mina");
             GameObject.Find("Punto_Malecon_Mina").transform.position = new Vector3(4f, 0.1f, -13.8f);
 
@@ -222,6 +227,9 @@ namespace Ascua.EditorTools
             new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule))
                 .GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
             BuildHud(player, assets, night, new[] { plazaZone, mercadoZone });
+            BuildPauseAndCodex(assets);
+            BuildPhotoMode(assets);
+            BuildAudio(assets.Audio);
 
             // --- Impacto al morir una zona: sacudida de cámara + sonido
             GameObject feedback = new GameObject("Feedback_ZonaApagada");
@@ -862,6 +870,9 @@ namespace Ascua.EditorTools
             Wire(lantern, "coreRenderer", core.GetComponent<Renderer>());
             Wire(lantern, "swayPivot", lanternPivot);
 
+            // Ronda de mejoras: movilidad, recogida y broche.
+            AddPlayerImprovements(assets, parts, input, controller, energy, lanternPivot, lightObject.transform);
+
             SetLayerRecursively(player, IgnoreRaycastLayer);
             PrefabUtility.SaveAsPrefabAssetAndConnect(player, AscuaAssetFactory.PrefabsFolder + "/Ilse.prefab", InteractionMode.AutomatedAction);
             return player;
@@ -973,7 +984,7 @@ namespace Ascua.EditorTools
             Transform[] lurk = CreateWaypoints("Heraldo_Acecho", new[]
             {
                 new Vector3(-60f, 0.1f, -10f), new Vector3(-60f, 0.1f, 18f), new Vector3(-30f, 0.1f, 20f),
-                new Vector3(20f, 0.1f, 20f), new Vector3(21.5f, 0.1f, -12f), new Vector3(-30f, 0.1f, -13f)
+                new Vector3(20f, 0.1f, 20f), new Vector3(21.5f, 0.1f, -12f), new Vector3(-30f, 0.1f, -14.6f)
             });
 
             ChibiParts parts = BuildChibi("Heraldo", lurk[0].position, 90f, 1.18f, 0.46f, ch.HeraldoBody, assets.ChibiController, true);
@@ -1027,7 +1038,7 @@ namespace Ascua.EditorTools
             SetLayerRecursively(root, IgnoreRaycastLayer);
         }
 
-        /// <summary>Pool de 3 velas de Teo en El Mercado (desactivadas hasta Vínculo 3).</summary>
+        /// <summary>Pool de 3 velas de Teo en El Mercado (desactivadas hasta Vínculo 3). Se recogen con E.</summary>
         private static void BuildCandles(AscuaAssets assets)
         {
             CharacterAssets ch = assets.Character;
@@ -1037,23 +1048,12 @@ namespace Ascua.EditorTools
 
             for (int i = 0; i < 3; i++)
             {
-                GameObject candle = new GameObject("Vela_" + i);
-                candle.transform.SetParent(root.transform, false);
-                SphereCollider trigger = candle.AddComponent<SphereCollider>();
-                trigger.isTrigger = true;
-                trigger.radius = 0.6f;
-                trigger.center = new Vector3(0f, 0.3f, 0f);
-                Rigidbody body = candle.AddComponent<Rigidbody>();
-                body.isKinematic = true;
-                body.useGravity = false;
-
-                Prim(PrimitiveType.Cylinder, "Cera", candle.transform, new Vector3(0f, 0.12f, 0f), new Vector3(0.09f, 0.12f, 0.09f), ch.CandleWax, Col.None, null, false);
-                GameObject flame = Prim(PrimitiveType.Sphere, "Llama", candle.transform, new Vector3(0f, 0.3f, 0f), new Vector3(0.05f, 0.09f, 0.05f), ch.CandleFlame, Col.None, null, false);
-
-                CandlePickup pickup = candle.AddComponent<CandlePickup>();
-                Wire(pickup, "flame", flame.GetComponent<Renderer>());
-                SetLayerRecursively(candle, IgnoreRaycastLayer);
-                candle.SetActive(false);
+                PickupItem candle = CreatePickup("Vela_" + i, root.transform, MercadoCenter, out Transform visual);
+                Prim(PrimitiveType.Cylinder, "Cera", visual, new Vector3(0f, 0.12f, 0f), new Vector3(0.09f, 0.12f, 0.09f), ch.CandleWax, Col.None, null, false);
+                Prim(PrimitiveType.Sphere, "Llama", visual, new Vector3(0f, 0.3f, 0f), new Vector3(0.05f, 0.09f, 0.05f), ch.CandleFlame, Col.None, null, false);
+                candle.Configure("vela_teo", "una vela de Teo", PickupKind.Vela, Ember, null, null, 6f, 8f, MercadoZone);
+                SetLayerRecursively(candle.gameObject, IgnoreRaycastLayer);
+                candle.gameObject.SetActive(false);
             }
         }
 
@@ -1172,7 +1172,7 @@ namespace Ascua.EditorTools
 
             // Indicadores de tamaño del Farol (3 puntos)
             RectTransform pipsRoot = UIRect("Radio", panel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(leftInset + 110f, -16f), new Vector2(80f, 16f));
-            Image[] pips = new Image[3];
+            Image[] pips = new Image[4];
             for (int i = 0; i < pips.Length; i++)
             {
                 float size = 8f + i * 3f;
@@ -1215,7 +1215,14 @@ namespace Ascua.EditorTools
             BuildDialogueBox(root);
             BuildToast(root);
             BuildDebugPanel(root);
-            BuildNightSummary(root, night);
+            BuildNightSummaryPanel(root, night);
+
+            // Ronda de mejoras: objetivo, flecha, tutorial, stamina, inventario, subtítulos, momento y ráfaga.
+            CanvasGroup surgeVignette = BuildHudExtras(canvas, player, assets);
+            BuildNightEvent(assets, canvas);
+            BuildSurge(surgeVignette);
+            root.Find("Resumen_Noche").SetAsLastSibling(); // el resumen tapa todo el HUD de juego
+            fade.transform.SetAsLastSibling(); // el fundido siempre por encima de todo el HUD
         }
 
         /// <summary>Panel de misiones (Tab) bajo la Esperanza, a la derecha, y su recordatorio compacto.</summary>
@@ -1365,6 +1372,12 @@ namespace Ascua.EditorTools
                 Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             message.fontStyle = FontStyles.Bold;
             message.characterSpacing = 4f;
+            // Mensajes largos ("Nueva página del Diario...") se encogen en vez de partirse en dos líneas.
+            message.textWrappingMode = TextWrappingModes.NoWrap;
+            message.enableAutoSizing = true;
+            message.fontSizeMin = 30f;
+            message.fontSizeMax = 54f;
+            message.margin = new Vector4(24f, 0f, 24f, 0f);
 
             ZoneLostNotification toast = panel.gameObject.AddComponent<ZoneLostNotification>();
             Wire(toast, "group", group);
@@ -1491,38 +1504,6 @@ namespace Ascua.EditorTools
             WireArray(hopeHud, "zoneValues", values);
         }
 
-        /// <summary>Pantalla de resumen de la noche (oculta hasta que termina).</summary>
-        private static void BuildNightSummary(Transform canvasRoot, NightManager night)
-        {
-            Color cold = AscuaPalette.TextoFrio;
-
-            RectTransform panel = UIRect("Resumen_Noche", canvasRoot, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-            Image dim = panel.gameObject.AddComponent<Image>();
-            dim.color = new Color(0.02f, 0.03f, 0.07f, 0.82f);
-            CanvasGroup group = panel.gameObject.AddComponent<CanvasGroup>();
-            group.alpha = 0f;
-            group.interactable = false;
-            group.blocksRaycasts = false;
-
-            TextMeshProUGUI title = UIText("Titulo", panel, "Amanece en Vesper", 72f, AscuaPalette.Ambar, TextAlignmentOptions.Center,
-                new Vector2(0.5f, 0.66f), new Vector2(0.5f, 0.66f), Vector2.zero, new Vector2(1400f, 110f));
-            title.fontStyle = FontStyles.Bold;
-            title.characterSpacing = 6f;
-            TextMeshProUGUI body = UIText("Cuerpo", panel, "Zonas salvadas: 0/2", 32f, cold, TextAlignmentOptions.Center,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1200f, 160f));
-
-            Button retry = UIButton("Boton_Reintentar", panel, "Reintentar", new Vector2(0.5f, 0.32f));
-            Button toTitle = UIButton("Boton_Titulo", panel, "Título", new Vector2(0.5f, 0.23f));
-
-            NightSummaryPanel summary = panel.gameObject.AddComponent<NightSummaryPanel>();
-            Wire(summary, "night", night);
-            Wire(summary, "group", group);
-            Wire(summary, "titleText", title);
-            Wire(summary, "bodyText", body);
-            Wire(summary, "retryButton", retry);
-            Wire(summary, "titleButton", toTitle);
-        }
-
         // ================================================================== Título
 
         private static void BuildTitle(AscuaAssets assets)
@@ -1618,7 +1599,7 @@ namespace Ascua.EditorTools
             Button play = UIButton("Boton_Jugar", root, "Jugar", new Vector2(0.5f, 0.33f));
             Button quit = UIButton("Boton_Salir", root, "Salir", new Vector2(0.5f, 0.24f));
 
-            UIText("Version", root, "Prototipo · Fase 1", 20f, new Color(cold.r, cold.g, cold.b, 0.5f), TextAlignmentOptions.BottomRight,
+            UIText("Version", root, "Prototipo · Noche 1", 20f, new Color(cold.r, cold.g, cold.b, 0.5f), TextAlignmentOptions.BottomRight,
                 new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-40f, 30f), new Vector2(400f, 30f));
 
             CanvasGroup fade = CreateFade(root);
@@ -1723,6 +1704,8 @@ namespace Ascua.EditorTools
                 // Lo que cambia por script (ventanas, luces, farolas) no se agrupa estáticamente.
                 if (t.GetComponent<WindowLight>() != null || t.GetComponent<Light>() != null) continue;
                 if (t.GetComponentInParent<StreetLampToggle>() != null) continue;
+                // Objetos que se mueven o se ocultan (recogibles, atajos).
+                if (t.GetComponentInParent<PickupItem>() != null || t.GetComponent<ExplorationShortcut>() != null) continue;
                 GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.BatchingStatic);
             }
         }

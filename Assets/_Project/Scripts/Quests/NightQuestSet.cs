@@ -50,6 +50,17 @@ namespace Ascua.Quests
         public float fireflySpawnInterval = 5f;
         public int fireflyMaxActive = 5;
 
+        [Header("Dificultad · Ráfaga de urgencia de la Penumbra")]
+        public bool surgeEnabled = true;
+        [Range(0f, 1f)] public float surgeAt = 0.55f;
+        public float surgeSeconds = 10f;
+        public float surgeMeters = 7f;
+        public float surgeDecayMultiplier = 1.7f;
+
+        [Header("Progresión entre noches")]
+        [Tooltip("Cada noche que se repite este set, la caída de Esperanza sube este porcentaje.")]
+        [Range(0f, 0.5f)] public float decayIncreasePerNight = 0.15f;
+
         [Header("Dificultad · Heraldo")]
         public bool heraldoEnabled = true;
         [Tooltip("Momento de la noche (0-1) en que aparece.")]
