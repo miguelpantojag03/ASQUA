@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77dec953110fcae48b7efd4632c03438, type: 3}
+  m_Name: Q_Teo_UltimasVelas
+  m_EditorClassIdentifier: 
+  questId: teo_ultimas_velas
+  giverNpcId: teo
+  title: "Las tres \xFAltimas velas"
+  description: "Teo te pregunta a d\xF3nde llevar sus \xFAltimas velas. Tu elecci\xF3n
+    decide qu\xE9 zona recibe Esperanza."
+  type: 3
+  prerequisite: {fileID: 11400000, guid: 0344e694fc3db334c91f245f17caf414, type: 2}
+  targetZoneId: Plaza
+  hopeThreshold: 50
+  holdSeconds: 20
+  requiredCount: 3
+  collectRadiusMultiplier: 1.8
+  escortNpcId: mina
+  escortDestinationId: 
+  escortMaxDistance: 8
+  escortGraceSeconds: 6
+  rewardEnergy: 0
+  rewardHope: 0
+  rewardHopeZoneId: 
+  rewardBond: 1
+  penaltyHope: 0
+  penaltyZoneId: 
+  failIfTargetZoneDies: 1
+  offerDialogue: {fileID: 11400000, guid: 3c916982fb87d544c980e986dd9022c6, type: 2}
+  inProgressDialogue: {fileID: 0}
+  completedDialogue: {fileID: 11400000, guid: 2f77ac73167020a44b29864ddc3f362b, type: 2}
