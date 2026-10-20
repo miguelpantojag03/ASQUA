@@ -1,5 +1,7 @@
 using System;
+using Ascua.Characters;
 using Ascua.Controls;
+using Ascua.Quests;
 using Ascua.World;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -24,6 +26,8 @@ namespace Ascua.Core
         public int ZonesSaved;
         public int ZonesTotal;
         public bool EndedEarly;
+        public int QuestsCompleted;
+        public int QuestsTotal;
     }
 
     /// <summary>
@@ -38,6 +42,11 @@ namespace Ascua.Core
         [Header("Ritmo")]
         [Tooltip("Sutil = juego final (60 s). Demo rápida = para enseñarlo en clase (30 s). Personalizado = valores a mano.")]
         [SerializeField] private NightPacing pacing = NightPacing.Sutil;
+
+        [Header("Set de misiones (= el nivel de esta noche)")]
+        [Tooltip("Si hay un set asignado, SUS valores de dificultad mandan y el Ritmo se ignora. " +
+                 "Diseñar una noche nueva = crear otro NightQuestSet y ponerlo aquí (o que lo genere la IA en la Fase 4).")]
+        [SerializeField] private NightQuestSet questSet;
 
         [Header("Noche")]
         [SerializeField] private int nightNumber = 1;
@@ -55,6 +64,7 @@ namespace Ascua.Core
         public event Action<NightResult> NightEnded;
 
         public NightPacing Pacing => pacing;
+        public NightQuestSet QuestSet => questSet;
         public int NightNumber => nightNumber;
         public float Duration => nightDuration;
         public float Elapsed { get; private set; }
@@ -68,7 +78,33 @@ namespace Ascua.Core
             Time.timeScale = 1f;
             if (playerInput == null) playerInput = FindFirstObjectByType<PlayerInputReader>();
             if (gameSession == null) gameSession = FindFirstObjectByType<GameSession>();
-            ApplyPacing();
+
+            if (questSet != null) ApplyQuestSet(questSet);
+            else ApplyPacing();
+        }
+
+        /// <summary>
+        /// Vuelca la dificultad del set de misiones en la noche, las zonas, la Penumbra,
+        /// las luciérnagas y el Heraldo. Se ejecuta en Awake, antes de los Start de esos sistemas.
+        /// </summary>
+        private void ApplyQuestSet(NightQuestSet set)
+        {
+            nightNumber = set.nightNumber;
+            nightDuration = Mathf.Max(10f, set.nightDuration);
+
+            foreach (ZoneHope zone in FindObjectsByType<ZoneHope>(FindObjectsSortMode.None))
+            {
+                zone.ApplyPacing(set.startHope, set.hopeDecayPerSecond, set.hopeRisePerSecond);
+            }
+
+            Penumbra penumbra = FindFirstObjectByType<Penumbra>();
+            if (penumbra != null) penumbra.ApplyCustom(set.penumbraStartRadius, set.penumbraEndRadius, set.fastPenumbraCurve);
+
+            FireflyPool pool = FindFirstObjectByType<FireflyPool>();
+            if (pool != null) pool.Configure(set.fireflySpawnInterval, set.fireflyMaxActive);
+
+            Heraldo_AI heraldo = FindFirstObjectByType<Heraldo_AI>();
+            if (heraldo != null) heraldo.Configure(set.heraldoEnabled, set.heraldoAppearAt, set.heraldoChaseSpeed);
         }
 
         /// <summary>
@@ -96,6 +132,7 @@ namespace Ascua.Core
         {
             Elapsed = 0f;
             IsRunning = true;
+            if (QuestManager.Instance != null) QuestManager.Instance.BeginNight(questSet);
             NightStarted?.Invoke(this);
         }
 
@@ -133,6 +170,17 @@ namespace Ascua.Core
                 if (!zone.IsDead) result.ZonesSaved++;
             }
 
+            QuestManager quests = QuestManager.Instance;
+            if (quests != null)
+            {
+                quests.EndNight();
+                foreach (QuestRuntime q in quests.Quests)
+                {
+                    result.QuestsTotal++;
+                    if (q.State == QuestState.Completada) result.QuestsCompleted++;
+                }
+            }
+
             // Pausa: se congela todo lo que usa Time.deltaTime; la UI usa tiempo sin escalar.
             Time.timeScale = 0f;
             if (playerInput != null) playerInput.SetGameplayEnabled(false);
@@ -146,6 +194,8 @@ namespace Ascua.Core
         public void RestartNight()
         {
             Time.timeScale = 1f;
+            // Lo ganado en un intento fallido no se conserva al repetir la noche.
+            if (QuestManager.Instance != null) QuestManager.Instance.RevertNightProgress();
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 

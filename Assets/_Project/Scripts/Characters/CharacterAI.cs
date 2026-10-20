@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Ascua.World;
 using UnityEngine;
 using UnityEngine.AI;
@@ -59,12 +60,123 @@ namespace Ascua.Characters
         private float waitTimer;
         private bool waiting;
 
+        // Escolta y conversación (Fase 3).
+        private enum Mode { Patrol, Escort, Hold, Talking }
+        private static readonly List<CharacterAI> all = new List<CharacterAI>();
+        private Mode mode = Mode.Patrol;
+        private Mode modeBeforeTalk = Mode.Patrol;
+        private Vector3 escortDestination;
+        private float escortStartDistance = 1f;
+        private NpcIdentity identity;
+
         public CharacterMood Mood { get; private set; } = CharacterMood.Calm;
         public ZoneHope Zone => zone;
+        public string NpcId => identity != null ? identity.NpcId : name;
+        /// <summary>True cuando el NPC escoltado llegó a su destino.</summary>
+        public bool EscortArrived { get; private set; }
+        /// <summary>0-1: cuánto camino de la escolta lleva recorrido.</summary>
+        public float EscortProgress01 { get; private set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            all.Clear();
+        }
+
+        /// <summary>Busca un NPC por su id de NpcIdentity (mina, teo...).</summary>
+        public static CharacterAI Find(string npcId)
+        {
+            for (int i = 0; i < all.Count; i++)
+            {
+                if (all[i].NpcId == npcId) return all[i];
+            }
+            return null;
+        }
+
+        private void OnEnable()
+        {
+            if (!all.Contains(this)) all.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            all.Remove(this);
+        }
+
+        // ------------------------------------------------------------------ Escolta / conversación
+
+        /// <summary>Deja la patrulla y camina hacia un destino (misiones de escolta).</summary>
+        public void StartEscort(Vector3 destination)
+        {
+            mode = Mode.Escort;
+            escortDestination = destination;
+            EscortArrived = false;
+            EscortProgress01 = 0f;
+            escortStartDistance = Mathf.Max(1f, Vector3.Distance(transform.position, destination));
+            waiting = false;
+            if (agent.isOnNavMesh)
+            {
+                agent.isStopped = false;
+                agent.SetDestination(destination);
+            }
+        }
+
+        /// <summary>Se queda quieto donde está (p. ej. tras llegar, esperando la entrega de la misión).</summary>
+        public void HoldPosition()
+        {
+            mode = Mode.Hold;
+            if (agent.isOnNavMesh) agent.isStopped = true;
+        }
+
+        /// <summary>Termina la escolta y vuelve a su patrulla habitual.</summary>
+        public void StopEscort()
+        {
+            if (mode == Mode.Talking) modeBeforeTalk = Mode.Patrol;
+            else mode = Mode.Patrol;
+            EscortArrived = false;
+            if (agent.isOnNavMesh) agent.isStopped = false;
+            if (mode == Mode.Patrol && waypoints != null && waypoints.Length > 0) GoToCurrentWaypoint();
+        }
+
+        /// <summary>Se detiene y mira a quien le habla.</summary>
+        public void BeginConversation(Transform listener)
+        {
+            if (mode != Mode.Talking) modeBeforeTalk = mode;
+            mode = Mode.Talking;
+            if (agent.isOnNavMesh) agent.isStopped = true;
+
+            if (listener != null)
+            {
+                Vector3 toListener = listener.position - transform.position;
+                toListener.y = 0f;
+                if (toListener.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(toListener.normalized, Vector3.up);
+            }
+        }
+
+        public void EndConversation()
+        {
+            if (mode != Mode.Talking) return;
+            mode = modeBeforeTalk;
+            if (agent.isOnNavMesh && mode != Mode.Hold) agent.isStopped = false;
+            if (mode == Mode.Escort && agent.isOnNavMesh) agent.SetDestination(escortDestination);
+        }
+
+        private void UpdateEscort()
+        {
+            if (!agent.isOnNavMesh) return;
+            float remaining = Vector3.Distance(transform.position, escortDestination);
+            EscortProgress01 = Mathf.Clamp01(1f - remaining / escortStartDistance);
+            if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.25f)
+            {
+                EscortArrived = true;
+                EscortProgress01 = 1f;
+            }
+        }
 
         private void Awake()
         {
             agent = GetComponent<NavMeshAgent>();
+            identity = GetComponent<NpcIdentity>();
             propertyBlock = new MaterialPropertyBlock();
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (visual == null && animator != null) visual = animator.transform;
@@ -98,7 +210,11 @@ namespace Ascua.Characters
             else
             {
                 agent.speed = Mood == CharacterMood.Worried ? worriedSpeed : walkSpeed;
-                Patrol();
+                switch (mode)
+                {
+                    case Mode.Patrol: Patrol(); break;
+                    case Mode.Escort: UpdateEscort(); break;
+                }
             }
 
             if (animator != null)

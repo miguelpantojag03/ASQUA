@@ -3,7 +3,9 @@ using Ascua.Characters;
 using Ascua.Controls;
 using Ascua.Core;
 using Ascua.Lighting;
+using Ascua.Narrative;
 using Ascua.Player;
+using Ascua.Quests;
 using Ascua.UI;
 using Ascua.World;
 using TMPro;
@@ -193,12 +195,24 @@ namespace Ascua.EditorTools
             ZoneHope mercadoZone = BuildZone("Zona_Mercado", MercadoZone, "El Mercado", MercadoCenter, 13f);
             BuildPenumbra(m);
             NightManager night = new GameObject("NightManager").AddComponent<NightManager>();
+            // El set de misiones es el "nivel" de esta noche (Fase 3).
+            // Se recarga desde disco: el asset pudo reimportarse tras crearse y la referencia en memoria quedaría vacía.
+            AssetDatabase.SaveAssets();
+            Wire(night, "questSet", AssetDatabase.LoadAssetAtPath<NightQuestSet>(AscuaNarrativeContent.Night1Path));
             BuildFireflies(m);
+
+            // --- Misiones: gestor persistente, habilidades de Vínculo, velas de Teo y puntos de misión
+            new GameObject("QuestManager").AddComponent<QuestManager>();
+            new GameObject("BondPerks").AddComponent<BondPerks>();
+            BuildCandles(assets);
+            new GameObject("Punto_Malecon_Mina").AddComponent<QuestPoint>().Configure("malecon_mina");
+            GameObject.Find("Punto_Malecon_Mina").transform.position = new Vector3(4f, 0.1f, -13.8f);
 
             // --- Personajes
             GameObject player = BuildPlayer(assets, out Transform cameraTarget, out PlayerInputReader input);
             BuildMina(assets, plazaZone);
             BuildTeo(assets, mercadoZone);
+            BuildHeraldo(assets);
 
             // --- Cámara en tercera persona
             BuildThirdPersonCamera(cameraTarget, input);
@@ -207,7 +221,7 @@ namespace Ascua.EditorTools
             new GameObject("GameSession").AddComponent<GameSession>();
             new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule))
                 .GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
-            BuildHud(player, assets.FlameSprite, night, new[] { plazaZone, mercadoZone });
+            BuildHud(player, assets, night, new[] { plazaZone, mercadoZone });
 
             // --- Impacto al morir una zona: sacudida de cámara + sonido
             GameObject feedback = new GameObject("Feedback_ZonaApagada");
@@ -731,9 +745,15 @@ namespace Ascua.EditorTools
             GameObject player = parts.Root;
             player.tag = "Player";
 
-            // Silueta: melena larga y faldón del abrigo.
-            Prim(PrimitiveType.Sphere, "Melena", parts.Head, new Vector3(0f, 0.15f, 0.14f), new Vector3(0.42f, 0.6f, 0.3f), m.IlseBody, Col.None, null, false);
+            // Silueta: faldón del abrigo, capucha y capa doradas (Fase 3: sustituyen a la melena).
+            CharacterAssets ch = assets.Character;
             Prim(PrimitiveType.Capsule, "Abrigo", parts.Rig, new Vector3(0f, 0.02f, 0f), new Vector3(0.5f, 0.25f, 0.42f), m.IlseBody, Col.None, null, false);
+            GameObject hood = MeshObject("Capucha", parts.Head, new Vector3(0f, 0.25f, -0.01f), Vector3.one, ch.HoodMesh, ch.IlseHood);
+            GameObject cape = MeshObject("Capa", parts.Rig, new Vector3(0f, 0.57f, -0.02f), Vector3.one, ch.CapeMesh, ch.IlseCape);
+
+            // Ojos de luz: óvalos asimétricos (el izquierdo algo mayor e inclinado), sin boca.
+            GameObject leftEye = Prim(PrimitiveType.Sphere, "Ojo_Izq", parts.Head, new Vector3(-0.088f, 0.245f, 0.252f), new Vector3(0.078f, 0.112f, 0.04f), ch.IlseEyes, Col.None, Quaternion.Euler(0f, -12f, -8f), false);
+            GameObject rightEye = Prim(PrimitiveType.Sphere, "Ojo_Der", parts.Head, new Vector3(0.09f, 0.25f, 0.25f), new Vector3(0.07f, 0.102f, 0.04f), ch.IlseEyes, Col.None, Quaternion.Euler(0f, 12f, 6f), false);
 
             CharacterController cc = player.AddComponent<CharacterController>();
             cc.center = new Vector3(0f, 0.86f, 0f);
@@ -781,6 +801,55 @@ namespace Ascua.EditorTools
             fill.intensity = 0.35f;
             fill.shadows = LightShadows.None;
 
+            // --- Estela de chispas del Farol al correr (mismo tipo de partículas que las luciérnagas)
+            GameObject trailObject = new GameObject("Chispas_Carrera");
+            trailObject.transform.SetParent(lanternPivot, false);
+            trailObject.transform.localPosition = new Vector3(0f, -0.16f, 0f);
+            ParticleSystem trail = trailObject.AddComponent<ParticleSystem>();
+            ConfigureFireflyParticles(trail, m.FireflyParticle);
+            ParticleSystem.MainModule trailMain = trail.main;
+            trailMain.startColor = AscuaPalette.Ambar;
+            trailMain.startLifetime = 0.7f;
+            trailMain.startSize = 0.05f;
+            trailMain.maxParticles = 12;
+            trailMain.gravityModifier = -0.05f;
+            ParticleSystem.EmissionModule trailEmission = trail.emission;
+            trailEmission.rateOverTime = 0f;
+
+            // --- Pulso de luz: esfera que se expande + destello
+            GameObject ring = Prim(PrimitiveType.Sphere, "Pulso_Onda", player.transform, new Vector3(0f, 0.9f, 0f), Vector3.one, ch.Pulse, Col.None, null, false);
+            GameObject flashObject = new GameObject("Pulso_Destello");
+            flashObject.transform.SetParent(player.transform, false);
+            flashObject.transform.localPosition = new Vector3(0f, 1.2f, 0f);
+            Light flash = flashObject.AddComponent<Light>();
+            flash.type = LightType.Point;
+            flash.color = AscuaPalette.Ambar;
+            flash.shadows = LightShadows.None;
+            flash.intensity = 0f;
+            LightPulse pulse = player.AddComponent<LightPulse>();
+            Wire(pulse, "input", input);
+            Wire(pulse, "energy", energy);
+            Wire(pulse, "ringVisual", ring.transform);
+            Wire(pulse, "flashLight", flash);
+
+            // --- Rostro, gestos e interacción
+            CharacterFace face = player.AddComponent<CharacterFace>();
+            Wire(face, "leftEye", leftEye.transform);
+            Wire(face, "rightEye", rightEye.transform);
+            Wire(face, "energy", energy);
+
+            CharacterGestures gestures = player.AddComponent<CharacterGestures>();
+            Wire(gestures, "controller", controller);
+            Wire(gestures, "animator", parts.Animator);
+            Wire(gestures, "torso", parts.Rig.Find("Torso"));
+            Wire(gestures, "cape", cape.transform);
+            Wire(gestures, "capeRenderer", cape.GetComponent<Renderer>());
+            Wire(gestures, "lanternPivot", lanternPivot);
+            Wire(gestures, "runTrail", trail);
+
+            PlayerInteractor interactor = player.AddComponent<PlayerInteractor>();
+            Wire(interactor, "input", input);
+
             // --- Conexiones
             Wire(lantern, "fillLight", fill);
             Wire(controller, "input", input);
@@ -816,7 +885,7 @@ namespace Ascua.EditorTools
                 new Vector3(-7.5f, 0.1f, -3f), new Vector3(1f, 0.1f, -8.5f)
             });
 
-            SetupNpc(parts, "mina", "Mina", AscuaPalette.RojoMina, accents, 1.32f, 0.3f);
+            SetupNpc(parts, "mina", "Mina", AscuaPalette.RojoMina, accents, 1.32f, 0.3f, assets.Narrative.MinaIdle, assets.Character.Indicator);
             CharacterAI ai = parts.Root.GetComponent<CharacterAI>();
             ai.Configure(null, null, accents, AscuaPalette.RojoMina);
 
@@ -847,7 +916,7 @@ namespace Ascua.EditorTools
                 c + new Vector3(0f, 0.1f, -8f), c + new Vector3(-8f, 0.1f, 0f)
             });
 
-            SetupNpc(parts, "teo", "Teo Bravo", accent, accents, 1.55f, 0.35f);
+            SetupNpc(parts, "teo", "Teo Bravo", accent, accents, 1.55f, 0.35f, assets.Narrative.TeoIdle, assets.Character.Indicator);
             CharacterAI ai = parts.Root.GetComponent<CharacterAI>();
             ai.Configure(null, null, accents, accent);
 
@@ -855,8 +924,9 @@ namespace Ascua.EditorTools
             ai.Configure(zone, patrol, accents, accent);
         }
 
-        /// <summary>Componentes comunes de un NPC: colisión, NavMeshAgent, identidad, mirada e IA.</summary>
-        private static void SetupNpc(ChibiParts parts, string id, string displayName, Color accent, Renderer[] accents, float height, float radius)
+        /// <summary>Componentes comunes de un NPC: colisión, NavMeshAgent, identidad, mirada, IA, diálogo e indicador de misión.</summary>
+        private static void SetupNpc(ChibiParts parts, string id, string displayName, Color accent, Renderer[] accents, float height, float radius,
+            DialogueSequence idleDialogue, Material indicatorMaterial)
         {
             GameObject root = parts.Root;
 
@@ -883,8 +953,122 @@ namespace Ascua.EditorTools
             Wire(ai, "animator", parts.Animator);
             Wire(ai, "visual", parts.Visual);
 
+            // Se puede hablar con él (mantener E) y muestra un rombo si tiene misión.
+            NpcInteractable interactable = root.AddComponent<NpcInteractable>();
+            interactable.SetIdleDialogue(idleDialogue);
+            GameObject diamond = Prim(PrimitiveType.Cube, "Indicador_Mision", root.transform, new Vector3(0f, height + 0.45f, 0f), Vector3.one * 0.14f,
+                indicatorMaterial, Col.None, Quaternion.Euler(45f, 0f, 45f), false);
+            QuestIndicator indicator = root.AddComponent<QuestIndicator>();
+            Wire(indicator, "npc", interactable);
+            Wire(indicator, "diamond", diamond.GetComponent<Renderer>());
+
             // Fuera de la capa Default: no recorta el NavMesh al hornear ni empuja la cámara.
             SetLayerRecursively(root, IgnoreRaycastLayer);
+        }
+
+        /// <summary>El Heraldo: figura alta y oscura, capa y capucha que ondean, ojos y farol violetas.</summary>
+        private static void BuildHeraldo(AscuaAssets assets)
+        {
+            CharacterAssets ch = assets.Character;
+            Transform[] lurk = CreateWaypoints("Heraldo_Acecho", new[]
+            {
+                new Vector3(-60f, 0.1f, -10f), new Vector3(-60f, 0.1f, 18f), new Vector3(-30f, 0.1f, 20f),
+                new Vector3(20f, 0.1f, 20f), new Vector3(21.5f, 0.1f, -12f), new Vector3(-30f, 0.1f, -13f)
+            });
+
+            ChibiParts parts = BuildChibi("Heraldo", lurk[0].position, 90f, 1.18f, 0.46f, ch.HeraldoBody, assets.ChibiController, true);
+            MeshObject("Capucha", parts.Head, new Vector3(0f, 0.24f, -0.01f), Vector3.one * 0.95f, ch.HoodMesh, ch.HeraldoCape);
+            MeshObject("Capa", parts.Rig, new Vector3(0f, 0.57f, -0.02f), new Vector3(1.1f, 1.35f, 1.1f), ch.CapeMesh, ch.HeraldoCape);
+            Prim(PrimitiveType.Sphere, "Ojo_Izq", parts.Head, new Vector3(-0.075f, 0.22f, 0.21f), new Vector3(0.05f, 0.03f, 0.03f), ch.HeraldoEyes, Col.None, null, false);
+            Prim(PrimitiveType.Sphere, "Ojo_Der", parts.Head, new Vector3(0.075f, 0.22f, 0.21f), new Vector3(0.05f, 0.03f, 0.03f), ch.HeraldoEyes, Col.None, null, false);
+
+            // Farol violeta en la mano.
+            Transform lantern = Pivot("Farol_Violeta", parts.Root.transform, new Vector3(0.42f, 0.85f, 0.15f));
+            GameObject core = Prim(PrimitiveType.Cube, "Brasa", lantern, Vector3.zero, new Vector3(0.1f, 0.16f, 0.1f), ch.HeraldoLantern, Col.None, null, false);
+            Light violet = new GameObject("Luz_Violeta").AddComponent<Light>();
+            violet.transform.SetParent(lantern, false);
+            violet.type = LightType.Point;
+            violet.color = new Color(0.55f, 0.4f, 1f);
+            violet.range = 6f;
+            violet.intensity = 1.6f;
+            violet.shadows = LightShadows.None;
+
+            GameObject root = parts.Root;
+            CapsuleCollider capsule = root.AddComponent<CapsuleCollider>();
+            capsule.center = new Vector3(0f, 0.95f, 0f);
+            capsule.height = 1.9f;
+            capsule.radius = 0.35f;
+
+            NavMeshAgent agent = root.AddComponent<NavMeshAgent>();
+            agent.radius = 0.35f;
+            agent.height = 1.9f;
+            agent.speed = 0.8f;
+            agent.angularSpeed = 200f;
+            agent.acceleration = 4f;
+            agent.stoppingDistance = 1.2f;
+            agent.obstacleAvoidanceType = ObstacleAvoidanceType.LowQualityObstacleAvoidance;
+
+            root.AddComponent<NpcIdentity>().Configure("heraldo", "El Heraldo", new Color(0.55f, 0.4f, 1f));
+            NpcInteractable interactable = root.AddComponent<NpcInteractable>();
+            interactable.SetIdleDialogue(assets.Narrative.HeraldoIdle);
+
+            Heraldo_AI ai = root.AddComponent<Heraldo_AI>();
+            List<Renderer> body = new List<Renderer>();
+            foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r.gameObject != core) body.Add(r);
+            }
+            Wire(ai, "animator", parts.Animator);
+            WireArray(ai, "bodyRenderers", body);
+            Wire(ai, "lanternRenderer", core.GetComponent<Renderer>());
+            Wire(ai, "violetLight", violet);
+            WireArray(ai, "lurkPoints", lurk);
+
+            SetLayerRecursively(root, IgnoreRaycastLayer);
+        }
+
+        /// <summary>Pool de 3 velas de Teo en El Mercado (desactivadas hasta Vínculo 3).</summary>
+        private static void BuildCandles(AscuaAssets assets)
+        {
+            CharacterAssets ch = assets.Character;
+            GameObject root = new GameObject("Velas_Teo");
+            root.transform.position = MercadoCenter;
+            root.AddComponent<CandleSpawner>();
+
+            for (int i = 0; i < 3; i++)
+            {
+                GameObject candle = new GameObject("Vela_" + i);
+                candle.transform.SetParent(root.transform, false);
+                SphereCollider trigger = candle.AddComponent<SphereCollider>();
+                trigger.isTrigger = true;
+                trigger.radius = 0.6f;
+                trigger.center = new Vector3(0f, 0.3f, 0f);
+                Rigidbody body = candle.AddComponent<Rigidbody>();
+                body.isKinematic = true;
+                body.useGravity = false;
+
+                Prim(PrimitiveType.Cylinder, "Cera", candle.transform, new Vector3(0f, 0.12f, 0f), new Vector3(0.09f, 0.12f, 0.09f), ch.CandleWax, Col.None, null, false);
+                GameObject flame = Prim(PrimitiveType.Sphere, "Llama", candle.transform, new Vector3(0f, 0.3f, 0f), new Vector3(0.05f, 0.09f, 0.05f), ch.CandleFlame, Col.None, null, false);
+
+                CandlePickup pickup = candle.AddComponent<CandlePickup>();
+                Wire(pickup, "flame", flame.GetComponent<Renderer>());
+                SetLayerRecursively(candle, IgnoreRaycastLayer);
+                candle.SetActive(false);
+            }
+        }
+
+        /// <summary>Objeto con una malla generada (capa, capucha) y sin colisión.</summary>
+        private static GameObject MeshObject(string name, Transform parent, Vector3 localPosition, Vector3 localScale, Mesh mesh, Material material)
+        {
+            GameObject go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPosition;
+            go.transform.localScale = localScale;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            MeshRenderer meshRenderer = go.AddComponent<MeshRenderer>();
+            meshRenderer.sharedMaterial = material;
+            meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            return go;
         }
 
         private static Transform[] CreateWaypoints(string name, Vector3[] points)
@@ -929,8 +1113,9 @@ namespace Ascua.EditorTools
 
         // ================================================================== HUD
 
-        private static void BuildHud(GameObject player, Sprite flameSprite, NightManager night, ZoneHope[] zones)
+        private static void BuildHud(GameObject player, AscuaAssets assets, NightManager night, ZoneHope[] zones)
         {
+            Sprite flameSprite = assets.FlameSprite;
             Canvas canvas = CreateCanvas("HUD", 10);
             Transform root = canvas.transform;
             Color amber = AscuaPalette.Ambar;
@@ -1016,10 +1201,153 @@ namespace Ascua.EditorTools
             Wire(hud, "fpsText", fps);
             Wire(hud, "fadeGroup", fade);
 
+            // Indicador del Pulso de luz en la fila de "FAROL".
+            TextMeshProUGUI pulseLabel = UIText("Pulso", panel, "PULSO · R", 18f, amber, TextAlignmentOptions.BottomLeft,
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(leftInset + 210f, 0f), new Vector2(160f, 28f));
+            pulseLabel.characterSpacing = 6f;
+            PulseIndicator pulseIndicator = pulseLabel.gameObject.AddComponent<PulseIndicator>();
+            Wire(pulseIndicator, "pulse", player.GetComponent<LightPulse>());
+            Wire(pulseIndicator, "label", pulseLabel);
+
             BuildHopeHud(canvas, night, zones);
+            BuildQuestLog(root);
+            BuildInteractionPrompt(root, assets.Character.WhiteSprite);
+            BuildDialogueBox(root);
             BuildToast(root);
             BuildDebugPanel(root);
             BuildNightSummary(root, night);
+        }
+
+        /// <summary>Panel de misiones (Tab) bajo la Esperanza, a la derecha, y su recordatorio compacto.</summary>
+        private static void BuildQuestLog(Transform canvasRoot)
+        {
+            Color cold = AscuaPalette.TextoFrio;
+
+            RectTransform compact = UIRect("Misiones_Compacto", canvasRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32f, -296f), new Vector2(470f, 80f));
+            TextMeshProUGUI compactText = compact.gameObject.AddComponent<TextMeshProUGUI>();
+            compactText.font = TMP_Settings.defaultFontAsset;
+            compactText.fontSize = 22f;
+            compactText.color = cold;
+            compactText.alignment = TextAlignmentOptions.TopRight;
+            compactText.richText = true;
+            compactText.raycastTarget = false;
+            compactText.text = "Tab · Misiones";
+
+            RectTransform panel = UIRect("Misiones", canvasRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32f, -296f), new Vector2(560f, 560f));
+            Image background = panel.gameObject.AddComponent<Image>();
+            background.color = new Color(0.02f, 0.03f, 0.08f, 0.82f);
+            background.raycastTarget = false;
+            CanvasGroup group = panel.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            group.blocksRaycasts = false;
+
+            TextMeshProUGUI list = UIText("Lista", panel, "", 22f, cold, TextAlignmentOptions.TopLeft,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            list.margin = new Vector4(22f, 18f, 22f, 18f);
+            list.richText = true;
+
+            QuestLogUI log = panel.gameObject.AddComponent<QuestLogUI>();
+            Wire(log, "panelGroup", group);
+            Wire(log, "listText", list);
+            Wire(log, "compactText", compactText);
+        }
+
+        /// <summary>Aviso "Mantén E · Hablar con..." con barra de mantener.</summary>
+        private static void BuildInteractionPrompt(Transform canvasRoot, Sprite whiteSprite)
+        {
+            RectTransform panel = UIRect("Aviso_Interaccion", canvasRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 150f), new Vector2(560f, 62f));
+            Image background = panel.gameObject.AddComponent<Image>();
+            background.color = new Color(0.02f, 0.03f, 0.07f, 0.65f);
+            background.raycastTarget = false;
+            CanvasGroup group = panel.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            group.blocksRaycasts = false;
+
+            TextMeshProUGUI label = UIText("Texto", panel, "Mantén E", 26f, AscuaPalette.TextoFrio, TextAlignmentOptions.Center,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(0f, 3f), Vector2.zero);
+
+            RectTransform bar = UIRect("Barra", panel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
+            bar.offsetMin = new Vector2(0f, 0f);
+            bar.offsetMax = new Vector2(0f, 5f);
+            Image fill = bar.gameObject.AddComponent<Image>();
+            fill.sprite = whiteSprite;
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillAmount = 0f;
+            fill.color = AscuaPalette.Ambar;
+            fill.raycastTarget = false;
+
+            InteractionPrompt prompt = panel.gameObject.AddComponent<InteractionPrompt>();
+            Wire(prompt, "group", group);
+            Wire(prompt, "label", label);
+            Wire(prompt, "holdFill", fill);
+        }
+
+        /// <summary>Caja de diálogo inferior con nombre, texto y hasta 3 elecciones.</summary>
+        private static void BuildDialogueBox(Transform canvasRoot)
+        {
+            Color amber = AscuaPalette.Ambar;
+            Color cold = AscuaPalette.TextoFrio;
+
+            RectTransform root = UIRect("Dialogo", canvasRoot, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            CanvasGroup group = root.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            group.blocksRaycasts = false;
+            group.interactable = false;
+
+            RectTransform box = UIRect("Caja", root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 36f), new Vector2(1180f, 230f));
+            Image background = box.gameObject.AddComponent<Image>();
+            background.color = new Color(0.02f, 0.03f, 0.08f, 0.88f);
+            RectTransform line = UIRect("Filo", box, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(0f, 3f));
+            Image lineImage = line.gameObject.AddComponent<Image>();
+            lineImage.color = new Color(amber.r, amber.g, amber.b, 0.7f);
+            lineImage.raycastTarget = false;
+
+            TextMeshProUGUI speaker = UIText("Nombre", box, "Mina", 30f, amber, TextAlignmentOptions.TopLeft,
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(34f, -18f), new Vector2(600f, 40f));
+            speaker.fontStyle = FontStyles.Bold;
+            speaker.characterSpacing = 4f;
+
+            TextMeshProUGUI body = UIText("Texto", box, "", 30f, new Color(0.9f, 0.92f, 1f), TextAlignmentOptions.TopLeft,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            body.margin = new Vector4(34f, 66f, 34f, 22f);
+            body.lineSpacing = 6f;
+
+            TextMeshProUGUI hint = UIText("Continuar", box, "E · Espacio  »", 20f, new Color(cold.r, cold.g, cold.b, 0.7f), TextAlignmentOptions.BottomRight,
+                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-24f, 14f), new Vector2(300f, 30f));
+
+            // Elecciones: columna sobre la caja.
+            Button[] buttons = new Button[3];
+            TextMeshProUGUI[] labels = new TextMeshProUGUI[3];
+            for (int i = 0; i < 3; i++)
+            {
+                RectTransform rt = UIRect("Eleccion_" + (i + 1), root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                    new Vector2(0f, 286f + (2 - i) * 70f), new Vector2(820f, 60f));
+                Image image = rt.gameObject.AddComponent<Image>();
+                image.color = amber;
+                Button button = rt.gameObject.AddComponent<Button>();
+                ColorBlock colors = button.colors;
+                colors.normalColor = new Color(1f, 1f, 1f, 0.12f);
+                colors.highlightedColor = new Color(1f, 1f, 1f, 0.38f);
+                colors.selectedColor = new Color(1f, 1f, 1f, 0.38f);
+                colors.pressedColor = new Color(1f, 1f, 1f, 0.6f);
+                colors.fadeDuration = 0.1f;
+                button.colors = colors;
+                button.targetGraphic = image;
+
+                labels[i] = UIText("Texto", rt, "Elección", 28f, new Color(1f, 0.93f, 0.8f), TextAlignmentOptions.Left,
+                    Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+                labels[i].margin = new Vector4(26f, 0f, 20f, 0f);
+                buttons[i] = button;
+            }
+
+            DialogueRunner runner = root.gameObject.AddComponent<DialogueRunner>();
+            Wire(runner, "group", group);
+            Wire(runner, "speakerText", speaker);
+            Wire(runner, "bodyText", body);
+            Wire(runner, "continueHint", hint);
+            WireArray(runner, "choiceButtons", buttons);
+            WireArray(runner, "choiceLabels", labels);
         }
 
         /// <summary>Aviso central reutilizable ("El Mercado se apagó").</summary>

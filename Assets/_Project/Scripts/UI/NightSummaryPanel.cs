@@ -60,6 +60,7 @@ namespace Ascua.UI
             {
                 string reason = result.EndedEarly ? "La Penumbra se lo llevó todo antes del alba." : "Sobreviviste a la noche " + result.NightNumber + ".";
                 bodyText.text = reason + "\n\nZonas salvadas: " + result.ZonesSaved + "/" + result.ZonesTotal;
+                if (result.QuestsTotal > 0) bodyText.text += "\nMisiones cumplidas: " + result.QuestsCompleted + "/" + result.QuestsTotal;
             }
 
             if (retryButton != null && EventSystem.current != null)

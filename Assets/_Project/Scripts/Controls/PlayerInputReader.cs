@@ -34,6 +34,8 @@ namespace Ascua.Controls
         private InputAction radiusDownAction;
         private InputAction zoomScrollAction;
         private InputAction zoomPadAction;
+        private InputAction interactAction;
+        private InputAction pulseAction;
 
         /// <summary>Movimiento normalizado (x = lateral, y = adelante).</summary>
         public Vector2 Move { get; private set; }
@@ -47,6 +49,15 @@ namespace Ascua.Controls
         /// <summary>Cambio de distancia de cámara en "pasos" (negativo = acercar).</summary>
         public float ZoomDelta { get; private set; }
         public bool GameplayEnabled => gameplayMap != null && gameplayMap.enabled;
+        /// <summary>True mientras se mantiene Interactuar (E / botón A).</summary>
+        public bool InteractHeld { get; private set; }
+        /// <summary>Pulso de luz pulsado este frame (R / botón Y).</summary>
+        public bool PulsePressed { get; private set; }
+        /// <summary>
+        /// Cerca de un NPC la tecla E sirve para hablar: mientras sea true, E no cambia el tamaño del Farol
+        /// (Q y los bumpers siguen funcionando).
+        /// </summary>
+        public bool BlockRadiusUp { get; set; }
 
         private void Awake()
         {
@@ -113,6 +124,14 @@ namespace Ascua.Controls
             zoomPadAction.AddCompositeBinding("1DAxis")
                 .With("Negative", "<Gamepad>/dpad/up")
                 .With("Positive", "<Gamepad>/dpad/down");
+
+            // Interactuar (mantener): E o botón A / Cruz.
+            interactAction = gameplayMap.AddAction("Interact", InputActionType.Button, "<Keyboard>/e");
+            interactAction.AddBinding("<Gamepad>/buttonSouth");
+
+            // Pulso de luz: R o botón Y / Triángulo.
+            pulseAction = gameplayMap.AddAction("Pulse", InputActionType.Button, "<Keyboard>/r");
+            pulseAction.AddBinding("<Gamepad>/buttonNorth");
         }
 
         private void Update()
@@ -136,7 +155,9 @@ namespace Ascua.Controls
 
             SprintHeld = sprintAction.IsPressed();
             LanternHeld = lanternAction.IsPressed();
-            RadiusUpPressed = radiusUpAction.WasPressedThisFrame();
+            RadiusUpPressed = radiusUpAction.WasPressedThisFrame() && !(BlockRadiusUp && Keyboard.current != null && Keyboard.current.eKey.isPressed);
+            InteractHeld = interactAction.IsPressed();
+            PulsePressed = pulseAction.WasPressedThisFrame();
             RadiusDownPressed = radiusDownAction.WasPressedThisFrame();
 
             // La rueda se trata como pasos discretos (los valores crudos varían según plataforma).
@@ -167,6 +188,8 @@ namespace Ascua.Controls
             RadiusUpPressed = false;
             RadiusDownPressed = false;
             ZoomDelta = 0f;
+            InteractHeld = false;
+            PulsePressed = false;
         }
     }
 }
