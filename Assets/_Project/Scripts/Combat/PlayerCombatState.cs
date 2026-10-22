@@ -3,8 +3,10 @@ using Ascua.Core;
 using Ascua.Lighting;
 using Ascua.Player;
 using Ascua.UI;
+using System.Collections;
 using Unity.Cinemachine;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Ascua.Combat
 {
@@ -86,11 +88,6 @@ namespace Ascua.Combat
             if (energy != null) energy.ExhaustedChanged += OnExhaustedChanged;
         }
 
-        private void OnDisable()
-        {
-            if (energy != null) energy.ExhaustedChanged -= OnExhaustedChanged;
-        }
-
         /// <summary>Invulnerabilidad breve (la usa PlayerDash al inicio de la esquiva).</summary>
         public void GrantInvulnerability(float seconds)
         {
@@ -148,6 +145,7 @@ namespace Ascua.Combat
             // Feedback: Farol que tiembla, viñeta, sacudida (si se permite) y empujón hacia atrás.
             if (lantern != null) lantern.PlayHurtFlicker();
             if (DamageVignette.Instance != null) DamageVignette.Instance.Pulse(Mathf.Clamp01(energyDamage / 15f));
+            if (AccessibilitySettings.Rumble && Gamepad.current != null) StartCoroutine(Rumble(Mathf.Clamp01(energyDamage / 15f)));
             if (impulse != null && AccessibilitySettings.CameraShake) impulse.GenerateImpulseWithForce(impulseForce);
             if (controller != null && !controller.IsBusy)
             {
@@ -159,6 +157,22 @@ namespace Ascua.Combat
             EventBus.RaisePlayerHurt(lost);
             Hurt?.Invoke(lost);
             return IncomingHitResult.Hit;
+        }
+
+        /// <summary>Vibración corta del mando, proporcional al golpe (0.15-0.25 s reales).</summary>
+        private IEnumerator Rumble(float strength)
+        {
+            Gamepad pad = Gamepad.current;
+            if (pad == null) yield break;
+            pad.SetMotorSpeeds(0.15f + 0.25f * strength, 0.3f + 0.4f * strength);
+            yield return new WaitForSecondsRealtime(0.15f + 0.1f * strength);
+            pad.SetMotorSpeeds(0f, 0f);
+        }
+
+        private void OnDisable()
+        {
+            if (energy != null) energy.ExhaustedChanged -= OnExhaustedChanged;
+            if (Gamepad.current != null) Gamepad.current.SetMotorSpeeds(0f, 0f);
         }
 
         private void OnExhaustedChanged(bool exhausted)

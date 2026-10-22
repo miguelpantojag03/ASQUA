@@ -18,6 +18,8 @@ namespace Ascua.EditorTools
         public DiaryPage[] Pages;
         // Combate: lo que el Heraldo deja caer al alejarse tras un enfrentamiento.
         public DialogueSequence[] HeraldoRevelations;
+        // Parte C: noches 2-4 y Perpetua.
+        public NightAssets Nights;
     }
 
     /// <summary>
@@ -30,7 +32,7 @@ namespace Ascua.EditorTools
         private const string DataFolder = AscuaAssetFactory.Root + "/Data";
         private const string DialoguesFolder = DataFolder + "/Dialogos";
         private const string QuestsFolder = DataFolder + "/Misiones";
-        private const string NightsFolder = DataFolder + "/Noches";
+        internal const string NightsFolder = DataFolder + "/Noches";
         public const string Night1Path = NightsFolder + "/Noche_01_LoQueTodaviaBrilla.asset";
         private const string PagesFolder = DataFolder + "/Diario";
 
@@ -409,6 +411,7 @@ namespace Ascua.EditorTools
                 EditorUtility.SetDirty(n.Night1);
             }
 
+            n.Nights = AscuaNarrativeNights.CreateAll();
             return n;
         }
 
@@ -432,13 +435,13 @@ namespace Ascua.EditorTools
 
         // ------------------------------------------------------------------ Utilidades
 
-        private static DialogueLine L(string speaker, string text) => new DialogueLine(speaker, text);
+        internal static DialogueLine L(string speaker, string text) => new DialogueLine(speaker, text);
 
-        private static DialogueChoice Accept(string label) => new DialogueChoice(label, ChoiceAction.AceptarMision);
+        internal static DialogueChoice Accept(string label) => new DialogueChoice(label, ChoiceAction.AceptarMision);
 
-        private static DialogueChoice Decline(string label) => new DialogueChoice(label, ChoiceAction.RechazarMision);
+        internal static DialogueChoice Decline(string label) => new DialogueChoice(label, ChoiceAction.RechazarMision);
 
-        private static DialogueSequence Dialogue(string id, DialogueLine[] lines, params DialogueChoice[] choices)
+        internal static DialogueSequence Dialogue(string id, DialogueLine[] lines, params DialogueChoice[] choices)
         {
             return Load<DialogueSequence>($"{DialoguesFolder}/D_{id}.asset", d =>
             {
@@ -448,13 +451,13 @@ namespace Ascua.EditorTools
             });
         }
 
-        private static Quest QuestAsset(string fileName, System.Action<Quest> fill)
+        internal static Quest QuestAsset(string fileName, System.Action<Quest> fill)
         {
             return Load<Quest>($"{QuestsFolder}/{fileName}.asset", fill);
         }
 
         /// <summary>Carga el asset si existe (sin tocarlo); si no, lo crea y lo rellena.</summary>
-        private static T Load<T>(string path, System.Action<T> fill) where T : ScriptableObject
+        internal static T Load<T>(string path, System.Action<T> fill) where T : ScriptableObject
         {
             T existing = AssetDatabase.LoadAssetAtPath<T>(path);
             if (existing != null) return existing;

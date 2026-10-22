@@ -220,10 +220,17 @@ namespace Ascua.Combat
             if (away.sqrMagnitude > 0.0001f && push > 0f) knockVelocity = away.normalized * push * 4f;
 
             if (CombatFx.Instance != null) CombatFx.Instance.Impact(TargetPosition, hit.IsStrong);
-            EventBus.RaiseShadowHit(TargetPosition, hit.IsStrong);
 
             OnHit(hit);
-            if (health <= 0 && !dying) Die(hit);
+            bool lethal = health <= 0 && !dying;
+
+            // Impacto: freeze-frame + sacudida proporcional. El sonido sale del evento:
+            // ShadowHit (golpe / remate) o ShadowDefeated (disolución), nunca los dos a la vez.
+            HitWeight weight = lethal ? HitWeight.Disuelve : hit.IsStrong ? HitWeight.Fuerte : HitWeight.Normal;
+            if (HitFeedback.Instance != null) HitFeedback.Instance.Play(TargetPosition, weight);
+
+            if (lethal) Die(hit);
+            else EventBus.RaiseShadowHit(TargetPosition, hit.IsStrong);
             return true;
         }
 

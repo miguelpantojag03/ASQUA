@@ -85,6 +85,7 @@ namespace Ascua.Combat
             lastHitTime = Time.time;
             Vector3 from = TargetPosition;
             if (CombatFx.Instance != null) CombatFx.Instance.Dissolve(from, 1.2f, mistColor);
+            if (HitFeedback.Instance != null) HitFeedback.Instance.Play(from, hits >= hitsToRepel ? HitWeight.Disuelve : HitWeight.Fuerte);
             EventBus.RaiseHeraldoConfronted(hits, hits >= hitsToRepel);
 
             if (hits >= hitsToRepel)

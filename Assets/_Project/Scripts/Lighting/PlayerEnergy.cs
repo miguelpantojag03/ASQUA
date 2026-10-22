@@ -26,9 +26,16 @@ namespace Ascua.Lighting
         [Tooltip("Fracción de energía necesaria para salir del agotamiento.")]
         [SerializeField, Range(0f, 1f)] private float exhaustedRecoverFraction = 0.25f;
 
+        [Header("Energía crítica")]
+        [Tooltip("Por debajo de esta fracción la energía es crítica (aviso fuerte).")]
+        [SerializeField, Range(0f, 1f)] private float criticalFraction = 0.2f;
+        [Tooltip("Hay que superar esta fracción para salir del estado crítico (evita parpadeos).")]
+        [SerializeField, Range(0f, 1f)] private float criticalRecoverFraction = 0.25f;
+
         private float current;
         private float lastConsumeTime = -999f;
         private bool exhausted;
+        private bool critical;
 
         /// <summary>(actual, máximo)</summary>
         public event Action<float, float> EnergyChanged;
@@ -40,6 +47,9 @@ namespace Ascua.Lighting
         public float Max => maxEnergy;
         public float Normalized => current / maxEnergy;
         public bool IsExhausted => exhausted;
+        /// <summary>Energía bajo el 20 %: borde de pantalla, Farol y sonido avisan con fuerza.</summary>
+        public bool IsCritical => critical;
+        public event Action<bool> CriticalChanged;
         public bool CanConsume => !exhausted && current > 0f;
 
         private void Awake()
@@ -101,7 +111,17 @@ namespace Ascua.Lighting
 
             current = clamped;
             if (exhausted && current >= maxEnergy * exhaustedRecoverFraction) SetExhausted(false);
+            UpdateCritical();
             EnergyChanged?.Invoke(current, maxEnergy);
+        }
+
+        private void UpdateCritical()
+        {
+            bool next = critical ? current < maxEnergy * criticalRecoverFraction : current < maxEnergy * criticalFraction;
+            if (next == critical) return;
+            critical = next;
+            CriticalChanged?.Invoke(critical);
+            Ascua.Core.EventBus.RaiseEnergyCritical(critical);
         }
 
         private void SetExhausted(bool value)

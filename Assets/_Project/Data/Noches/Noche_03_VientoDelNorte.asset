@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b41d040cf55ca149a30616185a8516c, type: 3}
+  m_Name: Noche_03_VientoDelNorte
+  m_EditorClassIdentifier: 
+  setId: noche_03_vientodelnorte
+  nightNumber: 3
+  title: "Noche 3 \xB7 Viento del norte"
+  designNotes: "M\xE1s presi\xF3n: doble objetivo inverso (Plaza + Mercado), escolta
+    con menos margen de energ\xEDa y oleadas con Sombra velada."
+  quests:
+  - {fileID: 11400000, guid: b3b869470f845da4cbf86265e5422f19, type: 2}
+  - {fileID: 11400000, guid: 83562df1d59b16c45865e118e7065c74, type: 2}
+  nightDuration: 270
+  startHope: 62
+  hopeDecayPerSecond: 0.8
+  hopeRisePerSecond: 4
+  penumbraStartRadius: 60
+  penumbraEndRadius: 16
+  fastPenumbraCurve: 0
+  fireflySpawnInterval: 5
+  fireflyMaxActive: 5
+  surgeEnabled: 1
+  surgeAt: 0.45
+  surgeSeconds: 12
+  surgeMeters: 7
+  surgeDecayMultiplier: 1.7
+  decayIncreasePerNight: 0.15
+  waves:
+  - label: El viento trae Susurros
+    atProgress: 0.28
+    zoneId: Mercado
+    moths: 2
+    brutes: 0
+    veiledBrutes: 0
+    whispers: 1
+    echoes: 1
+    hopeDrainPerCreature: 1.2
+  - label: Sombras veladas en la fuente
+    atProgress: 0.6
+    zoneId: Plaza
+    moths: 2
+    brutes: 1
+    veiledBrutes: 1
+    whispers: 0
+    echoes: 0
+    hopeDrainPerCreature: 1.2
+  heraldoEnabled: 1
+  heraldoAppearAt: 0.25
+  heraldoChaseSpeed: 1.5

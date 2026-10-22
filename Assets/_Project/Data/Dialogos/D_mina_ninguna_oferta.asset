@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a88d24fd4be5b8b47a4cf23ae78f10ec, type: 3}
+  m_Name: D_mina_ninguna_oferta
+  m_EditorClassIdentifier: 
+  dialogueId: mina_ninguna_oferta
+  lines:
+  - speaker: Mina
+    text: "El viento ha apagado dos farolas de la plaza. Si cae otra, ya no ver\xE9
+      la fuente desde mi ventana."
+  - speaker: Mina
+    text: "Y Teo\u2026 he o\xEDdo ruido en el mercado. Sombras."
+  - speaker: Mina
+    text: "No puedo pedirte que elijas. As\xED que no elijas, \xBFvale?"
+  choices:
+  - label: 'No elijo: las dos'
+    action: 1
+    hopeDelta: 0
+    hopeZoneId: 
+    energyDelta: 0
+    bondDelta: 0
+    toast: 
+    setFlag: 
+  - label: Ahora no
+    action: 2
+    hopeDelta: 0
+    hopeZoneId: 
+    energyDelta: 0
+    bondDelta: 0
+    toast: 
+    setFlag: 

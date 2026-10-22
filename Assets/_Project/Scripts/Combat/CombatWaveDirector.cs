@@ -101,6 +101,44 @@ namespace Ascua.Combat
             if (spawnedActive && alive.Count == 0) ClearWave();
         }
 
+        /// <summary>
+        /// Sombras para una misión (doble objetivo): aparecen alrededor de la zona con una etiqueta propia
+        /// ('tag' hace de ZoneId), así no cuentan como oleada ni drenan Esperanza. Devuelve las invocadas.
+        /// </summary>
+        public List<ShadowCreature> SpawnGroup(string zoneId, int mothCount, int echoCount, string tag)
+        {
+            List<ShadowCreature> spawned = new List<ShadowCreature>();
+            ZoneHope zone = ZoneHope.Find(zoneId);
+            Vector3 center = zone != null ? zone.Center : Vector3.zero;
+            SpawnTagged(moths, mothCount, center, tag, spawned);
+            SpawnTagged(echoes, echoCount, center, tag, spawned);
+            return spawned;
+        }
+
+        /// <summary>Retira (sin botín) las sombras de una misión que terminó o falló.</summary>
+        public void VanishGroup(string tag)
+        {
+            var targets = LightTargetRegistry.All;
+            for (int i = targets.Count - 1; i >= 0; i--)
+            {
+                if (targets[i] is ShadowCreature c && c.IsAlive && c.ZoneId == tag) c.Vanish();
+            }
+        }
+
+        private void SpawnTagged<T>(T[] pool, int count, Vector3 center, string tag, List<ShadowCreature> result) where T : ShadowCreature
+        {
+            if (pool == null) return;
+            int spawned = 0;
+            for (int i = 0; i < pool.Length && spawned < count; i++)
+            {
+                T creature = pool[i];
+                if (creature == null || creature.gameObject.activeSelf) continue;
+                creature.Spawn(FindSpawnPoint(center), tag);
+                result.Add(creature);
+                spawned++;
+            }
+        }
+
         /// <summary>Lanza ya una oleada (pruebas, depuración). Devuelve false si no existe.</summary>
         public bool StartWaveNow(int index)
         {

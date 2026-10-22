@@ -16,10 +16,14 @@ namespace Ascua.EditorTools
         public Material Sweep, Beam, Staff, StaffCore;
         // Recuerdos y vecinos.
         public Material Brass, Silver, NpcEye, CartWood;
+        // Perpetua (Parte C): tela gris cálida y chal lila (su color de acento, distinto de Mina y Teo).
+        public Material PerpetuaBody, PerpetuaShawl;
         public Mesh ArcMesh, BeamMesh, EyeMesh;
         /// <summary>Iconos de línea por tipo de misión (orden de QuestType) + combate.</summary>
         public Sprite[] QuestIcons;
         public Sprite CombatIcon, FrameSprite, DotSprite;
+        /// <summary>Fondo de vidrio esmerilado del sistema de diseño (9-slice, se tiñe).</summary>
+        public Sprite PanelSprite;
     }
 
     /// <summary>
@@ -84,6 +88,11 @@ namespace Ascua.EditorTools
             Fabric(m.MinaAccent, fabric, noise, ch.Fabric, AscuaPalette.RojoMina, AscuaPalette.Hdr(AscuaPalette.RojoMina, 0.55f), 0.55f, 12f, new Color(1f, 0.45f, 0.5f));
             Fabric(m.TeoAccent, fabric, noise, ch.Fabric, AscuaPalette.TurquesaTeo, AscuaPalette.Hdr(AscuaPalette.TurquesaTeo, 0.45f), 0.5f, 10f, new Color(0.5f, 1f, 0.95f));
 
+            c.PerpetuaBody = AscuaAssetFactory.Lit("M_Perpetua_Base", new Color(0.42f, 0.4f, 0.44f), 0.25f);
+            c.PerpetuaShawl = AscuaAssetFactory.Lit("M_Perpetua_Chal", new Color(0.78f, 0.64f, 0.85f), 0.3f);
+            Fabric(c.PerpetuaBody, fabric, noise, ch.Fabric, new Color(0.42f, 0.4f, 0.44f), Color.black, 0.4f, 6f, new Color(0.6f, 0.55f, 0.85f));
+            Fabric(c.PerpetuaShawl, fabric, noise, ch.Fabric, new Color(0.78f, 0.64f, 0.85f), new Color(0.78f, 0.64f, 0.85f) * 0.45f, 0.6f, 14f, new Color(0.9f, 0.8f, 1f));
+
             // --- Mallas.
             c.ArcMesh = BuildMesh("M_ArcoBarrido", BuildArc);
             c.BeamMesh = BuildMesh("M_HazRecto", BuildBeam);
@@ -97,11 +106,13 @@ namespace Ascua.EditorTools
                 Icon("UI_Icono_Escolta", IconEscort),
                 Icon("UI_Icono_Dialogo", IconDialogue),
                 Icon("UI_Icono_Trato", IconDeal),
-                Icon("UI_Icono_Entrega", IconDelivery)
+                Icon("UI_Icono_Entrega", IconDelivery),
+                Icon("UI_Icono_DobleObjetivo", IconDouble)
             };
             c.CombatIcon = Icon("UI_Icono_Combate", IconCombat);
             c.FrameSprite = CreateFrameSprite();
             c.DotSprite = CreateDotSprite();
+            c.PanelSprite = CreatePanelSprite();
             return c;
         }
 
@@ -353,6 +364,12 @@ namespace Ascua.EditorTools
             return Mathf.Min(d, Polyline(p, new Vector2(-0.32f, 0.22f), new Vector2(0f, -0.04f), new Vector2(0.32f, 0.22f)));
         }
 
+        /// <summary>Doble objetivo: dos anillos enlazados (dos cosas a la vez).</summary>
+        private static float IconDouble(Vector2 p)
+        {
+            return Mathf.Min(Ring(p, new Vector2(-0.12f, 0f), 0.2f), Ring(p, new Vector2(0.12f, 0f), 0.2f));
+        }
+
         /// <summary>Combate: sol de luz (anillo con 8 rayos).</summary>
         private static float IconCombat(Vector2 p)
         {
@@ -391,6 +408,28 @@ namespace Ascua.EditorTools
                 }
             }
             return SaveSprite("UI_MarcoAmbar", size, pixels, new Vector4(16f, 16f, 16f, 16f));
+        }
+
+        /// <summary>
+        /// Vidrio esmerilado: blanco con grano muy fino y un degradado vertical suave (arriba algo
+        /// más claro). Esquinas rectas (decisión única del sistema de diseño: angular). 9-slice de 16 px.
+        /// </summary>
+        private static Sprite CreatePanelSprite()
+        {
+            const int size = 64;
+            Color32[] pixels = new Color32[size * size];
+            System.Random rng = new System.Random(17);
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float gradient = Mathf.Lerp(0.86f, 1f, (float)y / (size - 1));
+                    float grain = 0.94f + 0.06f * (float)rng.NextDouble();
+                    byte v = (byte)(Mathf.Clamp01(gradient * grain) * 255f);
+                    pixels[y * size + x] = new Color32(v, v, v, 255);
+                }
+            }
+            return SaveSprite("UI_PanelEsmerilado", size, pixels, new Vector4(16f, 16f, 16f, 16f));
         }
 
         private static Sprite CreateDotSprite()

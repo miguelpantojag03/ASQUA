@@ -18,6 +18,9 @@ namespace Ascua.Core
         private static readonly HashSet<string> recuerdos = new HashSet<string>();
         // Páginas encontradas en ESTA noche, en orden: los Susurros roban la última.
         private static readonly List<string> pagesThisNight = new List<string>();
+        // Decisiones con consecuencia tardía (p. ej. a quién dio Ilse las velas de reserva en la Noche 2).
+        private static readonly HashSet<string> flags = new HashSet<string>();
+        private static readonly List<string> flagsThisNight = new List<string>();
 
         /// <summary>Noche actual (1, 2, 3...).</summary>
         public static int CurrentNight { get; private set; } = 1;
@@ -50,6 +53,8 @@ namespace Ascua.Core
             seenMoments.Clear();
             recuerdos.Clear();
             pagesThisNight.Clear();
+            flags.Clear();
+            flagsThisNight.Clear();
             WavesDefended = 0;
         }
 
@@ -57,6 +62,7 @@ namespace Ascua.Core
         {
             CurrentNight++;
             pagesThisNight.Clear();
+            flagsThisNight.Clear();
         }
 
         public static void MarkQuestCompleted(string questId) => completedQuests.Add(questId);
@@ -96,6 +102,25 @@ namespace Ascua.Core
         public static bool HasRecuerdo(string id) => recuerdos.Contains(id);
 
         public static void AddWaveDefended() => WavesDefended++;
+
+        /// <summary>Guarda una decisión que tendrá consecuencias en noches futuras.</summary>
+        public static void SetFlag(string flag)
+        {
+            if (string.IsNullOrEmpty(flag) || !flags.Add(flag)) return;
+            flagsThisNight.Add(flag);
+        }
+
+        public static bool HasFlag(string flag) => !string.IsNullOrEmpty(flag) && flags.Contains(flag);
+
+        /// <summary>Al reintentar una noche se deshacen las decisiones tomadas en ella.</summary>
+        public static void RevertNightFlags()
+        {
+            foreach (string flag in flagsThisNight) flags.Remove(flag);
+            flagsThisNight.Clear();
+        }
+
+        /// <summary>Solo para pruebas: salta directamente a una noche concreta.</summary>
+        public static void SetNightForTesting(int night) => CurrentNight = Mathf.Max(1, night);
         public static bool HasPage(string pageId) => foundPages.Contains(pageId);
 
         /// <summary>Registra un atajo descubierto. Devuelve true si es nuevo.</summary>

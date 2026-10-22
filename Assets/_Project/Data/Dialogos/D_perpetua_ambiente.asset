@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a88d24fd4be5b8b47a4cf23ae78f10ec, type: 3}
+  m_Name: D_perpetua_ambiente
+  m_EditorClassIdentifier: 
+  dialogueId: perpetua_ambiente
+  lines:
+  - speaker: Perpetua
+    text: "Las noches de antes eran igual de oscuras, \xBFsabes? Pero hab\xEDa m\xE1s
+      ventanas encendidas."
+  - speaker: Perpetua
+    text: "Mi Ram\xF3n dec\xEDa que la oscuridad no da miedo. Lo que da miedo es
+      estar solo en ella."
+  choices: []

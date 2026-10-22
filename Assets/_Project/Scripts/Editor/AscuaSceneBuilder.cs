@@ -203,6 +203,8 @@ namespace Ascua.EditorTools
             // Se recarga desde disco: el asset pudo reimportarse tras crearse y la referencia en memoria quedaría vacía.
             AssetDatabase.SaveAssets();
             Wire(night, "questSet", AssetDatabase.LoadAssetAtPath<NightQuestSet>(AscuaNarrativeContent.Night1Path));
+            // Parte C: las noches 2-4 tienen su propio set (datos), elegido por número de noche.
+            WireArray(night, "laterNights", LaterNightSets());
             BuildFireflies(m);
 
             // --- Misiones: gestor persistente, habilidades de Vínculo, velas de Teo y puntos de misión
@@ -221,6 +223,8 @@ namespace Ascua.EditorTools
             GameObject player = BuildPlayer(assets, out Transform cameraTarget, out PlayerInputReader input);
             BuildMina(assets, plazaZone);
             BuildTeo(assets, mercadoZone);
+            BuildPerpetua(assets, mercadoZone);
+            BuildCasaAncianos(m);
             BuildHeraldo(assets);
 
             // --- Cámara en tercera persona
@@ -233,6 +237,8 @@ namespace Ascua.EditorTools
             BuildHud(player, assets, night, new[] { plazaZone, mercadoZone });
             BuildPauseAndCodex(assets);
             BuildPhotoMode(assets);
+            ApplyMenuDesign(assets);
+            BuildHitFeedback();
             BuildAudio(assets.Audio);
 
             // --- Impacto al morir una zona: sacudida de cámara + sonido
@@ -1255,6 +1261,8 @@ namespace Ascua.EditorTools
             // Ronda de mejoras: objetivo, flecha, tutorial, stamina, inventario, subtítulos, momento y ráfaga.
             CanvasGroup surgeVignette = BuildHudExtras(canvas, player, assets);
             BuildCombatHud(canvas, player, assets);
+            // Parte A: mismo marco y fondo para toda la UI + capas de prioridad (diálogo / combate).
+            ApplyHudDesign(canvas, player, assets);
             BuildNightEvent(assets, canvas);
             BuildSurge(surgeVignette);
             root.Find("Resumen_Noche").SetAsLastSibling(); // el resumen tapa todo el HUD de juego
@@ -1457,7 +1465,25 @@ namespace Ascua.EditorTools
                 buttons[i] = button;
             }
 
+            // Parte C: resumen multilínea de la misión ofrecida (objetivo, secundario, límites, consecuencias).
+            RectTransform summary = UIRect("Resumen_Mision", root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(0f, 506f), new Vector2(900f, 150f));
+            summary.gameObject.AddComponent<Image>().color = new Color(0.02f, 0.03f, 0.08f, 0.9f);
+            CanvasGroup summaryGroup = summary.gameObject.AddComponent<CanvasGroup>();
+            summaryGroup.alpha = 0f;
+            summaryGroup.blocksRaycasts = false;
+            summaryGroup.interactable = false;
+            TextMeshProUGUI summaryText = UIText("Texto", summary, "", 22f, new Color(0.9f, 0.92f, 1f), TextAlignmentOptions.TopLeft,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            summaryText.margin = new Vector4(22f, 14f, 22f, 12f);
+            summaryText.richText = true;
+            summaryText.enableAutoSizing = true;
+            summaryText.fontSizeMin = 16f;
+            summaryText.fontSizeMax = 22f;
+
             DialogueRunner runner = root.gameObject.AddComponent<DialogueRunner>();
+            Wire(runner, "offerSummaryGroup", summaryGroup);
+            Wire(runner, "offerSummaryText", summaryText);
             Wire(runner, "group", group);
             Wire(runner, "speakerText", speaker);
             Wire(runner, "bodyText", body);
@@ -1712,6 +1738,7 @@ namespace Ascua.EditorTools
                 new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-40f, 30f), new Vector2(400f, 30f));
 
             CanvasGroup fade = CreateFade(root);
+            StyleButtons(root, GetStyleKit(assets));
 
             TitleScreen titleScreen = canvas.gameObject.AddComponent<TitleScreen>();
             Wire(titleScreen, "titleText", title);

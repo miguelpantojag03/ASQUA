@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b41d040cf55ca149a30616185a8516c, type: 3}
+  m_Name: Noche_04_LaVigilia
+  m_EditorClassIdentifier: 
+  setId: noche_04_lavigilia
+  nightNumber: 4
+  title: "Noche 4 \xB7 La vigilia"
+  designNotes: "Cierre del primer arco: la vigilia del Mercado cambia seg\xFAn la
+    decisi\xF3n de la Noche 2; doble objetivo m\xE1s exigente; oleadas de 4 criaturas."
+  quests:
+  - {fileID: 11400000, guid: 26884f235ec881941b3238886d45bc21, type: 2}
+  - {fileID: 11400000, guid: cc7dbf11379bc2d489f22e5f09783cea, type: 2}
+  nightDuration: 280
+  startHope: 60
+  hopeDecayPerSecond: 0.9
+  hopeRisePerSecond: 4
+  penumbraStartRadius: 60
+  penumbraEndRadius: 16
+  fastPenumbraCurve: 1
+  fireflySpawnInterval: 5
+  fireflyMaxActive: 5
+  surgeEnabled: 1
+  surgeAt: 0.5
+  surgeSeconds: 14
+  surgeMeters: 7
+  surgeDecayMultiplier: 1.7
+  decayIncreasePerNight: 0.15
+  waves:
+  - label: "La \xFAltima vigilia"
+    atProgress: 0.25
+    zoneId: Plaza
+    moths: 3
+    brutes: 0
+    veiledBrutes: 0
+    whispers: 0
+    echoes: 1
+    hopeDrainPerCreature: 1.2
+  - label: Todas las sombras
+    atProgress: 0.55
+    zoneId: Mercado
+    moths: 1
+    brutes: 1
+    veiledBrutes: 1
+    whispers: 1
+    echoes: 0
+    hopeDrainPerCreature: 1.2
+  heraldoEnabled: 1
+  heraldoAppearAt: 0.20000002
+  heraldoChaseSpeed: 1.6

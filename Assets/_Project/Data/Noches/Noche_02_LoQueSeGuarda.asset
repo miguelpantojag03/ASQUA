@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b41d040cf55ca149a30616185a8516c, type: 3}
+  m_Name: Noche_02_LoQueSeGuarda
+  m_EditorClassIdentifier: 
+  setId: noche_02_loqueseguarda
+  nightNumber: 2
+  title: "Noche 2 \xB7 Lo que se guarda"
+  designNotes: "Dificultad: doble objetivo (Mercado + Plaza), primera escolta con
+    energ\xEDa limitada y la decisi\xF3n de las velas (consecuencia en la Noche 4)."
+  quests:
+  - {fileID: 11400000, guid: 378c92cb79376dd4d8befde3b3a969e8, type: 2}
+  - {fileID: 11400000, guid: 77e3d96ef65022448bb937cad4dc62c8, type: 2}
+  - {fileID: 11400000, guid: ffe0b311dbe8f14458754ae4e202c1ae, type: 2}
+  nightDuration: 260
+  startHope: 65
+  hopeDecayPerSecond: 0.7
+  hopeRisePerSecond: 4
+  penumbraStartRadius: 60
+  penumbraEndRadius: 16
+  fastPenumbraCurve: 0
+  fireflySpawnInterval: 5
+  fireflyMaxActive: 5
+  surgeEnabled: 1
+  surgeAt: 0.5
+  surgeSeconds: 10
+  surgeMeters: 7
+  surgeDecayMultiplier: 1.7
+  decayIncreasePerNight: 0.15
+  waves:
+  - label: Polillas sobre la fuente
+    atProgress: 0.3
+    zoneId: Plaza
+    moths: 3
+    brutes: 0
+    veiledBrutes: 0
+    whispers: 0
+    echoes: 1
+    hopeDrainPerCreature: 1.2
+  - label: Robo en el Mercado
+    atProgress: 0.62
+    zoneId: Mercado
+    moths: 2
+    brutes: 1
+    veiledBrutes: 0
+    whispers: 1
+    echoes: 0
+    hopeDrainPerCreature: 1.2
+  heraldoEnabled: 1
+  heraldoAppearAt: 0.3
+  heraldoChaseSpeed: 1.4

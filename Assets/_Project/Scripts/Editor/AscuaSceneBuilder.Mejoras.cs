@@ -409,6 +409,10 @@ namespace Ascua.EditorTools
             Wire(audio, "sfxWaveCleared", a.WaveCleared);
             Wire(audio, "sfxBruteWarning", a.BruteWarning);
             Wire(audio, "sfxShadowBolt", a.ShadowBolt);
+            Wire(audio, "sfxComboFinisher", a.ComboFinisher);
+            Wire(audio, "sfxPowerDown", a.PowerDown);
+            Wire(audio, "sfxCriticalEnergy", a.CriticalEnergy);
+            Wire(audio, "sfxThreat", a.Threat);
         }
 
         // ================================================================== HUD nuevo
@@ -459,8 +463,8 @@ namespace Ascua.EditorTools
                 new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(70f, -46f), new Vector2(-90f, 44f));
             objectiveAction.richText = true;
             RectTransform progressBack = UIRect("Progreso", objective, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
-            progressBack.offsetMin = new Vector2(70f, 9f);
-            progressBack.offsetMax = new Vector2(-24f, 13f);
+            progressBack.offsetMin = new Vector2(70f, 12f);
+            progressBack.offsetMax = new Vector2(-24f, 16f);
             Image progressBackImage = progressBack.gameObject.AddComponent<Image>();
             progressBackImage.color = new Color(0.08f, 0.1f, 0.2f, 0.9f);
             progressBackImage.raycastTarget = false;
@@ -471,6 +475,22 @@ namespace Ascua.EditorTools
             progressFill.color = amber;
             progressFill.raycastTarget = false;
             progressBack.gameObject.SetActive(false);
+
+            // Parte C: segunda barra (objetivo B del doble objetivo, o energía gastada en un presupuesto).
+            RectTransform secondaryBack = UIRect("Progreso_B", objective, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
+            secondaryBack.offsetMin = new Vector2(70f, 5f);
+            secondaryBack.offsetMax = new Vector2(-24f, 9f);
+            Image secondaryBackImage = secondaryBack.gameObject.AddComponent<Image>();
+            secondaryBackImage.color = new Color(0.08f, 0.1f, 0.2f, 0.9f);
+            secondaryBackImage.raycastTarget = false;
+            Image secondaryFill = UIRect("Relleno", secondaryBack, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero).gameObject.AddComponent<Image>();
+            secondaryFill.sprite = assets.Character.WhiteSprite;
+            secondaryFill.type = Image.Type.Filled;
+            secondaryFill.fillMethod = Image.FillMethod.Horizontal;
+            secondaryFill.color = new Color(0.72f, 0.8f, 1f);
+            secondaryFill.raycastTarget = false;
+            secondaryBack.gameObject.SetActive(false);
+
             ObjectiveTrackerUI tracker = objective.gameObject.AddComponent<ObjectiveTrackerUI>();
             Wire(tracker, "group", objectiveGroup);
             Wire(tracker, "titleText", objectiveTitle);
@@ -481,6 +501,8 @@ namespace Ascua.EditorTools
             Wire(tracker, "progressFill", progressFill);
             WireArray(tracker, "typeIcons", assets.Combat.QuestIcons);
             Wire(tracker, "combatIcon", assets.Combat.CombatIcon);
+            Wire(tracker, "secondaryRoot", secondaryBack.gameObject);
+            Wire(tracker, "secondaryFill", secondaryFill);
 
             // --- Flecha de dirección: marcador centrado que el script recoloca cada frame.
             RectTransform marker = UIRect("Flecha_Objetivo", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120f, 110f));
@@ -635,6 +657,7 @@ namespace Ascua.EditorTools
             Toggle subtitles = UIToggle("Subtitulos", access, "Subtítulos de efectos de sonido", new Vector2(0.25f, 0.38f));
             Toggle flashes = UIToggle("Destellos", access, "Reducir destellos (daño, aberración, combate)", new Vector2(0.25f, 0.26f));
             flashes.isOn = false;
+            Toggle rumble = UIToggle("Vibracion", access, "Vibración del mando al recibir daño", new Vector2(0.25f, 0.14f));
             UIText("Ayuda", access, "Esc · volver", 20f, new Color(cold.r, cold.g, cold.b, 0.55f), TextAlignmentOptions.Center,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(600f, 30f));
 
@@ -654,6 +677,7 @@ namespace Ascua.EditorTools
             Wire(menu, "shakeToggle", shake);
             Wire(menu, "subtitlesToggle", subtitles);
             Wire(menu, "flashesToggle", flashes);
+            Wire(menu, "rumbleToggle", rumble);
 
             // --- Diario de Ilse (Codex)
             RectTransform codex = UIRect("Diario", root, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);

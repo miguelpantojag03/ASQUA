@@ -54,7 +54,7 @@ namespace Ascua.Core
         /// <summary>Ilse lanza un barrido de luz. Arg: paso del combo (1-3; 4 = ataque cargado).</summary>
         public static event Action<int> PlayerAttacked;
 
-        /// <summary>Un golpe de luz alcanza a una criatura. Args: posición, golpe fuerte.</summary>
+        /// <summary>Un golpe de luz alcanza a una criatura SIN disolverla (si la disuelve: ShadowDefeated). Args: posición, golpe fuerte.</summary>
         public static event Action<Vector3, bool> ShadowHit;
 
         /// <summary>Una criatura de sombra se disuelve en luz. Args: tipo, posición.</summary>
@@ -83,6 +83,12 @@ namespace Ascua.Core
 
         /// <summary>Habilidad especial usada (vela de Teo, Brasa guardiana, Vara de luz...). Arg: id.</summary>
         public static event Action<string> AbilityUsed;
+
+        /// <summary>Una sombra entra por primera vez en el radio de detección. Arg: posición.</summary>
+        public static event Action<Vector3> ThreatDetected;
+
+        /// <summary>La energía del Farol entra (true) o sale (false) de la zona crítica (&lt; 20 %).</summary>
+        public static event Action<bool> EnergyCritical;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
@@ -113,6 +119,8 @@ namespace Ascua.Core
             HeraldoConfronted = null;
             RecuerdoUnlocked = null;
             AbilityUsed = null;
+            ThreatDetected = null;
+            EnergyCritical = null;
         }
 
         public static void RaiseCelebration(string reason) => CelebrationRequested?.Invoke(reason);
@@ -141,5 +149,7 @@ namespace Ascua.Core
         public static void RaiseHeraldoConfronted(int hits, bool completed) => HeraldoConfronted?.Invoke(hits, completed);
         public static void RaiseRecuerdoUnlocked(string id) => RecuerdoUnlocked?.Invoke(id);
         public static void RaiseAbilityUsed(string id) => AbilityUsed?.Invoke(id);
+        public static void RaiseThreatDetected(Vector3 position) => ThreatDetected?.Invoke(position);
+        public static void RaiseEnergyCritical(bool critical) => EnergyCritical?.Invoke(critical);
     }
 }

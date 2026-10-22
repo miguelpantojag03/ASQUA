@@ -105,7 +105,7 @@ namespace Ascua.Narrative
             CharacterAI npc = CharacterAI.Find(npcId);
             Transform focus = npc != null ? npc.transform : null;
 
-            float previousTimeScale = Time.timeScale;
+            float previousTimeScale = Ascua.Combat.HitFeedback.UnfrozenTimeScale;
             Time.timeScale = previousTimeScale * slowMotion;
 
             // Corte seco al plano (y vuelta suave al final).
