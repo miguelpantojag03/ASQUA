@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Ascua.Characters;
+using Ascua.Combat;
 using Ascua.Controls;
 using Ascua.Core;
 using Ascua.Lighting;
@@ -137,6 +138,7 @@ namespace Ascua.EditorTools
         private static void ConfigureProject()
         {
             PlayerSettings.productName = "Ascua";
+            ConfigureRendering();
             EditorBuildSettings.scenes = new[]
             {
                 new EditorBuildSettingsScene(TitleScenePath, true),
@@ -162,7 +164,7 @@ namespace Ascua.EditorTools
             atmosphere.Configure(AscuaPalette.Niebla, 0.022f,
                 new Color(0.22f, 0.27f, 0.48f), new Color(0.15f, 0.18f, 0.34f), new Color(0.08f, 0.09f, 0.17f), mainCamera);
 
-            CreateDirectionalLight("Luna", Quaternion.Euler(35f, 20f, 0f), AscuaPalette.Hex("#8FA3E0"), 0.4f, 0.7f);
+            CreateDirectionalLight("Luna", Quaternion.Euler(35f, 20f, 0f), AscuaPalette.Hex("#8FA3E0"), 0.4f, 0.6f);
             CreateGlobalVolume(assets.VolumeProfile);
 
             // --- Entorno estático
@@ -210,6 +212,8 @@ namespace Ascua.EditorTools
             BuildCandles(assets);
             BuildPickups(assets);
             BuildExplorationShortcuts(assets);
+            BuildCombatWorld(assets);
+            BuildTeoCart(assets, MercadoCenter + new Vector3(5.6f, 0.05f, 6.4f), -30f);
             new GameObject("Punto_Malecon_Mina").AddComponent<QuestPoint>().Configure("malecon_mina");
             GameObject.Find("Punto_Malecon_Mina").transform.position = new Vector3(4f, 0.1f, -13.8f);
 
@@ -239,6 +243,10 @@ namespace Ascua.EditorTools
             impulse.ImpulseDefinition.ImpulseDuration = 0.8f;
             ZoneDeathFeedback deathFeedback = feedback.AddComponent<ZoneDeathFeedback>();
             Wire(deathFeedback, "impulseSource", impulse);
+
+            // --- Gráficos: tintes por instancia, post-procesado dinámico y reflejos
+            ApplyTintVariation(m);
+            BuildRenderingExtras(player);
 
             // --- NavMesh (al final, con toda la geometría ya colocada)
             BakeNavMesh();
@@ -299,7 +307,9 @@ namespace Ascua.EditorTools
             root.localRotation = Quaternion.Euler(0f, yaw, 0f);
             root.gameObject.AddComponent<PenumbraFade>();
 
-            Prim(PrimitiveType.Cube, "Muro", root, new Vector3(0f, height * 0.5f, depth * 0.5f), new Vector3(width, height, depth), wall);
+            // Ladrillo compartido por todos los edificios; el color de cada uno es un tinte por instancia.
+            GameObject muro = Prim(PrimitiveType.Cube, "Muro", root, new Vector3(0f, height * 0.5f, depth * 0.5f), new Vector3(width, height, depth), m.BrickWall);
+            muro.AddComponent<SurfaceTint>().Configure(wall.GetColor("_BaseColor") * 1.35f);
             Prim(PrimitiveType.Cube, "Cornisa", root, new Vector3(0f, height + 0.12f, depth * 0.5f), new Vector3(width + 0.4f, 0.25f, depth + 0.4f), m.Trim, Col.None);
 
             // Tejado a dos aguas: cubo girado 45º y aplastado por su pivote.
@@ -377,7 +387,10 @@ namespace Ascua.EditorTools
             light.color = AscuaPalette.Ambar;
             light.range = 5f;
             light.intensity = 0f;
-            light.shadows = LightShadows.None;
+            // Ventanas clave de La Plaza: proyectan sombras suaves (resolución baja, 256) sobre la calle.
+            light.shadows = zoneId == PlazaZone ? LightShadows.Soft : LightShadows.None;
+            light.shadowStrength = 0.7f;
+            if (zoneId == PlazaZone) SetShadowTier(light, 0);
             light.enabled = false;
             Wire(windowLight, "glowLight", light);
         }
@@ -711,8 +724,10 @@ namespace Ascua.EditorTools
 
         // ================================================================== Personajes
 
+        /// <param name="torso">Escala del torso (null = la de Ilse). Da a cada vecino su silueta.</param>
+        /// <param name="limb">Grosor de brazos y piernas (1 = Ilse). Mismo rig y animaciones para todos.</param>
         private static ChibiParts BuildChibi(string name, Vector3 position, float yaw, float visualScale, float headSize,
-            Material body, RuntimeAnimatorController controller, bool castShadows)
+            Material body, RuntimeAnimatorController controller, bool castShadows, Vector3? torso = null, float limb = 1f)
         {
             ChibiParts parts = new ChibiParts();
             parts.Root = new GameObject(name);
@@ -726,20 +741,20 @@ namespace Ascua.EditorTools
             parts.Animator.applyRootMotion = false;
 
             parts.Rig = Pivot("Rig", parts.Visual, new Vector3(0f, AscuaAssetFactory.HipsHeight, 0f));
-            Prim(PrimitiveType.Capsule, "Torso", parts.Rig, new Vector3(0f, 0.27f, 0f), new Vector3(0.44f, 0.3f, 0.34f), body, Col.None, null, castShadows);
+            Prim(PrimitiveType.Capsule, "Torso", parts.Rig, new Vector3(0f, 0.27f, 0f), torso ?? new Vector3(0.44f, 0.3f, 0.34f), body, Col.None, null, castShadows);
 
             parts.Head = Pivot("Head", parts.Rig, new Vector3(0f, 0.62f, 0f));
             Prim(PrimitiveType.Sphere, "Cabeza", parts.Head, new Vector3(0f, headSize * 0.5f - 0.02f, 0f), Vector3.one * headSize, body, Col.None, null, castShadows);
 
             Transform armL = Pivot("ArmL", parts.Rig, new Vector3(-0.27f, 0.5f, 0f));
-            Prim(PrimitiveType.Capsule, "Brazo", armL, new Vector3(0f, -0.19f, 0f), new Vector3(0.13f, 0.2f, 0.13f), body, Col.None, null, castShadows);
+            Prim(PrimitiveType.Capsule, "Brazo", armL, new Vector3(0f, -0.19f, 0f), new Vector3(0.13f * limb, 0.2f, 0.13f * limb), body, Col.None, null, castShadows);
             Transform armR = Pivot("ArmR", parts.Rig, new Vector3(0.27f, 0.5f, 0f));
-            Prim(PrimitiveType.Capsule, "Brazo", armR, new Vector3(0f, -0.19f, 0f), new Vector3(0.13f, 0.2f, 0.13f), body, Col.None, null, castShadows);
+            Prim(PrimitiveType.Capsule, "Brazo", armR, new Vector3(0f, -0.19f, 0f), new Vector3(0.13f * limb, 0.2f, 0.13f * limb), body, Col.None, null, castShadows);
 
             Transform legL = Pivot("LegL", parts.Rig, new Vector3(-0.11f, 0.02f, 0f));
-            Prim(PrimitiveType.Capsule, "Pierna", legL, new Vector3(0f, -0.27f, 0f), new Vector3(0.17f, 0.28f, 0.17f), body, Col.None, null, castShadows);
+            Prim(PrimitiveType.Capsule, "Pierna", legL, new Vector3(0f, -0.27f, 0f), new Vector3(0.17f * limb, 0.28f, 0.17f * limb), body, Col.None, null, castShadows);
             Transform legR = Pivot("LegR", parts.Rig, new Vector3(0.11f, 0.02f, 0f));
-            Prim(PrimitiveType.Capsule, "Pierna", legR, new Vector3(0f, -0.27f, 0f), new Vector3(0.17f, 0.28f, 0.17f), body, Col.None, null, castShadows);
+            Prim(PrimitiveType.Capsule, "Pierna", legR, new Vector3(0f, -0.27f, 0f), new Vector3(0.17f * limb, 0.28f, 0.17f * limb), body, Col.None, null, castShadows);
 
             return parts;
         }
@@ -797,6 +812,9 @@ namespace Ascua.EditorTools
             light.shadows = LightShadows.Soft;
             light.shadowStrength = 0.85f;
             light.shadowNearPlane = 0.15f;
+            // Es la única luz cálida que se mueve: sombras largas y dinámicas (resolución media: 6 caras de
+            // 512 caben en el atlas de 2048 junto a las ventanas, sin que URP tenga que reducirlas).
+            SetShadowTier(light, 1);
 
             // --- Luz de relleno sobre el personaje (sin sombras, no cuenta para la jugabilidad)
             GameObject fillObject = new GameObject("Luz_Relleno");
@@ -872,6 +890,8 @@ namespace Ascua.EditorTools
 
             // Ronda de mejoras: movilidad, recogida y broche.
             AddPlayerImprovements(assets, parts, input, controller, energy, lanternPivot, lightObject.transform);
+            // Combate de luz: barrido, combo, i-frames, Vara de luz y habilidades de Vínculo.
+            AddPlayerCombat(assets, parts, input, controller, energy, lantern, lanternPivot);
 
             SetLayerRecursively(player, IgnoreRaycastLayer);
             PrefabUtility.SaveAsPrefabAssetAndConnect(player, AscuaAssetFactory.PrefabsFolder + "/Ilse.prefab", InteractionMode.AutomatedAction);
@@ -883,7 +903,9 @@ namespace Ascua.EditorTools
             AscuaMaterials m = assets.Materials;
 
             // Mina: silueta pequeña, ropa neutra fría y bufanda roja emisiva.
-            ChibiParts parts = BuildChibi("NPC_Mina", new Vector3(3.6f, 0.12f, -4.2f), 205f, 0.78f, 0.6f, m.MinaBody, assets.ChibiController, true);
+            // Mina: pequeña y esbelta (torso estrecho, extremidades finas).
+            ChibiParts parts = BuildChibi("NPC_Mina", new Vector3(3.6f, 0.12f, -4.2f), 205f, 0.78f, 0.6f, m.MinaBody, assets.ChibiController, true,
+                new Vector3(0.34f, 0.32f, 0.27f), 0.82f);
 
             GameObject scarf = Prim(PrimitiveType.Cylinder, "Bufanda", parts.Rig, new Vector3(0f, 0.6f, 0f), new Vector3(0.4f, 0.06f, 0.36f), m.MinaAccent, Col.None);
             GameObject scarfTail = Prim(PrimitiveType.Cube, "BufandaCola", parts.Rig, new Vector3(0.1f, 0.45f, 0.17f), new Vector3(0.1f, 0.32f, 0.04f), m.MinaAccent, Col.None, Quaternion.Euler(12f, 0f, -8f));
@@ -897,6 +919,7 @@ namespace Ascua.EditorTools
             });
 
             SetupNpc(parts, "mina", "Mina", AscuaPalette.RojoMina, accents, 1.32f, 0.3f, assets.Narrative.MinaIdle, assets.Character.Indicator);
+            AddNpcEyes(parts, assets.Combat, 0.6f, new Color(1f, 0.9f, 0.82f));
             CharacterAI ai = parts.Root.GetComponent<CharacterAI>();
             ai.Configure(null, null, accents, AscuaPalette.RojoMina);
 
@@ -911,7 +934,9 @@ namespace Ascua.EditorTools
             Color accent = AscuaPalette.TurquesaTeo;
 
             // Teo Bravo: comerciante robusto (torso ancho, gorra) con delantal turquesa.
-            ChibiParts parts = BuildChibi("NPC_Teo", MercadoCenter + new Vector3(2f, 0.12f, 0f), 180f, 0.95f, 0.5f, m.TeoBody, assets.ChibiController, true);
+            // Teo: bajo y ancho (torso ancho y corto, extremidades gruesas) con el mismo rig.
+            ChibiParts parts = BuildChibi("NPC_Teo", MercadoCenter + new Vector3(2f, 0.12f, 0f), 180f, 0.92f, 0.5f, m.TeoBody, assets.ChibiController, true,
+                new Vector3(0.56f, 0.26f, 0.44f), 1.28f);
 
             Prim(PrimitiveType.Capsule, "Barriga", parts.Rig, new Vector3(0f, 0.22f, 0.02f), new Vector3(0.54f, 0.28f, 0.42f), m.TeoBody, Col.None);
             GameObject apron = Prim(PrimitiveType.Cube, "Delantal", parts.Rig, new Vector3(0f, 0.16f, 0.22f), new Vector3(0.38f, 0.44f, 0.03f), m.TeoAccent, Col.None, Quaternion.Euler(-6f, 0f, 0f));
@@ -928,6 +953,7 @@ namespace Ascua.EditorTools
             });
 
             SetupNpc(parts, "teo", "Teo Bravo", accent, accents, 1.55f, 0.35f, assets.Narrative.TeoIdle, assets.Character.Indicator);
+            AddNpcEyes(parts, assets.Combat, 0.5f, new Color(1f, 0.92f, 0.72f));
             CharacterAI ai = parts.Root.GetComponent<CharacterAI>();
             ai.Configure(null, null, accents, accent);
 
@@ -1034,6 +1060,15 @@ namespace Ascua.EditorTools
             Wire(ai, "lanternRenderer", core.GetComponent<Renderer>());
             Wire(ai, "violetLight", violet);
             WireArray(ai, "lurkPoints", lurk);
+
+            // Enfrentamiento narrativo (no es un jefe): retrocede, reaparece y revela una pista.
+            HeraldoConfrontation confrontation = root.AddComponent<HeraldoConfrontation>();
+            WireArray(confrontation, "revelations", new[]
+            {
+                FreshAsset<DialogueSequence>("D_heraldo_revela_1"),
+                FreshAsset<DialogueSequence>("D_heraldo_revela_2"),
+                FreshAsset<DialogueSequence>("D_heraldo_revela_3")
+            });
 
             SetLayerRecursively(root, IgnoreRaycastLayer);
         }
@@ -1210,7 +1245,7 @@ namespace Ascua.EditorTools
             Wire(pulseIndicator, "label", pulseLabel);
 
             BuildHopeHud(canvas, night, zones);
-            BuildQuestLog(root);
+            BuildQuestLog(root, assets);
             BuildInteractionPrompt(root, assets.Character.WhiteSprite);
             BuildDialogueBox(root);
             BuildToast(root);
@@ -1219,16 +1254,23 @@ namespace Ascua.EditorTools
 
             // Ronda de mejoras: objetivo, flecha, tutorial, stamina, inventario, subtítulos, momento y ráfaga.
             CanvasGroup surgeVignette = BuildHudExtras(canvas, player, assets);
+            BuildCombatHud(canvas, player, assets);
             BuildNightEvent(assets, canvas);
             BuildSurge(surgeVignette);
             root.Find("Resumen_Noche").SetAsLastSibling(); // el resumen tapa todo el HUD de juego
             fade.transform.SetAsLastSibling(); // el fundido siempre por encima de todo el HUD
         }
 
-        /// <summary>Panel de misiones (Tab) bajo la Esperanza, a la derecha, y su recordatorio compacto.</summary>
-        private static void BuildQuestLog(Transform canvasRoot)
+        /// <summary>
+        /// Panel de misiones (Tab) bajo la Esperanza, a la derecha, y su recordatorio compacto.
+        /// Marco con filo ámbar (como la barra del Farol), cabecera, 6 filas con icono por tipo,
+        /// marca de estado y barra de progreso, y los Vínculos al pie.
+        /// </summary>
+        private static void BuildQuestLog(Transform canvasRoot, AscuaAssets assets)
         {
             Color cold = AscuaPalette.TextoFrio;
+            Color amber = AscuaPalette.Ambar;
+            CombatAssets c = assets.Combat;
 
             RectTransform compact = UIRect("Misiones_Compacto", canvasRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32f, -296f), new Vector2(470f, 80f));
             TextMeshProUGUI compactText = compact.gameObject.AddComponent<TextMeshProUGUI>();
@@ -1240,23 +1282,90 @@ namespace Ascua.EditorTools
             compactText.raycastTarget = false;
             compactText.text = "Tab · Misiones";
 
-            RectTransform panel = UIRect("Misiones", canvasRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32f, -296f), new Vector2(560f, 560f));
+            const float rowHeight = 74f;
+            const int rowCount = 6;
+            RectTransform panel = UIRect("Misiones", canvasRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32f, -296f), new Vector2(620f, 120f + rowCount * rowHeight + 70f));
             Image background = panel.gameObject.AddComponent<Image>();
-            background.color = new Color(0.02f, 0.03f, 0.08f, 0.82f);
+            background.color = new Color(0.02f, 0.03f, 0.08f, 0.88f);
             background.raycastTarget = false;
+            Image frame = UIRect("Marco", panel, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero).gameObject.AddComponent<Image>();
+            frame.sprite = c.FrameSprite;
+            frame.type = Image.Type.Sliced;
+            frame.color = new Color(amber.r, amber.g, amber.b, 0.8f);
+            frame.raycastTarget = false;
             CanvasGroup group = panel.gameObject.AddComponent<CanvasGroup>();
             group.alpha = 0f;
             group.blocksRaycasts = false;
 
-            TextMeshProUGUI list = UIText("Lista", panel, "", 22f, cold, TextAlignmentOptions.TopLeft,
-                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-            list.margin = new Vector4(22f, 18f, 22f, 18f);
-            list.richText = true;
+            TextMeshProUGUI header = UIText("Cabecera", panel, "<b>MISIONES DE LA NOCHE</b>", 24f, amber, TextAlignmentOptions.TopLeft,
+                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(-56f, 64f));
+            header.characterSpacing = 4f;
+            header.richText = true;
+            Image divider = UIRect("Separador", panel, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -88f), new Vector2(-56f, 2f)).gameObject.AddComponent<Image>();
+            divider.color = new Color(amber.r, amber.g, amber.b, 0.35f);
+            divider.raycastTarget = false;
+
+            QuestRowUI[] rows = new QuestRowUI[rowCount];
+            for (int i = 0; i < rowCount; i++)
+            {
+                RectTransform row = UIRect("Fila_" + i, panel, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -100f - i * rowHeight), new Vector2(-56f, rowHeight - 8f));
+                CanvasGroup rowGroup = row.gameObject.AddComponent<CanvasGroup>();
+                Image mark = UIRect("Estado", row, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(3f, -10f)).gameObject.AddComponent<Image>();
+                mark.color = amber;
+                mark.raycastTarget = false;
+                RectTransform iconRect = UIRect("Icono", row, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(14f, 4f), new Vector2(38f, 38f));
+                Image icon = iconRect.gameObject.AddComponent<Image>();
+                icon.preserveAspect = true;
+                icon.raycastTarget = false;
+                TextMeshProUGUI title = UIText("Titulo", row, "Misión", 23f, new Color(1f, 0.93f, 0.8f), TextAlignmentOptions.TopLeft,
+                    new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(64f, -2f), new Vector2(-70f, 30f));
+                title.fontStyle = FontStyles.Bold;
+                TextMeshProUGUI detail = UIText("Detalle", row, "", 18f, cold, TextAlignmentOptions.TopLeft,
+                    new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(64f, -30f), new Vector2(-70f, 26f));
+                detail.richText = true;
+                detail.textWrappingMode = TextWrappingModes.NoWrap;
+                detail.overflowMode = TextOverflowModes.Ellipsis;
+                RectTransform bar = UIRect("Progreso", row, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
+                bar.offsetMin = new Vector2(64f, 2f);
+                bar.offsetMax = new Vector2(-10f, 6f);
+                Image barBack = bar.gameObject.AddComponent<Image>();
+                barBack.color = new Color(0.08f, 0.1f, 0.2f, 0.9f);
+                barBack.raycastTarget = false;
+                Image fill = UIRect("Relleno", bar, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero).gameObject.AddComponent<Image>();
+                fill.sprite = assets.Character.WhiteSprite;
+                fill.type = Image.Type.Filled;
+                fill.fillMethod = Image.FillMethod.Horizontal;
+                fill.color = amber;
+                fill.raycastTarget = false;
+
+                QuestRowUI rowUI = row.gameObject.AddComponent<QuestRowUI>();
+                Wire(rowUI, "root", row);
+                Wire(rowUI, "group", rowGroup);
+                Wire(rowUI, "icon", icon);
+                Wire(rowUI, "title", title);
+                Wire(rowUI, "detail", detail);
+                Wire(rowUI, "progressRoot", bar.gameObject);
+                Wire(rowUI, "progressFill", fill);
+                Wire(rowUI, "stateMark", mark);
+                row.gameObject.SetActive(false);
+                rows[i] = rowUI;
+            }
+
+            TextMeshProUGUI empty = UIText("Vacio", panel, "Nadie te ha pedido nada todavía. Habla con la gente de Vesper.", 20f, new Color(cold.r, cold.g, cold.b, 0.6f),
+                TextAlignmentOptions.TopLeft, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -104f), new Vector2(-56f, 60f));
+            TextMeshProUGUI bonds = UIText("Vinculos", panel, "", 20f, cold, TextAlignmentOptions.BottomLeft,
+                new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 16f), new Vector2(-56f, 56f));
+            bonds.richText = true;
 
             QuestLogUI log = panel.gameObject.AddComponent<QuestLogUI>();
             Wire(log, "panelGroup", group);
-            Wire(log, "listText", list);
+            Wire(log, "panelRoot", panel);
+            Wire(log, "headerText", header);
+            WireArray(log, "rows", rows);
+            Wire(log, "emptyText", empty);
+            Wire(log, "bondsText", bonds);
             Wire(log, "compactText", compactText);
+            WireArray(log, "typeIcons", c.QuestIcons);
         }
 
         /// <summary>Aviso "Mantén E · Hablar con..." con barra de mantener.</summary>

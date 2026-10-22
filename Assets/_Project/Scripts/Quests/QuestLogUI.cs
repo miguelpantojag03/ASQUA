@@ -7,29 +7,40 @@ using UnityEngine.InputSystem;
 namespace Ascua.Quests
 {
     /// <summary>
-    /// Panel de misiones de la noche (Tab / botón Select). Lista cada misión con su estado y progreso
-    /// en tiempo real, y el Vínculo con cada personaje. Cerrado, deja un pequeño recordatorio
-    /// "Tab · Misiones (n)" con la misión más urgente.
+    /// Panel de misiones de la noche (Tab / botón Select).
+    /// Diseño: marco con filo ámbar (mismo lenguaje que la barra del Farol), cabecera con el nombre
+    /// de la noche, una fila por misión (QuestRowUI: icono por tipo, estado, barra de progreso) y
+    /// los Vínculos al pie. Al abrirse entra con un fundido + escala breve.
+    /// Cerrado, deja el recordatorio compacto "Tab · Misiones (n)" con la misión más urgente.
     /// </summary>
     public class QuestLogUI : MonoBehaviour
     {
         [SerializeField] private CanvasGroup panelGroup;
-        [SerializeField] private TMP_Text listText;
+        [Tooltip("Raíz que escala al abrir (el propio panel).")]
+        [SerializeField] private RectTransform panelRoot;
+        [SerializeField] private TMP_Text headerText;
+        [SerializeField] private QuestRowUI[] rows;
+        [SerializeField] private TMP_Text emptyText;
+        [SerializeField] private TMP_Text bondsText;
         [SerializeField] private TMP_Text compactText;
+        [Tooltip("Icono por tipo de misión, en el orden de QuestType.")]
+        [SerializeField] private Sprite[] typeIcons;
         [SerializeField] private bool startOpen = false;
         [SerializeField] private float refreshInterval = 0.25f;
         [Tooltip("Personajes cuyo Vínculo se muestra (ids de NpcIdentity).")]
         [SerializeField] private string[] bondNpcIds = { "mina", "teo" };
 
-        private readonly StringBuilder builder = new StringBuilder(1024);
+        private readonly StringBuilder builder = new StringBuilder(256);
         private bool open;
         private float timer;
+        private float openAnim;
 
         public bool IsOpen => open;
 
         private void Awake()
         {
             SetOpen(startOpen);
+            openAnim = startOpen ? 1f : 0f;
         }
 
         private void Update()
@@ -39,7 +50,15 @@ namespace Ascua.Quests
             bool toggle = (keyboard != null && keyboard.tabKey.wasPressedThisFrame) || (gamepad != null && gamepad.selectButton.wasPressedThisFrame);
             if (toggle && (DialogueRunner.Instance == null || !DialogueRunner.Instance.IsOpen)) SetOpen(!open);
 
-            timer += Time.unscaledDeltaTime;
+            // Entrada del panel: fundido + escala de 0.96 a 1 en ~0.2 s.
+            float dt = Time.unscaledDeltaTime;
+            openAnim = Mathf.MoveTowards(openAnim, open ? 1f : 0f, dt * 5f);
+            float eased = 1f - (1f - openAnim) * (1f - openAnim);
+            if (panelGroup != null) panelGroup.alpha = eased;
+            if (panelRoot != null) panelRoot.localScale = Vector3.one * Mathf.Lerp(0.96f, 1f, eased);
+            if (compactText != null) compactText.alpha = 1f - eased;
+
+            timer += dt;
             if (timer < refreshInterval) return;
             timer = 0f;
             Refresh();
@@ -48,8 +67,6 @@ namespace Ascua.Quests
         public void SetOpen(bool value)
         {
             open = value;
-            if (panelGroup != null) panelGroup.alpha = value ? 1f : 0f;
-            if (compactText != null) compactText.alpha = value ? 0f : 1f;
             Refresh();
         }
 
@@ -59,41 +76,46 @@ namespace Ascua.Quests
             if (manager == null) return;
 
             if (compactText != null && !open) compactText.text = BuildCompact(manager);
-            if (!open || listText == null) return;
+            if (!open) return;
 
-            builder.Clear();
-            builder.Append("<size=120%><b>MISIONES DE LA NOCHE</b></size>\n");
-            if (manager.CurrentSet != null) builder.Append("<color=#B8C4EC99>").Append(manager.CurrentSet.title).Append("</color>\n");
-            builder.Append('\n');
+            if (headerText != null)
+            {
+                string set = manager.CurrentSet != null ? manager.CurrentSet.title : "";
+                headerText.text = "<b>MISIONES DE LA NOCHE</b>\n<size=80%><color=#B8C4EC99>" + set + "</color></size>";
+            }
 
-            int shown = 0;
+            int row = 0;
             var quests = manager.Quests;
-            for (int i = 0; i < quests.Count; i++)
+            for (int i = 0; i < quests.Count && rows != null && row < rows.Length; i++)
             {
                 QuestRuntime q = quests[i];
                 if (q.State == QuestState.Bloqueada) continue;
-                shown++;
-
-                builder.Append(StateIcon(q.State)).Append("  <b>").Append(q.Data.title).Append("</b>");
-                builder.Append("  <color=#B8C4EC88>· ").Append(GiverName(q.Data.giverNpcId)).Append("</color>\n");
-                builder.Append("     <color=").Append(StateColor(q.State)).Append('>').Append(q.ProgressText).Append("</color>\n");
-                if (q.State == QuestState.Activa && q.Progress01 > 0f) builder.Append("     ").Append(ProgressBar(q.Progress01)).Append('\n');
-                builder.Append('\n');
+                rows[row].Bind(q, IconFor(q.Data.type), GiverName(q.Data.giverNpcId), StateColor(q.State));
+                row++;
             }
-            if (shown == 0) builder.Append("<color=#B8C4EC99>Nadie te ha pedido nada todavía. Habla con la gente de Vesper.</color>\n\n");
+            if (rows != null) for (int i = row; i < rows.Length; i++) rows[i].Hide();
+            if (emptyText != null) emptyText.gameObject.SetActive(row == 0);
 
-            builder.Append("<b>VÍNCULOS</b>\n");
-            foreach (string npcId in bondNpcIds)
+            if (bondsText != null)
             {
-                int level = manager.GetBond(npcId);
-                builder.Append(GiverName(npcId)).Append("  <color=#FFC46B>");
-                for (int b = 0; b < QuestManager.MaxBond; b++) builder.Append(b < level ? "●" : "<color=#FFFFFF33>●</color>");
-                builder.Append("</color>");
-                if (level >= 3) builder.Append("  <color=#FFC46BAA>(habilidad activa)</color>");
-                builder.Append('\n');
+                builder.Clear();
+                builder.Append("<b>VÍNCULOS</b>   ");
+                foreach (string npcId in bondNpcIds)
+                {
+                    int level = manager.GetBond(npcId);
+                    builder.Append(GiverName(npcId)).Append(" <color=#FFC46B>");
+                    for (int b = 0; b < QuestManager.MaxBond; b++) builder.Append(b < level ? "●" : "<color=#FFFFFF33>●</color>");
+                    builder.Append("</color>     ");
+                }
+                builder.Append("\n<color=#B8C4EC66>Tab · cerrar</color>");
+                bondsText.SetText(builder);
             }
-            builder.Append("\n<color=#B8C4EC66>Tab · cerrar</color>");
-            listText.SetText(builder);
+        }
+
+        private Sprite IconFor(QuestType type)
+        {
+            int index = (int)type;
+            return typeIcons != null && index >= 0 && index < typeIcons.Length ? typeIcons[index] : null;
         }
 
         private static string BuildCompact(QuestManager manager)
@@ -113,36 +135,18 @@ namespace Ascua.Quests
             return line;
         }
 
-        private static string StateIcon(QuestState state)
+        /// <summary>Color de estado (el mismo en filas, iconos y objetivo actual).</summary>
+        public static Color StateColor(QuestState state)
         {
             switch (state)
             {
-                case QuestState.Disponible: return "<color=#FFC46B>○</color>";
-                case QuestState.Activa: return "<color=#FFC46B>●</color>";
-                case QuestState.PorEntregar: return "<color=#FFF1C9>!</color>";
-                case QuestState.Completada: return "<color=#9FD8A0>●</color>";
-                case QuestState.Fallida: return "<color=#DB7340>×</color>";
-                default: return "<color=#B8C4EC66>·</color>";
+                case QuestState.Disponible: return new Color(1f, 0.77f, 0.42f, 0.65f);
+                case QuestState.Activa: return new Color(1f, 0.77f, 0.42f);
+                case QuestState.PorEntregar: return new Color(1f, 0.95f, 0.79f);
+                case QuestState.Completada: return new Color(0.62f, 0.85f, 0.63f);
+                case QuestState.Fallida: return new Color(0.86f, 0.45f, 0.25f);
+                default: return new Color(0.72f, 0.77f, 0.93f, 0.4f);
             }
-        }
-
-        private static string StateColor(QuestState state)
-        {
-            switch (state)
-            {
-                case QuestState.Activa: return "#B8C4EC";
-                case QuestState.PorEntregar: return "#FFF1C9";
-                case QuestState.Completada: return "#9FD8A0";
-                case QuestState.Fallida: return "#DB7340";
-                default: return "#B8C4EC99";
-            }
-        }
-
-        private static string ProgressBar(float progress)
-        {
-            const int segments = 16;
-            int filled = Mathf.RoundToInt(progress * segments);
-            return "<color=#FFC46B>" + new string('■', filled) + "</color><color=#FFFFFF22>" + new string('■', segments - filled) + "</color>";
         }
 
         private static string GiverName(string npcId)

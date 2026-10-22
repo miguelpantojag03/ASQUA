@@ -17,7 +17,9 @@ namespace Ascua.World
         /// <summary>Vela de Teo: energía + Esperanza a su zona.</summary>
         Vela,
         /// <summary>Luciérnaga dorada (premio de exploración): mucha energía + Esperanza a la zona más cercana.</summary>
-        LuciernagaDorada
+        LuciernagaDorada,
+        /// <summary>Recuerdo que enseña un movimiento de combate (lo suelta una sombra derrotada).</summary>
+        Recuerdo
     }
 
     /// <summary>
@@ -39,7 +41,7 @@ namespace Ascua.World
         [SerializeField] private string requiresActiveQuestId;
 
         [Header("Efectos")]
-        [Tooltip("Id de la página del Diario (si es PaginaDiario).")]
+        [Tooltip("Id de la página del Diario (PaginaDiario) o del Recuerdo (Recuerdo).")]
         [SerializeField] private string diaryPageId;
         [SerializeField] private float energyAmount;
         [SerializeField] private float hopeAmount;
@@ -113,6 +115,14 @@ namespace Ascua.World
             seed = UnityEngine.Random.value * 10f;
             colliders = GetComponentsInChildren<Collider>(true);
             if (visual != null) visualBase = visual.localPosition;
+        }
+
+        private void Start()
+        {
+            // Páginas y Recuerdos ya conseguidos en otra noche no vuelven a aparecer.
+            // (Una página robada por un Susurro que escapó vuelve a su sitio la noche siguiente.)
+            if (kind == PickupKind.PaginaDiario && GameProgress.HasPage(diaryPageId)) gameObject.SetActive(false);
+            if (kind == PickupKind.Recuerdo && GameProgress.HasRecuerdo(diaryPageId)) gameObject.SetActive(false);
         }
 
         private void OnEnable()

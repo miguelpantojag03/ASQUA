@@ -1,5 +1,6 @@
 using System;
 using Ascua.Characters;
+using Ascua.Combat;
 using Ascua.Controls;
 using Ascua.Core;
 using Ascua.Lighting;
@@ -11,6 +12,8 @@ namespace Ascua.Player
     /// Pulso de luz: ráfaga de emergencia (R / botón Y). Cuesta 20 de energía, se recarga en 25 s,
     /// ilumina de golpe un radio grande (cuenta como fuente de luz para zonas y ventanas) y
     /// repele al Heraldo. Visual: una esfera ámbar que se expande y una luz que destella.
+    /// Combate: además hace daño de área (2, golpe fuerte) y aturde 2.5 s a las sombras en 7 m,
+    /// y deshace los proyectiles de los Centinelas. Mismo coste y recarga que antes.
     /// </summary>
     public class LightPulse : MonoBehaviour, IIlluminationSource
     {
@@ -30,6 +33,11 @@ namespace Ascua.Player
         [SerializeField] private float duration = 0.7f;
         [SerializeField] private float flashIntensity = 6f;
         [SerializeField] private Color pulseColor = new Color(2.4f, 1.8f, 0.95f, 0.32f);
+
+        [Header("Combate")]
+        [SerializeField] private float damageRadius = 7f;
+        [SerializeField] private int damage = 2;
+        [SerializeField] private float stunSeconds = 2.5f;
 
         public event Action Pulsed;
         public event Action Failed;
@@ -106,6 +114,11 @@ namespace Ascua.Player
                 heraldo.Repel(transform.position);
             }
 
+            // Daño de área: la onda deshace sombras y proyectiles cercanos.
+            HitInfo hit = new HitInfo(damage, 4f, transform.position, HitKind.Pulso, stunSeconds);
+            var targets = LightTargetRegistry.InSphere(transform.position + Vector3.up, damageRadius);
+            for (int i = targets.Count - 1; i >= 0; i--) targets[i].ReceiveLight(hit);
+
             if (ringVisual != null) ringVisual.gameObject.SetActive(true);
             if (flashLight != null) flashLight.enabled = true;
             UpdateVisual(0f);
@@ -125,7 +138,7 @@ namespace Ascua.Player
                 {
                     Color c = pulseColor;
                     c.a *= 1f - t;
-                    ringRenderer.GetPropertyBlock(propertyBlock);
+                    ringRenderer.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
                     propertyBlock.SetColor(BaseColorId, c);
                     ringRenderer.SetPropertyBlock(propertyBlock);
                 }

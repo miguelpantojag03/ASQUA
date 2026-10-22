@@ -41,7 +41,7 @@ namespace Ascua.Narrative
 
             if (glow == null) return;
             float flicker = 0.75f + 0.25f * Mathf.PerlinNoise(Time.time * 6f, 3.1f);
-            glow.GetPropertyBlock(propertyBlock);
+            glow.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
             propertyBlock.SetColor(EmissionColorId, color * (intensity * flicker));
             glow.SetPropertyBlock(propertyBlock);
         }

@@ -41,6 +41,25 @@ MonoBehaviour:
   surgeMeters: 7
   surgeDecayMultiplier: 1.7
   decayIncreasePerNight: 0.15
+  waves:
+  - label: Polillas en La Plaza
+    atProgress: 0.32
+    zoneId: Plaza
+    moths: 2
+    brutes: 0
+    veiledBrutes: 0
+    whispers: 0
+    echoes: 1
+    hopeDrainPerCreature: 1.2
+  - label: La Sombra Mayor del Mercado
+    atProgress: 0.66
+    zoneId: Mercado
+    moths: 1
+    brutes: 1
+    veiledBrutes: 1
+    whispers: 1
+    echoes: 0
+    hopeDrainPerCreature: 1.2
   heraldoEnabled: 1
   heraldoAppearAt: 0.25
   heraldoChaseSpeed: 1.3

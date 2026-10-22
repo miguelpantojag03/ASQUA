@@ -169,7 +169,7 @@ namespace Ascua.Player
             eye.localRotation = baseRotation * Quaternion.Euler(0f, 0f, tiltDegrees);
 
             if (eyeRenderer == null) return;
-            eyeRenderer.GetPropertyBlock(propertyBlock);
+            eyeRenderer.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
             propertyBlock.SetColor(EmissionColorId, eyeColor * intensity);
             eyeRenderer.SetPropertyBlock(propertyBlock);
         }

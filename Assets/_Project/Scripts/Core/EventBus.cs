@@ -49,6 +49,41 @@ namespace Ascua.Core
         /// <summary>Un momento narrativo (NightEvent) empieza o termina. Args: id, true al empezar.</summary>
         public static event Action<string, bool> NarrativeMoment;
 
+        // ------------------------------------------------------------------ Combate de luz
+
+        /// <summary>Ilse lanza un barrido de luz. Arg: paso del combo (1-3; 4 = ataque cargado).</summary>
+        public static event Action<int> PlayerAttacked;
+
+        /// <summary>Un golpe de luz alcanza a una criatura. Args: posición, golpe fuerte.</summary>
+        public static event Action<Vector3, bool> ShadowHit;
+
+        /// <summary>Una criatura de sombra se disuelve en luz. Args: tipo, posición.</summary>
+        public static event Action<string, Vector3> ShadowDefeated;
+
+        /// <summary>Ilse recibe daño (se traduce en energía perdida). Arg: cantidad.</summary>
+        public static event Action<float> PlayerHurt;
+
+        /// <summary>Esquiva perfecta: el golpe llegó durante los i-frames. Arg: posición.</summary>
+        public static event Action<Vector3> PerfectDodge;
+
+        /// <summary>Contraataque (Reloj de Nadir). Arg: posición.</summary>
+        public static event Action<Vector3> Parried;
+
+        /// <summary>Empieza (true) o termina (false) una oleada. Args: zona, empieza.</summary>
+        public static event Action<string, bool> CombatWave;
+
+        /// <summary>Oleada superada. Args: zona, valoración ("sin daño", "con dificultad"...).</summary>
+        public static event Action<string, string> WaveCleared;
+
+        /// <summary>Golpe al Heraldo en su enfrentamiento. Args: golpes dados, enfrentamiento completado.</summary>
+        public static event Action<int, bool> HeraldoConfronted;
+
+        /// <summary>Un Recuerdo desbloquea un movimiento. Arg: id del Recuerdo.</summary>
+        public static event Action<string> RecuerdoUnlocked;
+
+        /// <summary>Habilidad especial usada (vela de Teo, Brasa guardiana, Vara de luz...). Arg: id.</summary>
+        public static event Action<string> AbilityUsed;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
@@ -67,6 +102,17 @@ namespace Ascua.Core
             PenumbraSurge = null;
             ShortcutDiscovered = null;
             NarrativeMoment = null;
+            PlayerAttacked = null;
+            ShadowHit = null;
+            ShadowDefeated = null;
+            PlayerHurt = null;
+            PerfectDodge = null;
+            Parried = null;
+            CombatWave = null;
+            WaveCleared = null;
+            HeraldoConfronted = null;
+            RecuerdoUnlocked = null;
+            AbilityUsed = null;
         }
 
         public static void RaiseCelebration(string reason) => CelebrationRequested?.Invoke(reason);
@@ -84,5 +130,16 @@ namespace Ascua.Core
         public static void RaisePenumbraSurge(bool started) => PenumbraSurge?.Invoke(started);
         public static void RaiseShortcutDiscovered(string id, string displayName) => ShortcutDiscovered?.Invoke(id, displayName);
         public static void RaiseNarrativeMoment(string id, bool started) => NarrativeMoment?.Invoke(id, started);
+        public static void RaisePlayerAttacked(int step) => PlayerAttacked?.Invoke(step);
+        public static void RaiseShadowHit(Vector3 position, bool strong) => ShadowHit?.Invoke(position, strong);
+        public static void RaiseShadowDefeated(string type, Vector3 position) => ShadowDefeated?.Invoke(type, position);
+        public static void RaisePlayerHurt(float amount) => PlayerHurt?.Invoke(amount);
+        public static void RaisePerfectDodge(Vector3 position) => PerfectDodge?.Invoke(position);
+        public static void RaiseParried(Vector3 position) => Parried?.Invoke(position);
+        public static void RaiseCombatWave(string zoneId, bool started) => CombatWave?.Invoke(zoneId, started);
+        public static void RaiseWaveCleared(string zoneId, string rating) => WaveCleared?.Invoke(zoneId, rating);
+        public static void RaiseHeraldoConfronted(int hits, bool completed) => HeraldoConfronted?.Invoke(hits, completed);
+        public static void RaiseRecuerdoUnlocked(string id) => RecuerdoUnlocked?.Invoke(id);
+        public static void RaiseAbilityUsed(string id) => AbilityUsed?.Invoke(id);
     }
 }

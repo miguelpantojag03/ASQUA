@@ -13,6 +13,8 @@ namespace Ascua.EditorTools
         public AudioClip MusicBase, MusicHope, MusicTension, Wind, Water;
         public AudioClip Pickup, QuestComplete, WindowOn, ZoneLost, NpcTalk, Pulse, HopeLevel;
         public AudioClip Jump, Land, Dash, LanternResize, Surge, Bond, Moment, UiClick;
+        // Combate de luz.
+        public AudioClip Swing, LightHit, Dissolve, Hurt, PerfectDodge, WaveStart, WaveCleared, BruteWarning, ShadowBolt;
         // Audio Mixer "AM_Ascua" con 3 grupos bajo Master y sus volúmenes expuestos.
         public AudioMixer Mixer;
         public AudioMixerGroup MusicGroup, AmbientGroup, SfxGroup;
@@ -65,6 +67,17 @@ namespace Ascua.EditorTools
                 Moment = Clip("SFX_Momento", () => Swell(4f)),
                 UiClick = Clip("SFX_ClicUI", () => Chime(new[] { 2093f }, 0f, 0.08f, 0.25f))
             };
+            // Combate: todo suena a luz y cristal (nada de golpes metálicos ni gritos).
+            a.Swing = Clip("SFX_BarridoLuz", () => Mix(Whoosh(0.26f, 0.4f), Sweep(0.26f, 600f, 1900f, 0.22f)));
+            a.LightHit = Clip("SFX_GolpeLuz", () => Chime(new[] { 1760f, 2637f }, 0.02f, 0.35f, 0.4f));
+            a.Dissolve = Clip("SFX_SombraDisuelta", () => Mix(Sweep(0.9f, 1300f, 420f, 0.25f), Chime(new[] { 880f, 1318.5f, 1760f }, 0.06f, 1f, 0.35f)));
+            a.Hurt = Clip("SFX_FarolHerido", () => Mix(Thump(0.5f), Sweep(0.4f, 320f, 120f, 0.35f)));
+            a.PerfectDodge = Clip("SFX_EsquivaPerfecta", () => Chime(new[] { 2093f, 2637f, 3136f }, 0.03f, 0.8f, 0.45f));
+            a.WaveStart = Clip("SFX_OleadaSombras", () => Mix(Rumble(1.6f), Thump(1.2f)));
+            a.WaveCleared = Clip("SFX_OleadaSuperada", () => Chime(new[] { 523.25f, 659.25f, 783.99f, 1046.5f, 1318.5f }, 0.1f, 2f, 0.5f));
+            a.BruteWarning = Clip("SFX_AvisoEmbestida", () => Mix(Rumble(0.9f), Sweep(0.8f, 80f, 210f, 0.4f)));
+            a.ShadowBolt = Clip("SFX_ProyectilSombra", () => Sweep(0.35f, 520f, 240f, 0.35f));
+
             CreateMixer(a);
             return a;
         }
@@ -155,6 +168,15 @@ namespace Ascua.EditorTools
             EditorUtility.SetDirty((UnityEngine.Object)controller);
             AssetDatabase.SaveAssets();
             AssetDatabase.ImportAsset(MixerPath);
+        }
+
+        /// <summary>Suma dos sonidos (el más largo marca la duración) y normaliza.</summary>
+        private static float[] Mix(float[] a, float[] b)
+        {
+            float[] result = new float[Mathf.Max(a.Length, b.Length)];
+            for (int i = 0; i < a.Length; i++) result[i] += a[i];
+            for (int i = 0; i < b.Length; i++) result[i] += b[i];
+            return Normalize(result, 0.75f);
         }
 
         // ================================================================== Música

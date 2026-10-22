@@ -117,6 +117,10 @@ namespace Ascua.Core
 
             Heraldo_AI heraldo = FindFirstObjectByType<Heraldo_AI>();
             if (heraldo != null) heraldo.Configure(set.heraldoEnabled, set.heraldoAppearAt, set.heraldoChaseSpeed);
+
+            // Oleadas de sombras de esta noche (cada noche extra suma una Polilla por oleada).
+            Ascua.Combat.CombatWaveDirector waves = FindFirstObjectByType<Ascua.Combat.CombatWaveDirector>();
+            if (waves != null) waves.Configure(set.waves, extraNights);
         }
 
         /// <summary>

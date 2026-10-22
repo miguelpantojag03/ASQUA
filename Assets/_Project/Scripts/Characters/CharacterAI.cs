@@ -318,7 +318,7 @@ namespace Ascua.Characters
             foreach (Renderer r in accentRenderers)
             {
                 if (r == null) continue;
-                r.GetPropertyBlock(propertyBlock);
+                r.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
                 propertyBlock.SetColor(EmissionColorId, emission);
                 r.SetPropertyBlock(propertyBlock);
             }

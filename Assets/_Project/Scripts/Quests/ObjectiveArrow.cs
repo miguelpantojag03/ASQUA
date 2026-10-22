@@ -40,7 +40,13 @@ namespace Ascua.Quests
             bool blocked = GameSession.IsModalOpen || (DialogueRunner.Instance != null && DialogueRunner.Instance.IsOpen);
             QuestRuntime q = manager != null && !blocked ? manager.TrackedQuest : null;
 
-            if (q == null || cam == null || player == null || !manager.TryGetObjectivePosition(q, out Vector3 target))
+            // Durante una oleada de sombras la flecha guía a la sombra más cercana (prioridad sobre misiones).
+            Vector3 target = Vector3.zero;
+            Ascua.Combat.CombatWaveDirector waves = Ascua.Combat.CombatWaveDirector.Instance;
+            bool hasTarget = !blocked && player != null && waves != null && waves.TryGetObjective(player.position, out target);
+            if (!hasTarget) hasTarget = q != null && manager.TryGetObjectivePosition(q, out target);
+
+            if (!hasTarget || cam == null || player == null)
             {
                 SetAlpha(0f);
                 return;

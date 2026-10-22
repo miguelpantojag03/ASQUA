@@ -2,6 +2,7 @@ using System.Linq;
 using System.Text;
 using Ascua.Audio;
 using Ascua.Characters;
+using Ascua.Combat;
 using Ascua.Core;
 using Ascua.Narrative;
 using Ascua.Player;
@@ -12,6 +13,8 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace Ascua.EditorTools
 {
@@ -114,6 +117,8 @@ namespace Ascua.EditorTools
             ok &= Check(sb, body != null && body.isSupported && cape != null && cape.isSupported, "Shaders de Ilse (cuerpo translúcido y capa con viento) compilados y soportados");
 
             ok &= ValidateImprovements(sb, set);
+            ok &= ValidateCombat(sb, set);
+            ok &= ValidateGraphics(sb);
 
             report = sb.ToString();
             return ok;
@@ -188,6 +193,120 @@ namespace Ascua.EditorTools
             ok &= Check(sb, crate > 0.35f && crate < 1.1f && roof - crate < 1.7f && roof - crate > 0.35f,
                 $"Quiosco: caja {crate:0.00} m (salto/trepar) y tejado a {roof:0.00} m (+{roof - crate:0.00} m desde la caja)");
 
+            return ok;
+        }
+
+        // ================================================================== Combate de luz
+
+        private static bool ValidateCombat(StringBuilder sb, NightQuestSet set)
+        {
+            bool ok = true;
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            ok &= RefsOk(sb, player != null ? player.GetComponent<LightAttack>() : null);
+            ok &= RefsOk(sb, player != null ? player.GetComponent<PlayerCombatState>() : null);
+            ok &= RefsOk(sb, player != null ? player.GetComponent<LanternStaff>() : null);
+            ok &= RefsOk(sb, player != null ? player.GetComponent<BondCombatAbilities>() : null);
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<CombatFx>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<CombatWaveDirector>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<ComboHUD>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<DamageVignette>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<CombatAbilityHUD>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<HeraldoConfrontation>());
+
+            // Pools: los 5 tipos de criatura (+ la variante velada) existen y están desactivados.
+            T[] All<T>() where T : Object => Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            int moths = All<PenumbraMoth>().Length;
+            ShadowBrute[] brutes = All<ShadowBrute>();
+            int veiled = brutes.Count(b => b.GetComponent<LitVulnerable>() != null);
+            int whispers = All<WhisperWraith>().Length;
+            EchoShade[] echoes = All<EchoShade>();
+            int copies = echoes.Count(e => e.IsSplitCopy);
+            PenumbraSentinel[] sentinels = All<PenumbraSentinel>();
+            int bolts = All<ShadowBolt>().Length;
+            ok &= Check(sb, moths >= 6 && brutes.Length - veiled >= 2 && veiled >= 1 && whispers >= 2 && echoes.Length - copies >= 2 && copies >= 4 && sentinels.Length >= 1 && bolts >= 6,
+                $"Criaturas: {moths} Polillas, {brutes.Length - veiled} Sombras Mayores, {veiled} velada, {whispers} Susurros, {echoes.Length - copies} Ecos (+{copies} copias), {sentinels.Length} Centinela ({bolts} proyectiles)");
+            foreach (ShadowCreature creature in All<ShadowCreature>()) ok &= RefsOk(sb, creature, "recuerdoDrop");
+
+            // El quiosco sirve de cobertura frente al Centinela (línea de visión bloqueada detrás de él).
+            if (sentinels.Length > 0)
+            {
+                Transform eye = sentinels[0].transform.Find("Ojo");
+                Physics.SyncTransforms();
+                Vector3 behindKiosk = new Vector3(-27.3f, 1f, -11.2f);
+                bool blocked = eye != null && Physics.Linecast(eye.position, behindKiosk, LayerMask.GetMask("Default"), QueryTriggerInteraction.Ignore);
+                Vector3 open = new Vector3(-30f, 1f, -14.6f);
+                bool visible = eye != null && !Physics.Linecast(eye.position, open, LayerMask.GetMask("Default"), QueryTriggerInteraction.Ignore);
+                ok &= Check(sb, blocked && visible, "Centinela: el quiosco tapa su línea de visión (cobertura real) y la calle abierta queda a tiro");
+                ok &= Check(sb, NavMesh.SamplePosition(sentinels[0].transform.position + sentinels[0].transform.forward * 2f, out _, 1.5f, NavMesh.AllAreas), "Centinela: se puede llegar hasta él caminando");
+            }
+
+            // Recuerdos que sueltan las sombras.
+            PickupItem[] pickups = Object.FindObjectsByType<PickupItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            int recuerdos = pickups.Count(p => KindOf(p) == PickupKind.Recuerdo);
+            ok &= Check(sb, recuerdos >= 2, $"Recuerdos con movimiento de combate: {recuerdos} (Lupa de Mina, Reloj de Nadir)");
+
+            // Oleadas de la noche.
+            int waves = set != null && set.waves != null ? set.waves.Count : 0;
+            bool zonesOk = waves > 0 && set.waves.All(w => Object.FindObjectsByType<ZoneHope>(FindObjectsSortMode.None).Any(z => z.ZoneId == w.zoneId) && w.Total >= 3 && w.Total <= 4);
+            string detail = waves > 0 ? string.Join(", ", set.waves.Select(w => w.zoneId + ":" + w.Total)) : "-";
+            ok &= Check(sb, waves >= 1 && waves <= 2 && zonesOk, $"Oleadas de la noche: {waves} (3-4 criaturas, zonas válidas) [{detail}]");
+
+            // Enfrentamiento del Heraldo: 3 revelaciones.
+            HeraldoConfrontation confrontation = Object.FindFirstObjectByType<HeraldoConfrontation>();
+            int revelations = confrontation != null ? new SerializedObject(confrontation).FindProperty("revelations").arraySize : 0;
+            ok &= Check(sb, revelations == 3, $"Enfrentamiento del Heraldo con {revelations} revelaciones narrativas");
+            return ok;
+        }
+
+        // ================================================================== Mejora gráfica
+
+        private static bool ValidateGraphics(StringBuilder sb)
+        {
+            bool ok = true;
+            foreach (string name in new[] { "Ascua/PersonajeTela", "Ascua/BarridoLuz", "Ascua/SombraCriatura" })
+            {
+                Shader shader = Shader.Find(name);
+                ok &= Check(sb, shader != null && shader.isSupported, $"Shader {name} compilado y soportado");
+            }
+
+            // Materiales base con relieve real y suavidad variable.
+            foreach (string name in new[] { "M_Edificio_Ladrillo", "M_Asfalto", "M_PlazaPavimento", "M_Madera", "M_Metal", "M_Tejado" })
+            {
+                Material mat = AssetDatabase.LoadAssetAtPath<Material>(AscuaAssetFactory.MaterialsFolder + "/" + name + ".mat");
+                bool pbr = mat != null && mat.GetTexture("_BumpMap") != null && mat.GetTexture("_MetallicGlossMap") != null && mat.IsKeywordEnabled("_NORMALMAP") && mat.IsKeywordEnabled("_METALLICSPECGLOSSMAP");
+                ok &= Check(sb, pbr, $"Material {name}: normal map + máscara (suavidad/metálico/oclusión)");
+            }
+
+            int tinted = Object.FindObjectsByType<SurfaceTint>(FindObjectsSortMode.None).Length;
+            ok &= Check(sb, tinted >= 20, $"Tintes por instancia (MaterialPropertyBlock): {tinted} objetos comparten material base");
+
+            // Vecinos con ojos de luz (blend shapes) y tela.
+            foreach (NpcFace face in Object.FindObjectsByType<NpcFace>(FindObjectsSortMode.None))
+            {
+                SkinnedMeshRenderer[] eyes = face.GetComponentsInChildren<SkinnedMeshRenderer>();
+                bool shapes = eyes.Length == 2 && eyes.All(e => e.sharedMesh != null && e.sharedMesh.blendShapeCount == 3);
+                ok &= Check(sb, shapes, $"{face.name}: 2 ojos de luz con blend shapes (Alegre / Cansado / Parpadeo)");
+            }
+            Material mina = AssetDatabase.LoadAssetAtPath<Material>(AscuaAssetFactory.MaterialsFolder + "/M_Mina_Base.mat");
+            ok &= Check(sb, mina != null && mina.shader.name == "Ascua/PersonajeTela", "Mina y Teo con tela, borde de luz y sombras (Ascua/PersonajeTela)");
+            ok &= Check(sb, GameObject.Find("Carrito_Teo") != null, "Carrito de Teo (silueta distintiva)");
+
+            // Sombras y SSAO.
+            UniversalRenderPipelineAsset urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            ok &= Check(sb, urp != null && Mathf.Approximately(urp.shadowDistance, 45f) && urp.shadowCascadeCount == 3 && urp.supportsAdditionalLightShadows,
+                $"Sombras: distancia {urp?.shadowDistance}, {urp?.shadowCascadeCount} cascadas, luces adicionales con sombra");
+            Light farol = GameObject.Find("Luz_Farol") != null ? GameObject.Find("Luz_Farol").GetComponent<Light>() : null;
+            ok &= Check(sb, farol != null && farol.shadows == LightShadows.Soft, "El Farol proyecta sombras suaves en tiempo real");
+            ok &= Check(sb, Object.FindFirstObjectByType<ReflectionProbe>() != null && Object.FindFirstObjectByType<PostFxDirector>() != null,
+                "Sonda de reflejos (charcos) y post-procesado dinámico (aberración solo en urgencia)");
+
+            // Misiones: iconos por tipo y filas.
+            QuestLogUI log = Object.FindFirstObjectByType<QuestLogUI>();
+            SerializedObject logSo = log != null ? new SerializedObject(log) : null;
+            int icons = logSo != null ? logSo.FindProperty("typeIcons").arraySize : 0;
+            int rows = logSo != null ? logSo.FindProperty("rows").arraySize : 0;
+            ok &= Check(sb, icons == System.Enum.GetValues(typeof(QuestType)).Length && rows >= 6, $"Panel de misiones: {icons} iconos por tipo, {rows} filas con barra de progreso");
+            ok &= RefsOk(sb, log);
             return ok;
         }
 

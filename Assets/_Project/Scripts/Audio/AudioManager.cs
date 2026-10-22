@@ -66,7 +66,18 @@ namespace Ascua.Audio
         [SerializeField] private AudioClip sfxBond;
         [SerializeField] private AudioClip sfxMoment;
         [SerializeField] private AudioClip sfxUiClick;
-        [SerializeField] private int sfxVoices = 10;
+
+        [Header("Efectos · combate de luz")]
+        [SerializeField] private AudioClip sfxSwing;
+        [SerializeField] private AudioClip sfxLightHit;
+        [SerializeField] private AudioClip sfxDissolve;
+        [SerializeField] private AudioClip sfxHurt;
+        [SerializeField] private AudioClip sfxPerfectDodge;
+        [SerializeField] private AudioClip sfxWaveStart;
+        [SerializeField] private AudioClip sfxWaveCleared;
+        [SerializeField] private AudioClip sfxBruteWarning;
+        [SerializeField] private AudioClip sfxShadowBolt;
+        [SerializeField] private int sfxVoices = 14;
 
         private const string MusicKey = "ascua_vol_musica";
         private const string AmbientKey = "ascua_vol_ambiente";
@@ -80,6 +91,7 @@ namespace Ascua.Audio
         private float musicVolume = 0.8f, ambientVolume = 0.8f, sfxVolume = 0.9f;
         private float hopeLayer, tensionLayer, momentBoost;
         private bool surgeActive;
+        private bool waveActive;
         private float lastWindowSound;
 
         public float MusicVolume => musicVolume;
@@ -138,6 +150,17 @@ namespace Ascua.Audio
             EventBus.BondChanged += OnBond;
             EventBus.NarrativeMoment += OnMoment;
             EventBus.ShortcutDiscovered += OnShortcut;
+            EventBus.PlayerAttacked += OnAttack;
+            EventBus.ShadowHit += OnShadowHit;
+            EventBus.ShadowDefeated += OnShadowDefeated;
+            EventBus.PlayerHurt += OnHurt;
+            EventBus.PerfectDodge += OnPerfectDodge;
+            EventBus.Parried += OnParried;
+            EventBus.CombatWave += OnCombatWave;
+            EventBus.WaveCleared += OnWaveCleared;
+            EventBus.AbilityUsed += OnAbility;
+            EventBus.HeraldoConfronted += OnHeraldoConfronted;
+            EventBus.RecuerdoUnlocked += OnRecuerdo;
             WindowLight.AnyWindowLit += OnWindowLit;
             ZoneHope.AnyZoneDied += OnZoneDied;
         }
@@ -158,6 +181,17 @@ namespace Ascua.Audio
             EventBus.BondChanged -= OnBond;
             EventBus.NarrativeMoment -= OnMoment;
             EventBus.ShortcutDiscovered -= OnShortcut;
+            EventBus.PlayerAttacked -= OnAttack;
+            EventBus.ShadowHit -= OnShadowHit;
+            EventBus.ShadowDefeated -= OnShadowDefeated;
+            EventBus.PlayerHurt -= OnHurt;
+            EventBus.PerfectDodge -= OnPerfectDodge;
+            EventBus.Parried -= OnParried;
+            EventBus.CombatWave -= OnCombatWave;
+            EventBus.WaveCleared -= OnWaveCleared;
+            EventBus.AbilityUsed -= OnAbility;
+            EventBus.HeraldoConfronted -= OnHeraldoConfronted;
+            EventBus.RecuerdoUnlocked -= OnRecuerdo;
             WindowLight.AnyWindowLit -= OnWindowLit;
             ZoneHope.AnyZoneDied -= OnZoneDied;
         }
@@ -186,7 +220,8 @@ namespace Ascua.Audio
             // Tensión: Heraldo cerca y ráfaga de la Penumbra.
             float heraldo = 0f;
             if (Heraldo_AI.Instance != null) heraldo = Mathf.Clamp01(1f - (Heraldo_AI.Instance.DistanceToPlayer - 4f) / 18f);
-            float tension = Mathf.Max(heraldo, surgeActive ? 1f : 0f);
+            // Tensión: Heraldo cerca, ráfaga de la Penumbra u oleada de sombras.
+            float tension = Mathf.Max(heraldo, surgeActive ? 1f : waveActive ? 0.85f : 0f);
 
             float k = 1f - Mathf.Exp(-layerSmoothing * dt);
             hopeLayer = Mathf.Lerp(hopeLayer, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.3f, 0.85f, hope)), k);
@@ -249,6 +284,35 @@ namespace Ascua.Audio
         }
 
         private void OnZoneDied(ZoneHope zone) => PlaySfx(sfxZoneLost, 1f, 1f, "[Acorde grave: " + zone.DisplayName + " se ha apagado]");
+
+        // ------------------------------------------------------------------ Combate
+
+        private void OnAttack(int step) => PlaySfx(sfxSwing, step == 4 ? 0.8f : 0.5f, step == 4 ? 0.75f : 0.95f + 0.07f * step);
+        private void OnShadowHit(Vector3 position, bool strong) => PlaySfx(sfxLightHit, strong ? 0.75f : 0.55f, strong ? 0.85f : UnityEngine.Random.Range(1f, 1.12f));
+        private void OnShadowDefeated(string type, Vector3 position) => PlaySfx(sfxDissolve, 0.7f, UnityEngine.Random.Range(0.95f, 1.05f), "[Una sombra se deshace en luz]");
+        private void OnHurt(float amount) => PlaySfx(sfxHurt, 0.7f, UnityEngine.Random.Range(0.92f, 1.02f), "[El Farol tiembla]");
+        private void OnPerfectDodge(Vector3 position) => PlaySfx(sfxPerfectDodge, 0.8f, 1f, "[Esquiva perfecta]");
+        private void OnParried(Vector3 position) => PlaySfx(sfxPerfectDodge, 0.9f, 0.8f, "[Contraataque]");
+        private void OnWaveCleared(string zoneId, string rating) => PlaySfx(sfxWaveCleared, 0.85f, 1f, "[La zona respira: oleada superada]");
+        private void OnHeraldoConfronted(int hits, bool completed) => PlaySfx(completed ? sfxMoment : sfxZoneLost, completed ? 0.8f : 0.35f, completed ? 1f : 1.4f, completed ? "[El Heraldo se aleja]" : null);
+        private void OnRecuerdo(string id) => PlaySfx(sfxBond, 0.85f, 1.1f, "[Un recuerdo vuelve]");
+
+        private void OnCombatWave(string zoneId, bool started)
+        {
+            waveActive = started;
+            if (started) PlaySfx(sfxWaveStart, 0.9f, 1f, "[Las sombras se acercan]");
+        }
+
+        private void OnAbility(string id)
+        {
+            switch (id)
+            {
+                case "embestida_aviso": PlaySfx(sfxBruteWarning, 0.75f, 1f, "[Una Sombra Mayor se prepara para embestir]"); break;
+                case "proyectil_sombra": PlaySfx(sfxShadowBolt, 0.5f, UnityEngine.Random.Range(0.95f, 1.1f)); break;
+                case "vela_teo_estallido": PlaySfx(sfxDissolve, 1f, 0.7f, "[Estallido de luz]"); break;
+                case "vara_luz": PlaySfx(sfxMoment, 0.9f, 1.2f, "[El Farol se transforma]"); break;
+            }
+        }
 
         private void OnSurge(bool started)
         {
