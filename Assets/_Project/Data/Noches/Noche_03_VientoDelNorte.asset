@@ -20,6 +20,8 @@ MonoBehaviour:
   quests:
   - {fileID: 11400000, guid: b3b869470f845da4cbf86265e5422f19, type: 2}
   - {fileID: 11400000, guid: 83562df1d59b16c45865e118e7065c74, type: 2}
+  - {fileID: 11400000, guid: 9477df2d76c0e034ca36e5d248e0d679, type: 2}
+  - {fileID: 11400000, guid: 16d5245167339844a8b553062b1a36a5, type: 2}
   nightDuration: 270
   startHope: 62
   hopeDecayPerSecond: 0.8

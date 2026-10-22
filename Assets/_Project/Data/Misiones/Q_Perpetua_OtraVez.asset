@@ -45,9 +45,14 @@ MonoBehaviour:
   rewardHope: 12
   rewardHopeZoneId: Plaza
   rewardBond: 1
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 0
   offerDialogue: {fileID: 11400000, guid: 18f421d548ee51f4e817595ff2eee363, type: 2}
   inProgressDialogue: {fileID: 11400000, guid: f93a255784b281f4490dbb730f5692b9, type: 2}
   completedDialogue: {fileID: 11400000, guid: 86d6ece249569cf4c8683de8d7198f4c, type: 2}
+  emotionalContext: "Bajo cada noche porque arriba la casa est\xE1 muy callada. Abajo,
+    al menos, te encuentro a ti."
+  progressNervousDialogue: {fileID: 11400000, guid: 3a6a1ab053a442e419aa4abfe97e6b71, type: 2}
+  progressReliefDialogue: {fileID: 11400000, guid: db8ffa517286b4b4399e3cfefc4508ec, type: 2}

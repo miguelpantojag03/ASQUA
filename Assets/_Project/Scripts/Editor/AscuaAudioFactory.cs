@@ -17,6 +17,8 @@ namespace Ascua.EditorTools
         public AudioClip Swing, LightHit, Dissolve, Hurt, PerfectDodge, WaveStart, WaveCleared, BruteWarning, ShadowBolt;
         // Impacto y avisos (Partes A+B).
         public AudioClip ComboFinisher, PowerDown, CriticalEnergy, Threat;
+        // Parte D: fijar objetivo y susurro del presagio.
+        public AudioClip LockOn, Whisper;
         // Audio Mixer "AM_Ascua" con 3 grupos bajo Master y sus volúmenes expuestos.
         public AudioMixer Mixer;
         public AudioMixerGroup MusicGroup, AmbientGroup, SfxGroup;
@@ -87,6 +89,11 @@ namespace Ascua.EditorTools
             a.CriticalEnergy = Clip("SFX_EnergiaCritica", () => Mix(Thump(0.35f), Thump(0.8f)));
             // Amenaza detectada: dos notas graves descendentes.
             a.Threat = Clip("SFX_Amenaza", () => Mix(Sweep(0.5f, 220f, 165f, 0.35f), Rumble(0.6f)));
+
+            // Fijar objetivo: dos notas agudas y suaves (no tapan el combate).
+            a.LockOn = Clip("SFX_FijarObjetivo", () => Chime(new[] { 1318.5f, 1760f }, 0.03f, 0.35f, 0.3f));
+            // Presagio: un susurro sin palabras (ruido de aire con "sílabas" lentas), grave y lejano.
+            a.Whisper = Clip("SFX_SusurroLejano", () => WhisperNoise(3.6f, 0.4f));
 
             CreateMixer(a);
             return a;
@@ -349,6 +356,32 @@ namespace Ascua.EditorTools
                 float white = (float)rng.NextDouble() * 2f - 1f;
                 low += (white - low) * Mathf.Lerp(0.08f, 0.25f, Mathf.Sin(Mathf.PI * k));
                 data[i] = low * Mathf.Sin(Mathf.PI * k);
+            }
+            return Normalize(data, level);
+        }
+
+        /// <summary>
+        /// Susurro: ruido filtrado (aire) con una envolvente de "sílabas" de 2-4 por segundo y un leve
+        /// temblor tonal. No se entienden palabras a propósito: es una voz demasiado lejos.
+        /// </summary>
+        private static float[] WhisperNoise(float seconds, float level)
+        {
+            int n = (int)(Rate * seconds);
+            float[] data = new float[n];
+            System.Random rng = new System.Random(31);
+            float low = 0f, band = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                float t = (float)i / Rate;
+                float k = (float)i / n;
+                float white = (float)rng.NextDouble() * 2f - 1f;
+                low += (white - low) * 0.35f;
+                band += (low - band) * 0.12f;
+                float air = low - band; // paso banda: el "sss" del aire
+                float syllables = Mathf.Pow(Mathf.Abs(Mathf.Sin(t * Mathf.PI * (2.2f + Mathf.Sin(t * 1.3f) * 0.8f))), 2.5f);
+                float tone = Mathf.Sin(2f * Mathf.PI * 190f * t + Mathf.Sin(t * 5f) * 2f) * 0.08f;
+                float envelope = Mathf.Clamp01(k * 4f) * Mathf.Clamp01((1f - k) * 3f);
+                data[i] = (air * 1.6f + tone) * syllables * envelope;
             }
             return Normalize(data, level);
         }

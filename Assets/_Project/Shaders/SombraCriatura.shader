@@ -4,6 +4,8 @@
 //  _Dissolve: 0 = entera, 1 = deshecha en luz (borde ámbar que avanza con ruido).
 //  _Reveal: 1 = visible; valores bajos = "velada" (trama de puntos, casi invisible).
 //  _CrackStrength: grietas ámbar que aparecen al revelarse (solo la Sombra velada).
+//  _Warn: aviso de ataque (borde coral que se enciende durante el amago).
+//  _Damage: daño acumulado (0-1): las grietas de luz crecen con cada golpe, sin barra de vida.
 // La oscuridad responde a la luz: bajo el Farol se ven sus volúmenes; lejos, es solo un contorno.
 Shader "Ascua/SombraCriatura"
 {
@@ -22,6 +24,9 @@ Shader "Ascua/SombraCriatura"
         [HDR] _DissolveEdge ("Borde de disolución", Color) = (4, 2.6, 1.2, 1)
         _Reveal ("Revelada", Range(0, 1)) = 1
         _CrackStrength ("Grietas al revelarse", Range(0, 1)) = 0
+        _Warn ("Aviso de ataque", Range(0, 1)) = 0
+        [HDR] _WarnColor ("Color del aviso", Color) = (3.2, 1.1, 0.7, 1)
+        _Damage ("Daño acumulado", Range(0, 1)) = 0
         _FarStart ("Distancia: empieza el refuerzo del borde (m)", Float) = 7
         _FarEnd ("Distancia: refuerzo máximo (m)", Float) = 22
         _FarRimBoost ("Refuerzo del borde a distancia", Range(0, 4)) = 1.6
@@ -48,6 +53,9 @@ Shader "Ascua/SombraCriatura"
             float4 _DissolveEdge;
             float _Reveal;
             float _CrackStrength;
+            float _Warn;
+            float4 _WarnColor;
+            float _Damage;
             float _FarStart;
             float _FarEnd;
             float _FarRimBoost;
@@ -155,6 +163,14 @@ Shader "Ascua/SombraCriatura"
                 // Grietas ámbar de la Sombra velada al revelarse.
                 float cracks = smoothstep(0.47, 0.5, noise) * smoothstep(0.53, 0.5, noise);
                 color += _DissolveEdge.rgb * cracks * _CrackStrength * saturate(_Reveal * 1.2 - 0.2);
+
+                // Daño acumulado: las grietas se ensanchan con el daño (más vetas, más brillo).
+                float width = 0.012 + _Damage * 0.05;
+                float damageCracks = smoothstep(0.5 - width, 0.5, noise) * smoothstep(0.5 + width, 0.5, noise);
+                color += _DissolveEdge.rgb * damageCracks * _Damage * 0.9;
+
+                // Aviso de ataque: el borde (y un poco el cuerpo) se enciende en coral.
+                color += _WarnColor.rgb * _Warn * (rim * 1.6 + 0.18);
 
                 // Parpadeo al recibir luz y borde luminoso al disolverse.
                 color += _FlashColor.rgb * _FlashAmount;

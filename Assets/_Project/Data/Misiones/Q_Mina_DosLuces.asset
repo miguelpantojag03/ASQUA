@@ -45,9 +45,14 @@ MonoBehaviour:
   rewardHope: 12
   rewardHopeZoneId: Plaza
   rewardBond: 1
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 1
   offerDialogue: {fileID: 11400000, guid: 32d01424fc6e03c40a38269546c8b209, type: 2}
   inProgressDialogue: {fileID: 11400000, guid: c48e5d6d15a3594438c1ef75112285e9, type: 2}
   completedDialogue: {fileID: 11400000, guid: 7f2d7a1bea25f7346b4dea78f6f0991f, type: 2}
+  emotionalContext: "Esta noche no quiero ser la ni\xF1a que espera en la fuente.
+    Quiero ser la que ayuda."
+  progressNervousDialogue: {fileID: 11400000, guid: 6115ea24deae7214fbc2a0d749d84a7e, type: 2}
+  progressReliefDialogue: {fileID: 11400000, guid: 8aa3e68f4d46ceb48ac1fa135f86421e, type: 2}

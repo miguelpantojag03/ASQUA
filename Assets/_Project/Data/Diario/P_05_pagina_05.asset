@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa6c690a072cdda458226800676fcf56, type: 3}
+  m_Name: P_05_pagina_05
+  m_EditorClassIdentifier: 
+  pageId: pagina_05
+  number: 5
+  title: "P\xE1jaros de papel"
+  text: "El farolillo del padre de Mina tiene un p\xE1jaro negro pintado y una sola
+    letra: C.\n\nAlguien en esta ciudad doblaba papel mejor que nadie y regalaba
+    luces que no eran para \xE9l. Un d\xEDa dej\xF3 de venir.\n\nMe pregunto si alguien
+    le dio las gracias antes de que se cansara. Por si acaso, se las doy yo: gracias,
+    C., por una luz que todav\xEDa alumbra."

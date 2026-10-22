@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77dec953110fcae48b7efd4632c03438, type: 3}
+  m_Name: Q_Teo_TodaviaSirvo
+  m_EditorClassIdentifier: 
+  questId: teo_todavia_sirvo
+  giverNpcId: teo
+  title: "Todav\xEDa sirvo"
+  description: "Teo quiere encender con sus manos el farol de su padre. Vigila: mant\xE9n
+    El Mercado sobre 50 de Esperanza y disuelve las 3 Polillas que vendr\xE1n a por
+    la llama."
+  type: 6
+  shortInstruction: "Vigila a Teo: El Mercado \u2265 50 mientras disuelves las Polillas
+    que vienen a por su farol."
+  prerequisite: {fileID: 0}
+  targetZoneId: Mercado
+  hopeThreshold: 50
+  holdSeconds: 20
+  requiredCount: 3
+  collectRadiusMultiplier: 1.8
+  escortNpcId: mina
+  escortDestinationId: 
+  escortMaxDistance: 8
+  escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
+  defeatZoneId: Mercado
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 45
+  holdGraceSeconds: 2.5
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
+  rewardEnergy: 20
+  rewardHope: 15
+  rewardHopeZoneId: Mercado
+  rewardBond: 1
+  rewardDiaryPage: {fileID: 11400000, guid: 72d3faad0853d9a4ebef721e7f54febf, type: 2}
+  penaltyHope: 0
+  penaltyZoneId: 
+  failIfTargetZoneDies: 1
+  offerDialogue: {fileID: 11400000, guid: 2076efdbdbd0afa4c8e4787416e01152, type: 2}
+  inProgressDialogue: {fileID: 11400000, guid: 89ef4e667f6586e418ceaca1709e0de3, type: 2}
+  completedDialogue: {fileID: 11400000, guid: b71008ac3de3a8049b7a77bd05853d07, type: 2}
+  emotionalContext: "Desde que no puedo salir a alumbrar calles, me siento como un
+    farol sin mecha: un estorbo en la esquina.\nNecesito que alguien vea que todav\xEDa
+    sirvo para algo."
+  progressNervousDialogue: {fileID: 11400000, guid: aea6eeea682cc74499d7d75a3650e455, type: 2}
+  progressReliefDialogue: {fileID: 11400000, guid: b96a766e2068b77499706da56c6d6909, type: 2}

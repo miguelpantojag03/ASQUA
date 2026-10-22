@@ -32,13 +32,27 @@ MonoBehaviour:
   deliverItemId: 
   deliverItemName: 
   deliverToNpcId: 
+  defeatZoneId: Plaza
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 45
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
   rewardEnergy: 20
   rewardHope: 15
   rewardHopeZoneId: Mercado
   rewardBond: 2
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 1
   offerDialogue: {fileID: 11400000, guid: b0de45a171906dc4e82dd430668226ab, type: 2}
   inProgressDialogue: {fileID: 11400000, guid: bcbdc86eb57e9134d92193ea5f5d0cf1, type: 2}
   completedDialogue: {fileID: 11400000, guid: cab046a0b081fae4b97f1cd2f1a69f98, type: 2}
+  emotionalContext: "Mi padre abri\xF3 este mercado cuando aqu\xED no hab\xEDa nada.
+    Si se apaga mientras yo estoy, ser\xE1 culpa m\xEDa.\nNo quiero ser el \xFAltimo
+    Bravo que baja la persiana."
+  progressNervousDialogue: {fileID: 11400000, guid: 3532eb7616cf3c14e90d3eb8defe9fb8, type: 2}
+  progressReliefDialogue: {fileID: 11400000, guid: fd15a952c77af6d4aacf21a819ddcd5a, type: 2}

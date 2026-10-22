@@ -32,13 +32,28 @@ MonoBehaviour:
   deliverItemId: 
   deliverItemName: 
   deliverToNpcId: 
+  defeatZoneId: Plaza
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 45
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
   rewardEnergy: 60
   rewardHope: 0
   rewardHopeZoneId: 
   rewardBond: 0
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 35
   penaltyZoneId: Mercado
   failIfTargetZoneDies: 0
   offerDialogue: {fileID: 11400000, guid: 025a317916d088c4c94e2e58f75ac75c, type: 2}
   inProgressDialogue: {fileID: 0}
   completedDialogue: {fileID: 11400000, guid: 0eb4c240701809e4dab8fe9337480aea, type: 2}
+  emotionalContext: 'No lo hago por el mercado. Lo hago porque conozco ese cansancio.
+
+    Lo
+    he visto antes. Demasiadas veces.'
+  progressNervousDialogue: {fileID: 0}
+  progressReliefDialogue: {fileID: 0}

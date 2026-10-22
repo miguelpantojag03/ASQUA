@@ -276,7 +276,17 @@ namespace Ascua.Combat
             float r = range > 0f ? range : aimRange * RangeMultiplier;
             float a = halfAngle > 0f ? halfAngle : aimHalfAngle;
             Vector3 forward = controller != null && controller.DesiredDirection.sqrMagnitude > 0.01f ? controller.DesiredDirection : transform.forward;
-            ILightTarget target = LightTargetRegistry.NearestInCone(transform.position, forward, r, a);
+            // Con un objetivo fijado (TargetLock), se apunta a él aunque esté fuera del cono normal
+            // (hasta 2.2 veces el alcance de apuntado: no se teletransporta el golpe, solo se gira).
+            ILightTarget target = null;
+            TargetLock targetLock = TargetLock.Instance;
+            if (targetLock != null && targetLock.HasTarget)
+            {
+                Vector3 toLocked = targetLock.Current.TargetPosition - transform.position;
+                toLocked.y = 0f;
+                if (toLocked.magnitude <= r * 2.2f) target = targetLock.Current;
+            }
+            if (target == null) target = LightTargetRegistry.NearestInCone(transform.position, forward, r, a);
             Vector3 look = target != null ? target.TargetPosition - transform.position : forward;
             look.y = 0f;
             if (look.sqrMagnitude > 0.001f) transform.rotation = Quaternion.LookRotation(look.normalized, Vector3.up);

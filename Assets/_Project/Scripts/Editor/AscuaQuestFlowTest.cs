@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text;
 using Ascua.Characters;
 using Ascua.Combat;
+using Ascua.Controls;
 using Ascua.Core;
 using Ascua.Lighting;
 using Ascua.Narrative;
@@ -600,6 +601,8 @@ namespace Ascua.EditorTools
                 return Check(explained, "Fallo explicado: «" + q?.FailReason + "»");
             });
 
+            AddStoryNight2Steps();
+
             // --- Noche 4: la vigilia cambia por la decisión de la Noche 2.
             steps.Add(() => { GameProgress.AdvanceNight(); NightManager.Instance.StartNextNight(); return true; });
             steps.Add(() => (NightManager.Instance != null && NightManager.Instance.NightNumber == 4 && NightManager.Instance.IsRunning && Elapsed() > 2.5) || TimedOut(40));
@@ -625,6 +628,168 @@ namespace Ascua.EditorTools
                 return ok;
             });
             steps.Add(() => CloseDialogues(0.3));
+            AddStoryNight4Steps();
+        }
+
+        // ================================================================== Parte D: trama + lectura del combate
+
+        private static HeraldoOmen Omen() => UnityEngine.Object.FindFirstObjectByType<HeraldoOmen>();
+        private static PlayerInputReader InputReader() => UnityEngine.Object.FindFirstObjectByType<PlayerInputReader>();
+        private static ShadowCreature lockedCreature;
+        private static bool reliefSeen;
+
+        /// <summary>Noche 2: presagio del Heraldo, contexto emocional, ánimo nervioso, el farolillo y el combate nuevo.</summary>
+        private static void AddStoryNight2Steps()
+        {
+            // --- D.2 Presagio: empieza solo a mitad de la noche, si no hay combate ni diálogo.
+            steps.Add(() => CloseDialogues(0.3));
+            steps.Add(() => { Log("--- Parte D: presagio de la Noche 2 ---"); Teleport(new Vector3(0f, 0.12f, -7f), 0f); HoldNight(0.55f); return true; });
+            steps.Add(() => (Omen() != null && Omen().IsPlaying) || TimedOut(6));
+            steps.Add(() => Check(Omen() != null && Omen().IsPlaying, "D.2 El presagio empieza solo a mitad de la Noche 2 (sin combate ni diálogo)"));
+            steps.Add(() => Elapsed() > 3.0);
+            steps.Add(() => { Capture("f8_01_presagio"); return true; });
+            steps.Add(() => !Omen().IsPlaying || TimedOut(20));
+            steps.Add(() => Check(!Omen().IsPlaying && Omen().HasPlayed && GameProgress.HasPage("pagina_04") && InputReader().GameplayEnabled,
+                "Presagio terminado: control devuelto, no se repite y página 4 del Diario («Una luz que no era de nadie»)"));
+
+            // --- D.1 + D.3 Mina: oferta con contexto emocional.
+            steps.Add(() => { HoldNight(0.3f); Talk("mina"); return true; });
+            steps.Add(() => Elapsed() > 0.4);
+            steps.Add(() => { Runner().SkipToEnd(); return true; });
+            steps.Add(() => Elapsed() > 0.4);
+            steps.Add(() =>
+            {
+                Capture("f8_02_oferta_farolillo");
+                QuestRuntime q = QuestManager.Instance.FindById("mina_farolillo");
+                DialogueSequence offer = q != null ? QuestDialogues.Offer(q, "Mina") : null;
+                bool context = offer != null && offer.lines.Count == q.Data.offerDialogue.lines.Count + 2
+                               && offer.lines[offer.lines.Count - 1].speaker == "Mina" && offer.lines[offer.lines.Count - 1].text.Contains("voz");
+                Check(context, "D.1 La oferta termina con 2 frases de por qué le importa a Mina (contexto emocional)");
+                Runner().SelectChoice(0);
+                return true;
+            });
+            steps.Add(() => Expect("mina_farolillo", QuestState.Activa));
+            steps.Add(() => CloseDialogues(0.3));
+
+            // --- D.1 Ánimo: con la noche a punto de acabar, el diálogo de progreso es el nervioso.
+            steps.Add(() =>
+            {
+                HoldNight(0.92f);
+                QuestRuntime q = QuestManager.Instance.FindById("mina_farolillo");
+                bool nervous = QuestManager.Instance.GetMood(q) == QuestMood.Nerviosa && QuestDialogues.Progress(q, null) == q.Data.progressNervousDialogue;
+                HoldNight(0.3f);
+                bool normal = QuestManager.Instance.GetMood(q) == QuestMood.Normal && QuestDialogues.Progress(q, null) == q.Data.inProgressDialogue;
+                return Check(nervous && normal, "D.1 Progreso según el avance real: nerviosa con poca noche, normal con tiempo de sobra");
+            });
+
+            // --- D.3 El farolillo: en el callejón de los faroleros, se entrega a Mina (página 5).
+            steps.Add(() =>
+            {
+                PickupItem lantern = FindPickup("farolillo_papel");
+                Teleport(new Vector3(0f, 0.12f, 19f), 0f);
+                lantern.Interact(Player());
+                return true;
+            });
+            steps.Add(() => Elapsed() > 1.2);
+            steps.Add(() => { Capture("f8_03_farolillo"); return Check(PickupSystem.Instance.Has("farolillo_papel"), "El farolillo de papel está en el inventario"); });
+            steps.Add(() => Expect("mina_farolillo", QuestState.PorEntregar));
+            steps.Add(() => TurnIn("mina", "mina_farolillo"));
+            steps.Add(() => CloseDialogues(0.5));
+            steps.Add(() => Check(State("mina_farolillo") == QuestState.Completada && GameProgress.HasPage("pagina_05"), "D.3 Farolillo entregado a Mina y página 5 del Diario («Pájaros de papel»)"));
+
+            // --- Combate: turnos de ataque (máx. 2), fijar objetivo, grietas y salto de objetivo.
+            steps.Add(() =>
+            {
+                Log("--- Combate: turnos, objetivo fijado y grietas ---");
+                Time.timeScale = 1f;
+                Teleport(new Vector3(0f, 0.12f, -7f), 0f);
+                HoldNight(0.6f);
+                List<ShadowCreature> group = CombatWaveDirector.Instance.SpawnGroup("Plaza", 4, 0, "prueba_turnos");
+                EnemyAttackTokens.ResetPeak();
+                return Check(group.Count == 4, "4 Polillas a la vez para probar los turnos");
+            });
+            steps.Add(() => { Energy().Restore(100f); KeepZonesAlive(); return Elapsed() > 8.0; });
+            steps.Add(() => Check(EnemyAttackTokens.PeakCount >= 1 && EnemyAttackTokens.PeakCount <= 2,
+                $"Turnos de ataque: como mucho {EnemyAttackTokens.PeakCount} sombras atacaron a la vez (máx. 2 de 4)"));
+            steps.Add(() => { TargetLock.Instance.Toggle(); return true; });
+            steps.Add(() => Elapsed() > 0.3);
+            steps.Add(() =>
+            {
+                Capture("f8_04_objetivo_fijado");
+                lockedCreature = TargetLock.Instance.Current as ShadowCreature;
+                Check(lockedCreature != null, "Fijar objetivo (T / clic central / R3) marca una sombra");
+                if (lockedCreature != null) lockedCreature.ReceiveLight(new HitInfo(1, 0f, Player().position, HitKind.Barrido));
+                return true;
+            });
+            steps.Add(() => Elapsed() > 0.6);
+            steps.Add(() =>
+            {
+                bool cracks = lockedCreature != null && lockedCreature.IsAlive && lockedCreature.Damage01 > 0.2f;
+                Check(cracks, $"Daño visible sin barra de vida: grietas al {(lockedCreature != null ? lockedCreature.Damage01 : 0f):P0}");
+                if (lockedCreature != null) lockedCreature.ReceiveLight(new HitInfo(5, 0f, Player().position, HitKind.Remate));
+                return true;
+            });
+            steps.Add(() => Elapsed() > 0.5);
+            steps.Add(() => Check(TargetLock.Instance.HasTarget && !ReferenceEquals(TargetLock.Instance.Current, lockedCreature),
+                "Al disolverse la sombra fijada, el objetivo salta solo a la siguiente"));
+            steps.Add(() =>
+            {
+                TargetLock.Instance.SetTarget(null);
+                CombatWaveDirector.Instance.VanishGroup("prueba_turnos");
+                Energy().Restore(100f);
+                return Elapsed() > 0.8;
+            });
+        }
+
+        /// <summary>Noche 4: la secundaria de Teo (vigilar mientras enciende el farol de su padre).</summary>
+        private static void AddStoryNight4Steps()
+        {
+            steps.Add(() =>
+            {
+                Log("--- Parte D: «Todavía sirvo» (Teo) ---");
+                Time.timeScale = 1f;
+                HoldNight(0.3f);
+                reliefSeen = false;
+                QuestRuntime q = QuestManager.Instance.FindById("teo_todavia_sirvo");
+                Check(q != null && q.State == QuestState.Disponible && !string.IsNullOrEmpty(q.Data.emotionalContext), "La secundaria de Teo está disponible en la Noche 4, con su contexto emocional");
+                QuestManager.Instance.Accept(q);
+                return true;
+            });
+            steps.Add(() => Expect("teo_todavia_sirvo", QuestState.Activa));
+            steps.Add(() =>
+            {
+                HoldNight(0.3f);
+                ZoneHope mercado = ZoneHope.Find("Mercado");
+                if (mercado != null && mercado.Hope < 75f) mercado.AddHope(75f - mercado.Hope);
+                QuestRuntime q = QuestManager.Instance.FindById("teo_todavia_sirvo");
+                if (q == null || q.State != QuestState.Activa || TimedOut(45)) return true;
+                if (QuestManager.Instance.GetMood(q) == QuestMood.Aliviada) reliefSeen = true;
+                ShadowCreature next = null;
+                float best = float.MaxValue;
+                foreach (ShadowCreature c in UnityEngine.Object.FindObjectsByType<ShadowCreature>(FindObjectsSortMode.None))
+                {
+                    if (!c.IsAlive || c.ZoneId != "mision:teo_todavia_sirvo") continue;
+                    float d = (c.transform.position - Player().position).sqrMagnitude;
+                    if (d < best) { best = d; next = c; }
+                }
+                if (next != null) StrikeAt(next, 1.1f);
+                return false;
+            });
+            steps.Add(() => Expect("teo_todavia_sirvo", QuestState.PorEntregar));
+            steps.Add(() => Check(reliefSeen, "D.1 Ánimo aliviado de Teo al pasar de la mitad (diálogo de progreso aliviado)"));
+            steps.Add(() => TurnIn("teo", "teo_todavia_sirvo"));
+            steps.Add(() => CloseDialogues(1.6));
+            steps.Add(() =>
+            {
+                QuestLitObject farol = UnityEngine.Object.FindFirstObjectByType<QuestLitObject>();
+                Transform t = farol != null ? farol.transform : null;
+                if (t != null) Teleport(t.position + new Vector3(-6f, 0f, 1.5f), 100f);
+                return Check(GameProgress.HasPage("pagina_06") && farol != null && farol.IsLit, "D.3 Teo enciende el farol de los Bravo (queda encendido) y página 6 del Diario");
+            });
+            steps.Add(() => Elapsed() > 1.2);
+            steps.Add(() => { Capture("f8_05_farol_bravo"); CodexUI.Instance.Open(true); return true; });
+            steps.Add(() => Elapsed() > 0.6);
+            steps.Add(() => { Capture("f8_06_diario_paginas"); CodexUI.Instance.Close(); return true; });
         }
 
         // ================================================================== Combate de luz

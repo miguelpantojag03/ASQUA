@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa6c690a072cdda458226800676fcf56, type: 3}
+  m_Name: P_04_pagina_04
+  m_EditorClassIdentifier: 
+  pageId: pagina_04
+  number: 4
+  title: Una luz que no era de nadie
+  text: "Esta noche vi un farol encendido donde no hay ning\xFAn farol. Violeta.
+    Quieto. Como un ojo.\n\nLos faroles se encienden para que alguien encuentre el
+    camino. Entonces, \xBFa qui\xE9n llamaba esa luz?\n\nNo se lo he contado a nadie.
+    Todav\xEDa no s\xE9 si me dio miedo\u2026 o pena."

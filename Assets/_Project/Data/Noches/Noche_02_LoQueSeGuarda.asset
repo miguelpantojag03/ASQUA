@@ -21,6 +21,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 378c92cb79376dd4d8befde3b3a969e8, type: 2}
   - {fileID: 11400000, guid: 77e3d96ef65022448bb937cad4dc62c8, type: 2}
   - {fileID: 11400000, guid: ffe0b311dbe8f14458754ae4e202c1ae, type: 2}
+  - {fileID: 11400000, guid: 9477df2d76c0e034ca36e5d248e0d679, type: 2}
   nightDuration: 260
   startHope: 65
   hopeDecayPerSecond: 0.7

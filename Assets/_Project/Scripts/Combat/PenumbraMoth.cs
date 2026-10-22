@@ -74,13 +74,19 @@ namespace Ascua.Combat
                     circleAngle += circleDirection * dt * 1.4f;
                     Vector3 offset = new Vector3(Mathf.Cos(circleAngle), 0f, Mathf.Sin(circleAngle)) * circleRadius;
                     target = player.position + offset + Vector3.up * (hoverHeight + Mathf.Sin(Time.time * 3f) * 0.2f);
-                    if (phaseTimer > circleDuration) SetPhase(Phase.WindUp);
+                    if (phaseTimer > circleDuration)
+                    {
+                        // Turnos: si ya hay 2 sombras atacando, da otra vuelta corta y lo vuelve a intentar.
+                        if (RequestAttackTurn()) SetPhase(Phase.WindUp);
+                        else circleDuration += 0.4f;
+                    }
                     break;
 
                 case Phase.WindUp:
                     // Aviso: se queda quieta un instante con las alas plegadas (se puede leer y esquivar).
                     speed = 0.5f;
                     target = transform.position;
+                    ShowWarning(phaseTimer / windUpTime);
                     if (phaseTimer >= windUpTime)
                     {
                         diveTarget = player.position + Vector3.up * 0.9f;
@@ -91,7 +97,8 @@ namespace Ascua.Combat
                 case Phase.Dive:
                     speed = diveSpeed;
                     target = diveTarget;
-                    TryContactDamage();
+                    ShowWarning(0.6f);
+                    TryContactDamage(true);
                     if ((transform.position - diveTarget).sqrMagnitude < 0.2f || phaseTimer > 1.2f) SetPhase(Phase.Retreat);
                     break;
 
@@ -115,6 +122,8 @@ namespace Ascua.Combat
         {
             phase = next;
             phaseTimer = 0f;
+            // El turno de ataque termina al retirarse (o si la aturden y vuelve a rodear).
+            if (next == Phase.Retreat || next == Phase.Circle || next == Phase.Approach) EndAttackTurn();
             // Cada vuelta dura distinto para que varias polillas no ataquen a la vez.
             if (next == Phase.Circle) circleDuration = Random.Range(1.2f, 2.1f);
         }

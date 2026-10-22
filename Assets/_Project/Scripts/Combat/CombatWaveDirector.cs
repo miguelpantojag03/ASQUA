@@ -38,6 +38,8 @@ namespace Ascua.Combat
         [SerializeField] private float minDistanceToPlayer = 4f;
         [SerializeField] private float finisherSlowScale = 0.3f;
         [SerializeField] private float finisherRealSeconds = 0.5f;
+        [Tooltip("Turnos de ataque: cuántas sombras pueden atacar a Ilse a la vez (las demás rodean y esperan).")]
+        [SerializeField, Range(1, 4)] private int maxSimultaneousAttackers = 2;
 
         [Header("Oleadas de la noche (las reemplaza el NightQuestSet)")]
         [SerializeField] private List<CombatWave> waves = new List<CombatWave>();
@@ -58,6 +60,7 @@ namespace Ascua.Combat
         private void Awake()
         {
             Instance = this;
+            EnemyAttackTokens.MaxAttackers = maxSimultaneousAttackers;
         }
 
         private void OnDestroy()

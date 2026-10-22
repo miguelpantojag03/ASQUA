@@ -46,6 +46,7 @@ namespace Ascua.Quests
         private FireflyPool fireflyPool;
         private float textTimer;
         private float lastEnergy = -1f;
+        private bool pageRewardPending;
         private readonly List<KeyValuePair<string, float>> pendingHopeBonus = new List<KeyValuePair<string, float>>();
 
         public event Action<QuestRuntime> QuestStateChanged;
@@ -413,7 +414,7 @@ namespace Ascua.Quests
             if (q.Data.type != QuestType.TratoHeraldo)
             {
                 EventBus.RaiseCelebration("mision");
-                Toast("Misión completada: " + q.Data.title);
+                Toast("Misión completada: " + q.Data.title + PageToastSuffix());
             }
             RefreshLocks();
         }
@@ -432,7 +433,7 @@ namespace Ascua.Quests
             GrantRewards(q);
             SetState(q, QuestState.Completada);
             EventBus.RaiseCelebration("mision");
-            Toast("Misión completada: " + q.Data.title);
+            Toast("Misión completada: " + q.Data.title + PageToastSuffix());
             RefreshLocks();
         }
 
@@ -748,6 +749,65 @@ namespace Ascua.Quests
                 if (zone != null) zone.AddHope(-data.penaltyHope);
             }
             if (data.rewardBond != 0) AddBond(data.giverNpcId, data.rewardBond);
+
+            // Recompensa narrativa: una página nueva del Diario de Ilse.
+            if (data.rewardDiaryPage != null && GameProgress.AddPage(data.rewardDiaryPage.pageId))
+            {
+                pageRewardPending = true;
+            }
+        }
+
+        // ================================================================== Ánimo de quien la pidió (Parte D)
+
+        /// <summary>
+        /// Ánimo del personaje según el avance REAL de su misión activa:
+        ///  - Nerviosa: queda menos del 35 % del límite de tiempo, la zona está bajo el umbral (o a 5 puntos),
+        ///    Ilse se ha alejado en una escolta, se ha gastado más del 70 % del presupuesto de energía,
+        ///    o a la noche le queda menos del 20 % (mín. 30 s). Si ya está casi hecha (≥ 85 %), no se pone nerviosa.
+        ///  - Aliviada: más de la mitad hecha (≥ 50 %) y sin apuros.
+        ///  - Normal: el resto.
+        /// </summary>
+        public QuestMood GetMood(QuestRuntime q)
+        {
+            if (q == null || q.State != QuestState.Activa) return QuestMood.Normal;
+            Quest d = q.Data;
+            bool urgent = false;
+
+            switch (d.type)
+            {
+                case QuestType.RescateEsperanza:
+                    ZoneHope zone = ZoneHope.Find(d.targetZoneId);
+                    if (zone != null && zone.Hope < q.EffThreshold) urgent = true;
+                    break;
+                case QuestType.DobleObjetivo:
+                    ZoneHope holdZone = ZoneHope.Find(d.targetZoneId);
+                    if (holdZone != null && holdZone.Hope < q.EffThreshold + 5f) urgent = true;
+                    if (q.EffTimeLimit > 0f && q.EffTimeLimit - q.Elapsed < q.EffTimeLimit * 0.35f) urgent = true;
+                    break;
+                case QuestType.Escolta:
+                    if (q.Timer > 0f) urgent = true; // Ilse está demasiado lejos ahora mismo
+                    break;
+            }
+            if (q.EffEnergyBudget > 0f && q.EnergySpent > q.EffEnergyBudget * 0.7f) urgent = true;
+
+            NightManager night = NightManager.Instance;
+            if (night != null && night.IsRunning && night.Remaining < Mathf.Max(30f, night.Duration * 0.2f)) urgent = true;
+
+            if (urgent && q.Progress01 < 0.85f) return QuestMood.Nerviosa;
+            if (q.Progress01 >= 0.5f) return QuestMood.Aliviada;
+            return QuestMood.Normal;
+        }
+
+        /// <summary>El diálogo de "en curso" que toca según el ánimo (con el normal como respaldo).</summary>
+        public DialogueSequence GetProgressDialogue(QuestRuntime q)
+        {
+            if (q == null) return null;
+            switch (GetMood(q))
+            {
+                case QuestMood.Nerviosa when q.Data.progressNervousDialogue != null: return q.Data.progressNervousDialogue;
+                case QuestMood.Aliviada when q.Data.progressReliefDialogue != null: return q.Data.progressReliefDialogue;
+                default: return q.Data.inProgressDialogue;
+            }
         }
 
         private void SetState(QuestRuntime q, QuestState state)
@@ -789,7 +849,8 @@ namespace Ascua.Quests
 
                 Quest requirement = q.Data.prerequisite;
                 QuestRuntime required = requirement != null ? Find(requirement) : null;
-                if (requirement == null || (required != null && required.State == QuestState.Completada))
+                bool doneBefore = requirement != null && required == null && GameProgress.IsQuestCompleted(requirement.questId);
+                if (requirement == null || doneBefore || (required != null && required.State == QuestState.Completada))
                 {
                     SetState(q, QuestState.Disponible);
                     UpdateProgressText(q);
@@ -875,6 +936,14 @@ namespace Ascua.Quests
         {
             ZoneHope zone = ZoneHope.Find(zoneId);
             return zone != null ? zone.DisplayName : zoneId;
+        }
+
+        /// <summary>Si la última recompensa incluía una página del Diario, lo añade al aviso (un solo aviso, no dos).</summary>
+        private string PageToastSuffix()
+        {
+            if (!pageRewardPending) return "";
+            pageRewardPending = false;
+            return " · Nueva página del Diario (J)";
         }
 
         private static void Toast(string message)

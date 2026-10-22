@@ -15,12 +15,19 @@ namespace Ascua.Combat
     ///  - Al llegar a 0 se disuelven en luz (_Dissolve + partículas), nunca de forma "realista",
     ///    y devuelven energía al Farol de Ilse.
     ///  - Se reciclan (pool): Spawn() las reactiva, nada se instancia durante la partida.
+    /// Lectura del combate (Parte D):
+    ///  - Aviso antes de atacar: el borde se enciende en coral (_Warn) durante el amago.
+    ///  - Daño visible sin barra: grietas de luz (_Damage) que crecen con cada golpe recibido.
+    ///  - Reacción al golpe: se encoge y rebota (squash) para que cada impacto se note.
+    ///  - Turnos (EnemyAttackTokens): como mucho 2 sombras atacan a la vez; el resto espera.
     /// </summary>
     public abstract class ShadowCreature : MonoBehaviour, ILightTarget
     {
         private static readonly int FlashId = Shader.PropertyToID("_FlashAmount");
         private static readonly int DissolveId = Shader.PropertyToID("_Dissolve");
         private static readonly int RevealId = Shader.PropertyToID("_Reveal");
+        private static readonly int WarnId = Shader.PropertyToID("_Warn");
+        private static readonly int DamageId = Shader.PropertyToID("_Damage");
 
         [Header("Identidad")]
         [SerializeField] protected string typeId = "sombra";
@@ -35,6 +42,12 @@ namespace Ascua.Combat
         [SerializeField] protected float contactDamage = 6f;
         [SerializeField] protected float contactRange = 0.9f;
         [SerializeField] protected float contactCooldown = 1.2f;
+        [Tooltip("Amago antes del golpe de contacto (s): el borde se enciende para poder esquivar.")]
+        [SerializeField] protected float contactWindup = 0.35f;
+
+        [Header("Reacción al golpe")]
+        [Tooltip("Cuánto se aplasta al recibir luz (0 = nada).")]
+        [SerializeField] protected float hitSquash = 0.22f;
 
         [Header("Cuerpo")]
         [Tooltip("Altura del centro de la hitbox sobre el suelo.")]
@@ -59,12 +72,21 @@ namespace Ascua.Combat
         private LitVulnerable veil;
         private float baseEnergyDrop;
         private MaterialPropertyBlock propertyBlock;
+        private float windupTimer = -1f;   // < 0 = sin amago en curso
+        private float externalWarn;        // aviso pedido por la criatura este frame (picado, embestida...)
+        private float damageShown;         // grietas visibles (se acercan suave al daño real)
+        private float squashTimer = -1f;
+        private Vector3 restScale = Vector3.one;
 
         public string TypeId => typeId;
         public string ZoneId { get; private set; }
         public bool IsAlive => !dying && isActiveAndEnabled;
         public bool IsStunned => stunTimer > 0f;
         public int Health => health;
+        /// <summary>0 = intacta, 1 = a punto de deshacerse (lo que muestran las grietas).</summary>
+        public float Damage01 => maxHealth > 0 ? Mathf.Clamp01(1f - (float)health / maxHealth) : 0f;
+        /// <summary>True durante el amago de un golpe de contacto.</summary>
+        public bool IsWindingUp => windupTimer >= 0f;
 
         // ILightTarget
         public Vector3 TargetPosition => transform.position + Vector3.up * centerHeight * transform.localScale.y;
@@ -86,6 +108,10 @@ namespace Ascua.Combat
         protected virtual void OnDisable()
         {
             LightTargetRegistry.Unregister(this);
+            EnemyAttackTokens.Release(this);
+            windupTimer = -1f;
+            if (squashTimer >= 0f) transform.localScale = restScale;
+            squashTimer = -1f;
         }
 
         /// <summary>Activa la criatura en una posición (del pool). zoneId = zona que defiende la oleada.</summary>
@@ -101,7 +127,12 @@ namespace Ascua.Combat
             dissolveValue = 1f;
             energyDrop = baseEnergyDrop;
             revealValue = veil != null ? 0.15f : 1f;
+            windupTimer = -1f;
+            externalWarn = 0f;
+            damageShown = 0f;
+            squashTimer = -1f;
             gameObject.SetActive(true);
+            restScale = transform.localScale;
 
             if (agent != null)
             {
@@ -158,6 +189,8 @@ namespace Ascua.Combat
 
             if (!dying)
             {
+                // Aturdirla durante el amago cancela su ataque (premia golpear primero).
+                if (IsStunned && windupTimer >= 0f) CancelWindup();
                 if (stunTimer > 0f) stunTimer -= dt;
                 if (contactTimer > 0f) contactTimer -= dt;
                 if (repathTimer > 0f) repathTimer -= dt;
@@ -172,26 +205,107 @@ namespace Ascua.Combat
                 }
 
                 if (player != null && !IsStunned) Tick(dt);
+                if (windupTimer >= 0f && !IsStunned) AdvanceWindup(dt);
             }
 
             flash = Mathf.MoveTowards(flash, 0f, dt * 6f);
+            damageShown = Mathf.MoveTowards(damageShown, Damage01, dt * 3f);
+            UpdateSquash(dt);
             ApplyMaterial();
+            externalWarn = 0f;
         }
+
+        /// <summary>
+        /// La criatura pide mostrar su aviso este frame (0-1). Las clases hijas lo llaman
+        /// durante su propio amago (picado de la Polilla, embestida de la Sombra Mayor...).
+        /// </summary>
+        protected void ShowWarning(float amount)
+        {
+            externalWarn = Mathf.Max(externalWarn, Mathf.Clamp01(amount));
+        }
+
+        /// <summary>Pide turno de ataque (máx. 2 a la vez). False = sigue rodeando y vuelve a intentarlo.</summary>
+        protected bool RequestAttackTurn() => EnemyAttackTokens.TryAcquire(this);
+
+        /// <summary>Devuelve el turno al terminar el ataque.</summary>
+        protected void EndAttackTurn() => EnemyAttackTokens.Release(this);
 
         /// <summary>Comportamiento propio de cada criatura (no se llama aturdida ni muriendo).</summary>
         protected abstract void Tick(float dt);
 
-        /// <summary>Daño de contacto con cooldown (cuerpo a cuerpo de las criaturas).</summary>
-        protected bool TryContactDamage()
+        /// <summary>
+        /// Golpe de contacto con cooldown (cuerpo a cuerpo de las criaturas).
+        /// instant = false (por defecto): primero pide turno y hace un amago de 'contactWindup' s con el borde
+        /// encendido; el golpe sale al terminar el amago si Ilse sigue cerca (se puede esquivar o interrumpir).
+        /// instant = true: golpea ya (para ataques que ya tienen su propio aviso, como el picado de la Polilla).
+        /// Devuelve true solo si el golpe instantáneo acertó.
+        /// </summary>
+        protected bool TryContactDamage(bool instant = false)
         {
             if (contactTimer > 0f || player == null || playerCombat == null) return false;
-            Vector3 delta = player.position - transform.position;
-            delta.y = 0f;
-            if (delta.magnitude > contactRange + 0.3f) return false;
+            if (FlatToPlayer().magnitude > contactRange + 0.3f) return false;
+            if (instant) return DealContactDamage();
+
+            if (windupTimer >= 0f) return false; // ya está amagando
+            if (!RequestAttackTurn())
+            {
+                // Sin turno: espera un poco y lo vuelve a pedir.
+                contactTimer = 0.3f;
+                return false;
+            }
+            windupTimer = 0f;
+            return false;
+        }
+
+        private bool DealContactDamage()
+        {
             contactTimer = contactCooldown;
             IncomingHitResult result = playerCombat.ReceiveHit(contactDamage, transform.position, this);
             OnContactResult(result);
             return result == IncomingHitResult.Hit;
+        }
+
+        private void AdvanceWindup(float dt)
+        {
+            windupTimer += dt;
+            if (windupTimer < contactWindup) return;
+            windupTimer = -1f;
+            // Margen extra de 0.6 m: si Ilse se apartó a tiempo, el golpe falla (y se ve).
+            if (player != null && playerCombat != null && FlatToPlayer().magnitude <= contactRange + 0.6f) DealContactDamage();
+            else contactTimer = contactCooldown * 0.6f;
+            EndAttackTurn();
+        }
+
+        private void CancelWindup()
+        {
+            windupTimer = -1f;
+            contactTimer = Mathf.Max(contactTimer, contactCooldown * 0.5f);
+            EndAttackTurn();
+        }
+
+        /// <summary>Aviso visible ahora (0-1): el mayor entre el amago de contacto y el que pida la criatura.</summary>
+        private float CurrentWarning()
+        {
+            float w = externalWarn;
+            if (windupTimer >= 0f && contactWindup > 0f) w = Mathf.Max(w, Mathf.Clamp01(windupTimer / contactWindup));
+            return w;
+        }
+
+        private void UpdateSquash(float dt)
+        {
+            if (squashTimer < 0f) return;
+            squashTimer += dt;
+            const float duration = 0.22f;
+            if (squashTimer >= duration)
+            {
+                squashTimer = -1f;
+                transform.localScale = restScale;
+                return;
+            }
+            // Se aplasta de golpe y rebota con un pequeño sobrepaso (curva amortiguada).
+            float t = squashTimer / duration;
+            float s = Mathf.Cos(t * Mathf.PI * 1.5f) * (1f - t) * hitSquash;
+            transform.localScale = new Vector3(restScale.x * (1f + s * 0.8f), restScale.y * (1f - s), restScale.z * (1f + s * 0.8f));
         }
 
         protected virtual void OnContactResult(IncomingHitResult result) { }
@@ -211,6 +325,8 @@ namespace Ascua.Combat
             }
 
             flash = 1f;
+            if (squashTimer < 0f) restScale = transform.localScale;
+            squashTimer = 0f;
             health -= Mathf.Max(1, hit.Damage);
             stunTimer = Mathf.Max(stunTimer, hit.StunSeconds);
 
@@ -248,6 +364,8 @@ namespace Ascua.Combat
         protected virtual void Die(HitInfo hit)
         {
             dying = true;
+            windupTimer = -1f;
+            EndAttackTurn();
             LightTargetRegistry.Unregister(this);
             if (agent != null && agent.enabled) agent.enabled = false;
 
@@ -273,6 +391,8 @@ namespace Ascua.Combat
         {
             if (dying || !gameObject.activeSelf) return;
             dying = true;
+            windupTimer = -1f;
+            EndAttackTurn();
             LightTargetRegistry.Unregister(this);
             if (agent != null && agent.enabled) agent.enabled = false;
             StartCoroutine(DissolveAndHide());
@@ -302,6 +422,13 @@ namespace Ascua.Combat
         private void ApplyMaterial()
         {
             if (bodyRenderers == null) return;
+            // Aviso: con "reducir destellos" no late, solo se enciende de forma estable y más suave.
+            float warn = CurrentWarning();
+            if (warn > 0f)
+            {
+                float beat = AccessibilitySettings.ReduceFlashes ? 1f : 0.75f + 0.25f * Mathf.Sin(Time.time * 28f);
+                warn *= beat * Mathf.Lerp(0.6f, 1f, AccessibilitySettings.FlashScale);
+            }
             for (int i = 0; i < bodyRenderers.Length; i++)
             {
                 Renderer r = bodyRenderers[i];
@@ -310,6 +437,8 @@ namespace Ascua.Combat
                 propertyBlock.SetFloat(FlashId, flash * Mathf.Lerp(0.5f, 1f, AccessibilitySettings.FlashScale));
                 propertyBlock.SetFloat(DissolveId, dissolveValue);
                 propertyBlock.SetFloat(RevealId, revealValue);
+                propertyBlock.SetFloat(WarnId, warn);
+                propertyBlock.SetFloat(DamageId, damageShown);
                 r.SetPropertyBlock(propertyBlock);
             }
         }

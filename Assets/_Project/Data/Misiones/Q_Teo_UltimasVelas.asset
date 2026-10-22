@@ -32,13 +32,26 @@ MonoBehaviour:
   deliverItemId: 
   deliverItemName: 
   deliverToNpcId: 
+  defeatZoneId: Plaza
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 45
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
   rewardEnergy: 0
   rewardHope: 0
   rewardHopeZoneId: 
   rewardBond: 1
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 1
   offerDialogue: {fileID: 11400000, guid: 3c916982fb87d544c980e986dd9022c6, type: 2}
   inProgressDialogue: {fileID: 0}
   completedDialogue: {fileID: 11400000, guid: 2f77ac73167020a44b29864ddc3f362b, type: 2}
+  emotionalContext: "Las hizo mi padre el \xFAltimo invierno que pudo. No me atrevo
+    a decidir solo d\xF3nde se gastan."
+  progressNervousDialogue: {fileID: 0}
+  progressReliefDialogue: {fileID: 0}

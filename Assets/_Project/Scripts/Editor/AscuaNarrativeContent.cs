@@ -20,6 +20,8 @@ namespace Ascua.EditorTools
         public DialogueSequence[] HeraldoRevelations;
         // Parte C: noches 2-4 y Perpetua.
         public NightAssets Nights;
+        // Parte D: trama (contexto emocional, secundarias, páginas 4-6).
+        public StoryAssets Story;
     }
 
     /// <summary>
@@ -412,6 +414,7 @@ namespace Ascua.EditorTools
             }
 
             n.Nights = AscuaNarrativeNights.CreateAll();
+            n.Story = AscuaNarrativeStory.CreateAll(n);
             return n;
         }
 

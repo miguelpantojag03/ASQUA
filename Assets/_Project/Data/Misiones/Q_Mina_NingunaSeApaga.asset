@@ -45,9 +45,14 @@ MonoBehaviour:
   rewardHope: 10
   rewardHopeZoneId: Plaza
   rewardBond: 1
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 1
   offerDialogue: {fileID: 11400000, guid: fa6b8c183ce57474babb28062ce7ff4b, type: 2}
   inProgressDialogue: {fileID: 11400000, guid: b9269b326ceb3b54fbbb26b2d7a11d00, type: 2}
   completedDialogue: {fileID: 11400000, guid: 89fec288a89105b40aa5465da9152f82, type: 2}
+  emotionalContext: "Desde mi ventana veo la fuente y el mercado. Si se apaga uno,
+    ya no podr\xE9 asomarme sin pensar en eso."
+  progressNervousDialogue: {fileID: 11400000, guid: e881629f14f3bf74885cb30b816ebc68, type: 2}
+  progressReliefDialogue: {fileID: 11400000, guid: d50bf0a607944004cb33645669225b8f, type: 2}

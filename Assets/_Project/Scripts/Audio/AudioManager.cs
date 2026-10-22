@@ -86,6 +86,10 @@ namespace Ascua.Audio
         [SerializeField] private AudioClip sfxCriticalEnergy;
         [SerializeField] private float criticalRepeatSeconds = 4.5f;
         [SerializeField] private AudioClip sfxThreat;
+        [Tooltip("Parte D: fijar objetivo en combate (campanilla corta).")]
+        [SerializeField] private AudioClip sfxLockOn;
+        [Tooltip("Parte D: susurro lejano del presagio de la Noche 2.")]
+        [SerializeField] private AudioClip sfxWhisper;
         [SerializeField] private int sfxVoices = 14;
 
         private const string MusicKey = "ascua_vol_musica";
@@ -350,6 +354,8 @@ namespace Ascua.Audio
                 case "proyectil_sombra": PlaySfx(sfxShadowBolt, 0.5f, UnityEngine.Random.Range(0.95f, 1.1f)); break;
                 case "vela_teo_estallido": PlaySfx(sfxDissolve, 1f, 0.7f, "[Estallido de luz]"); break;
                 case "vara_luz": PlaySfx(sfxMoment, 0.9f, 1.2f, "[El Farol se transforma]"); break;
+                case "fijar_objetivo": PlaySfx(sfxLockOn, 0.45f, UnityEngine.Random.Range(0.97f, 1.03f)); break;
+                case "presagio_susurro": PlaySfx(sfxWhisper, 0.85f, 1f, "[Un susurro lejano, sin palabras]"); break;
             }
         }
 

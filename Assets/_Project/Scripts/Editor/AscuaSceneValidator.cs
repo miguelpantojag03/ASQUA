@@ -121,6 +121,7 @@ namespace Ascua.EditorTools
             ok &= ValidateGraphics(sb);
             ok &= ValidateDesignAndImpact(sb);
             ok &= ValidateLaterNights(sb, night);
+            ok &= ValidateStory(sb, night);
 
             report = sb.ToString();
             return ok;
@@ -384,6 +385,64 @@ namespace Ascua.EditorTools
             ok &= Check(sb, runner != null && new SerializedObject(runner).FindProperty("offerSummaryText").objectReferenceValue != null, "Resumen multilínea al ofrecer misiones");
             ObjectiveTrackerUI tracker = Object.FindFirstObjectByType<ObjectiveTrackerUI>();
             ok &= Check(sb, tracker != null && new SerializedObject(tracker).FindProperty("secondaryFill").objectReferenceValue != null, "Progreso doble en el objetivo actual (barras A y B)");
+            return ok;
+        }
+
+        // ================================================================== Parte D
+
+        private static bool ValidateStory(StringBuilder sb, NightManager night)
+        {
+            bool ok = true;
+
+            // --- Combate: fijar objetivo, turnos de ataque, aviso y grietas.
+            TargetLock targetLock = Object.FindFirstObjectByType<TargetLock>();
+            ok &= RefsOk(sb, targetLock, "input", "viewCamera");
+            Shader creature = Shader.Find("Ascua/SombraCriatura");
+            bool shaderOk = creature != null && creature.isSupported && creature.FindPropertyIndex("_Warn") >= 0 && creature.FindPropertyIndex("_Damage") >= 0;
+            ok &= Check(sb, shaderOk, "Sombras: aviso de ataque (_Warn) y grietas de daño (_Damage) en el shader");
+            CombatWaveDirector director = Object.FindFirstObjectByType<CombatWaveDirector>();
+            int maxAttackers = director != null ? new SerializedObject(director).FindProperty("maxSimultaneousAttackers").intValue : 0;
+            ok &= Check(sb, maxAttackers == 2, $"Turnos de ataque: como mucho {maxAttackers} sombras atacan a la vez");
+            AudioManager audio = Object.FindFirstObjectByType<AudioManager>();
+            SerializedObject audioSo = audio != null ? new SerializedObject(audio) : null;
+            ok &= Check(sb, audioSo != null && audioSo.FindProperty("sfxLockOn").objectReferenceValue != null && audioSo.FindProperty("sfxWhisper").objectReferenceValue != null,
+                "Sonidos de fijar objetivo y del susurro del presagio");
+
+            // --- D.2 Presagio de la Noche 2.
+            HeraldoOmen omen = Object.FindFirstObjectByType<HeraldoOmen>();
+            ok &= RefsOk(sb, omen);
+
+            // --- D.1 Contexto emocional en TODAS las misiones; progreso nervioso/aliviado en las que tienen avance.
+            System.Collections.Generic.List<Quest> all = new System.Collections.Generic.List<Quest>();
+            if (night != null && night.QuestSet != null) all.AddRange(night.QuestSet.quests);
+            SerializedProperty later = night != null ? new SerializedObject(night).FindProperty("laterNights") : null;
+            for (int i = 0; later != null && i < later.arraySize; i++)
+            {
+                if (later.GetArrayElementAtIndex(i).objectReferenceValue is NightQuestSet set) all.AddRange(set.quests);
+            }
+            all = all.Where(q => q != null).Distinct().ToList();
+            int withContext = all.Count(q => !string.IsNullOrWhiteSpace(q.emotionalContext));
+            ok &= Check(sb, withContext == all.Count, $"Contexto emocional al ofrecer: {withContext}/{all.Count} misiones");
+            var progressable = all.Where(q => !q.CompletesOnChoice).ToList();
+            int moods = progressable.Count(q => q.progressNervousDialogue != null);
+            ok &= Check(sb, moods == progressable.Count, $"Diálogo de progreso nervioso: {moods}/{progressable.Count} misiones con avance");
+            int relief = progressable.Count(q => q.progressReliefDialogue != null);
+            ok &= Check(sb, relief >= progressable.Count - 3, $"Diálogo de progreso aliviado: {relief}/{progressable.Count} (las entregas no tienen avance intermedio)");
+
+            // --- D.3 Secundarias.
+            Quest farolillo = all.FirstOrDefault(q => q.questId == "mina_farolillo");
+            Quest teo = all.FirstOrDefault(q => q.questId == "teo_todavia_sirvo");
+            ok &= Check(sb, farolillo != null && farolillo.rewardDiaryPage != null && farolillo.completedDialogue != null, "Secundaria de Mina: «El farolillo de papel» (página 5 al completarla)");
+            ok &= Check(sb, teo != null && teo.rewardDiaryPage != null && teo.completedDialogue != null, "Secundaria de Teo: «Todavía sirvo» (página 6 al completarla)");
+            PickupItem lantern = Object.FindObjectsByType<PickupItem>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault(p => p.ItemId == "farolillo_papel");
+            ok &= Check(sb, lantern != null, "El farolillo de papel está en el callejón de los faroleros");
+            QuestLitObject farol = Object.FindFirstObjectByType<QuestLitObject>();
+            ok &= RefsOk(sb, farol);
+
+            // --- D.4 Diario: al menos 6 páginas escritas.
+            CodexUI codex = Object.FindFirstObjectByType<CodexUI>(FindObjectsInactive.Include);
+            int pages = codex != null ? new SerializedObject(codex).FindProperty("pages").arraySize : 0;
+            ok &= Check(sb, pages >= 6, $"Diario de Ilse: {pages} páginas (4-6 nuevas: presagio, farolillo, Teo)");
             return ok;
         }
 
