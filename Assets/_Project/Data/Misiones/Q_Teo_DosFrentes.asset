@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77dec953110fcae48b7efd4632c03438, type: 3}
+  m_Name: Q_Teo_DosFrentes
+  m_EditorClassIdentifier: 
+  questId: teo_dos_frentes
+  giverNpcId: teo
+  title: Dos frentes
+  description: "Mant\xE9n El Mercado sobre 45 de Esperanza mientras disuelves las
+    3 Polillas que acosan La Plaza."
+  type: 6
+  shortInstruction: "Mant\xE9n El Mercado \u2265 45 mientras disuelves las Polillas
+    de La Plaza."
+  prerequisite: {fileID: 0}
+  targetZoneId: Mercado
+  hopeThreshold: 45
+  holdSeconds: 20
+  requiredCount: 3
+  collectRadiusMultiplier: 1.8
+  escortNpcId: mina
+  escortDestinationId: 
+  escortMaxDistance: 8
+  escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
+  defeatZoneId: Plaza
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 50
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
+  rewardEnergy: 15
+  rewardHope: 10
+  rewardHopeZoneId: Mercado
+  rewardBond: 1
+  penaltyHope: 0
+  penaltyZoneId: 
+  failIfTargetZoneDies: 1
+  offerDialogue: {fileID: 11400000, guid: 9e166f80c5f5e634190c10d8a3ed5b51, type: 2}
+  inProgressDialogue: {fileID: 11400000, guid: 38d8e3f17a1e8bb45ba73cc540c8c67b, type: 2}
+  completedDialogue: {fileID: 11400000, guid: 7d6b00a5155aca04abf61001c9b1a880, type: 2}

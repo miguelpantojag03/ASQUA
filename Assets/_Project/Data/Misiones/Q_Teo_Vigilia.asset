@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77dec953110fcae48b7efd4632c03438, type: 3}
+  m_Name: Q_Teo_Vigilia
+  m_EditorClassIdentifier: 
+  questId: teo_vigilia
+  giverNpcId: teo
+  title: La vigilia del Mercado
+  description: "Mant\xE9n El Mercado con Esperanza \u2265 60 durante 35 segundos.
+    Lo que decidiste en la Noche 2 cambia las condiciones."
+  type: 0
+  shortInstruction: "Mant\xE9n El Mercado con Esperanza suficiente hasta que pase
+    lo peor."
+  prerequisite: {fileID: 0}
+  targetZoneId: Mercado
+  hopeThreshold: 60
+  holdSeconds: 35
+  requiredCount: 3
+  collectRadiusMultiplier: 1.8
+  escortNpcId: mina
+  escortDestinationId: 
+  escortMaxDistance: 8
+  escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
+  defeatZoneId: Plaza
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 45
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions:
+  - flag: velas_mercado
+    thresholdDelta: -10
+    holdSecondsDelta: 0
+    timeLimitDelta: 0
+    energyBudgetDelta: 0
+    startHopeBonus: 15
+    note: "En la Noche 2 dejaste las velas de reserva en el Mercado: hoy arden en
+      los puestos. El Mercado empieza con m\xE1s luz y basta con sostenerlo en 50."
+  - flag: velas_casa
+    thresholdDelta: 0
+    holdSecondsDelta: -12
+    timeLimitDelta: 0
+    energyBudgetDelta: 0
+    startHopeBonus: 0
+    note: "En la Noche 2 llevaste las velas a la Casa de ancianos: Perpetua y los
+      dem\xE1s las han puesto en las ventanas que dan al Mercado. Basta con aguantar
+      23 s."
+  rewardEnergy: 20
+  rewardHope: 15
+  rewardHopeZoneId: Mercado
+  rewardBond: 1
+  penaltyHope: 0
+  penaltyZoneId: 
+  failIfTargetZoneDies: 1
+  offerDialogue: {fileID: 11400000, guid: 350a00a923e322c478d8513b77d264e1, type: 2}
+  inProgressDialogue: {fileID: 11400000, guid: 937a05c211e4f5846a66513b7d1da541, type: 2}
+  completedDialogue: {fileID: 11400000, guid: 6415e9f3da972e74fa7484c787b90bee, type: 2}

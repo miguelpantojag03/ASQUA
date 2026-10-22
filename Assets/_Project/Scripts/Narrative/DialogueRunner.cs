@@ -29,6 +29,10 @@ namespace Ascua.Narrative
         [SerializeField] private TMP_Text continueHint;
         [SerializeField] private Button[] choiceButtons;
         [SerializeField] private TMP_Text[] choiceLabels;
+        [Header("Resumen de la misión ofrecida (Parte C: claridad)")]
+        [Tooltip("Panel con la condición principal, la secundaria y los límites, junto a Aceptar / Ahora no.")]
+        [SerializeField] private CanvasGroup offerSummaryGroup;
+        [SerializeField] private TMP_Text offerSummaryText;
 
         [Header("Ritmo")]
         [SerializeField] private float charactersPerSecond = 42f;
@@ -113,7 +117,7 @@ namespace Ascua.Narrative
             if (!open)
             {
                 open = true;
-                previousTimeScale = Time.timeScale;
+                previousTimeScale = Ascua.Combat.HitFeedback.UnfrozenTimeScale;
                 Time.timeScale = 0f;
                 if (playerInput != null) playerInput.SetGameplayEnabled(false);
                 GameSession.PushModal();
@@ -232,6 +236,14 @@ namespace Ascua.Narrative
                 if (used) choiceLabels[i].text = (i + 1) + "   " + choices[i].label;
             }
 
+            // Antes de aceptar, el jugador ve EXACTAMENTE qué se le pide (y por qué cambió, si cambió).
+            bool isOffer = quest != null && quest.State == QuestState.Disponible && choices.Exists(c => c.action == ChoiceAction.AceptarMision);
+            if (isOffer && offerSummaryText != null && QuestManager.Instance != null)
+            {
+                offerSummaryText.text = QuestManager.Instance.BuildOfferSummary(quest);
+            }
+            SetSummaryVisible(isOffer);
+
             if (EventSystem.current != null && choiceButtons.Length > 0) EventSystem.current.SetSelectedGameObject(choiceButtons[0].gameObject);
         }
 
@@ -299,8 +311,15 @@ namespace Ascua.Narrative
         /// <summary>True si se están mostrando elecciones.</summary>
         public bool IsChoosing => choosing;
 
+        private void SetSummaryVisible(bool visible)
+        {
+            if (offerSummaryGroup == null) return;
+            offerSummaryGroup.alpha = visible ? 1f : 0f;
+        }
+
         private void SetChoicesVisible(bool visible)
         {
+            if (!visible) SetSummaryVisible(false);
             if (choiceButtons == null) return;
             foreach (Button button in choiceButtons) button.gameObject.SetActive(visible && button.gameObject.activeSelf);
         }
@@ -308,6 +327,7 @@ namespace Ascua.Narrative
         /// <summary>Cierra la conversación, reanuda la noche y, si toca, entrega la misión.</summary>
         public void Close()
         {
+            SetSummaryVisible(false);
             if (!open) return;
             open = false;
             choosing = false;

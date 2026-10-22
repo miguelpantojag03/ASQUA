@@ -69,7 +69,7 @@ namespace Ascua.Lighting
         [SerializeField] private float flickerSpeed = 3.5f;
         [Tooltip("Por debajo de esta energía normalizada el Farol parpadea más.")]
         [SerializeField] private float lowEnergyThreshold = 0.2f;
-        [SerializeField] private float lowEnergyFlicker = 0.25f;
+        [SerializeField] private float lowEnergyFlicker = 0.5f;
 
         [Header("Balanceo")]
         [SerializeField] private float swayAngle = 7f;

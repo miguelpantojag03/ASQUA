@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77dec953110fcae48b7efd4632c03438, type: 3}
+  m_Name: Q_Mina_DosLuces
+  m_EditorClassIdentifier: 
+  questId: mina_dos_luces
+  giverNpcId: mina
+  title: Dos luces, una noche
+  description: "Mant\xE9n La Plaza sobre 55 mientras disuelves las 5 sombras del
+    Mercado en 60 segundos."
+  type: 6
+  shortInstruction: "Mant\xE9n La Plaza \u2265 55 mientras disuelves las 5 sombras
+    del Mercado."
+  prerequisite: {fileID: 0}
+  targetZoneId: Plaza
+  hopeThreshold: 55
+  holdSeconds: 20
+  requiredCount: 3
+  collectRadiusMultiplier: 1.8
+  escortNpcId: mina
+  escortDestinationId: 
+  escortMaxDistance: 8
+  escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
+  defeatZoneId: Mercado
+  defeatMoths: 4
+  defeatEchoes: 1
+  timeLimit: 60
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
+  rewardEnergy: 20
+  rewardHope: 12
+  rewardHopeZoneId: Plaza
+  rewardBond: 1
+  penaltyHope: 0
+  penaltyZoneId: 
+  failIfTargetZoneDies: 1
+  offerDialogue: {fileID: 11400000, guid: 32d01424fc6e03c40a38269546c8b209, type: 2}
+  inProgressDialogue: {fileID: 11400000, guid: c48e5d6d15a3594438c1ef75112285e9, type: 2}
+  completedDialogue: {fileID: 11400000, guid: 7f2d7a1bea25f7346b4dea78f6f0991f, type: 2}

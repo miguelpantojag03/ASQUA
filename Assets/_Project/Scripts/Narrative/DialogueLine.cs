@@ -48,6 +48,8 @@ namespace Ascua.Narrative
         public int bondDelta;
         [Tooltip("Aviso en pantalla opcional al elegir.")]
         public string toast;
+        [Tooltip("Marca que deja esta decisión para noches futuras (consecuencia tardía). Vacío = ninguna.")]
+        public string setFlag;
 
         public DialogueChoice() { }
 

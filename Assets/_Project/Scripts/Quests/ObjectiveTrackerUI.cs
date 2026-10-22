@@ -1,4 +1,5 @@
 using Ascua.Combat;
+using Ascua.Core;
 using Ascua.Narrative;
 using Ascua.World;
 using TMPro;
@@ -13,6 +14,11 @@ namespace Ascua.Quests
     /// Al aceptar o completar una misión (o empezar una oleada) el panel hace un fundido + escala
     /// breve en vez de cambiar el texto de golpe.
     /// Durante una oleada de sombras muestra "Defiende La Plaza · N sombras" (tiene prioridad).
+    /// Parte C:
+    ///  - Progreso doble: en misiones de doble objetivo, barra A (Esperanza de la zona que hay que
+    ///    sostener, en rojo si está por debajo) y barra B (sombras restantes + tiempo).
+    ///    En misiones con presupuesto, la barra B es la energía gastada.
+    ///  - Al fallar una misión, durante 5 s se ve "Misión fallida" con el PORQUÉ, nunca solo el estado.
     /// </summary>
     public class ObjectiveTrackerUI : MonoBehaviour
     {
@@ -31,15 +37,28 @@ namespace Ascua.Quests
         [SerializeField] private Sprite[] typeIcons;
         [SerializeField] private Sprite combatIcon;
 
+        [Header("Progreso doble y fallos (Parte C)")]
+        [SerializeField] private GameObject secondaryRoot;
+        [SerializeField] private Image secondaryFill;
+        [SerializeField] private Color dangerColor = new Color(0.86f, 0.45f, 0.25f);
+        [SerializeField] private Color secondaryColor = new Color(0.72f, 0.8f, 1f);
+        [SerializeField] private float failureSeconds = 5f;
+
         private float timer;
         private string shownKey;
         private float pop;
         private float swapFade = 1f;
+        private QuestRuntime failed;
+        private float failureTimer;
+        private QuestManager subscribed;
 
         private void Update()
         {
             float dt = Time.unscaledDeltaTime;
             AnimatePop(dt);
+
+            SubscribeIfNeeded();
+            if (failureTimer > 0f) failureTimer -= dt;
 
             timer += dt;
             if (timer < refreshInterval) return;
@@ -51,6 +70,12 @@ namespace Ascua.Quests
             if (waves != null && waves.HasActiveWave)
             {
                 ShowWave(waves, dialogue);
+                return;
+            }
+
+            if (failureTimer > 0f && failed != null)
+            {
+                ShowFailure(dialogue);
                 return;
             }
 
@@ -72,9 +97,78 @@ namespace Ascua.Quests
                 icon.sprite = typeIcons != null && index < typeIcons.Length ? typeIcons[index] : null;
                 icon.color = QuestLogUI.StateColor(q.State);
             }
-            bool numeric = q.State == QuestState.Activa && q.Progress01 > 0f;
-            if (progressRoot != null) progressRoot.SetActive(numeric);
-            if (progressFill != null) progressFill.fillAmount = Mathf.Clamp01(q.Progress01);
+            ShowProgressBars(q);
+        }
+
+        /// <summary>Una barra (progreso) o dos (A y B) según el tipo de misión.</summary>
+        private void ShowProgressBars(QuestRuntime q)
+        {
+            bool active = q.State == QuestState.Activa;
+            Quest d = q.Data;
+            bool dual = active && (d.type == QuestType.DobleObjetivo || q.EffEnergyBudget > 0f);
+
+            if (active && d.type == QuestType.DobleObjetivo)
+            {
+                // A: Esperanza de la zona a sostener (roja si está por debajo del umbral).
+                ZoneHope zone = ZoneHope.Find(d.targetZoneId);
+                float hope = zone != null ? zone.Hope : 0f;
+                SetBar(progressRoot, progressFill, hope / 100f, hope < q.EffThreshold ? dangerColor : AscuaPalette.Ambar);
+                // B: sombras disueltas.
+                SetBar(secondaryRoot, secondaryFill, q.Progress01, secondaryColor);
+                return;
+            }
+
+            bool numeric = active && q.Progress01 > 0f;
+            SetBar(progressRoot, progressFill, Mathf.Clamp01(q.Progress01), AscuaPalette.Ambar, numeric || dual);
+            if (dual)
+            {
+                // Presupuesto: energía gastada (se pone roja al acercarse al límite).
+                float used = q.EffEnergyBudget > 0f ? q.EnergySpent / q.EffEnergyBudget : 0f;
+                SetBar(secondaryRoot, secondaryFill, used, used > 0.75f ? dangerColor : secondaryColor);
+            }
+            else if (secondaryRoot != null) secondaryRoot.SetActive(false);
+        }
+
+        private static void SetBar(GameObject root, Image fill, float value, Color color, bool visible = true)
+        {
+            if (root != null) root.SetActive(visible);
+            if (fill == null) return;
+            fill.fillAmount = Mathf.Clamp01(value);
+            fill.color = color;
+        }
+
+        /// <summary>Tarjeta de fallo: título de la misión + el motivo concreto.</summary>
+        private void ShowFailure(bool dialogue)
+        {
+            if (group != null) group.alpha = Mathf.MoveTowards(group.alpha, dialogue ? 0f : 1f, 0.5f);
+            string key = "fallo|" + failed.Data.questId;
+            if (key != shownKey) StartPop(key);
+            if (titleText != null) titleText.text = "Misión fallida · " + failed.Data.title;
+            if (actionText != null) actionText.text = "<color=#DB7340>" + failed.FailReason + "</color>";
+            if (icon != null) icon.color = dangerColor;
+            if (progressRoot != null) progressRoot.SetActive(false);
+            if (secondaryRoot != null) secondaryRoot.SetActive(false);
+        }
+
+        private void SubscribeIfNeeded()
+        {
+            QuestManager manager = QuestManager.Instance;
+            if (manager == subscribed) return;
+            if (subscribed != null) subscribed.QuestStateChanged -= OnQuestStateChanged;
+            subscribed = manager;
+            if (subscribed != null) subscribed.QuestStateChanged += OnQuestStateChanged;
+        }
+
+        private void OnDestroy()
+        {
+            if (subscribed != null) subscribed.QuestStateChanged -= OnQuestStateChanged;
+        }
+
+        private void OnQuestStateChanged(QuestRuntime q)
+        {
+            if (q.State != QuestState.Fallida) return;
+            failed = q;
+            failureTimer = failureSeconds;
         }
 
         private void ShowWave(CombatWaveDirector waves, bool dialogue)
@@ -95,6 +189,7 @@ namespace Ascua.Quests
             }
             if (progressRoot != null) progressRoot.SetActive(zone != null);
             if (progressFill != null && zone != null) progressFill.fillAmount = zone.Hope / 100f;
+            if (secondaryRoot != null) secondaryRoot.SetActive(false);
         }
 
         private void StartPop(string key)
@@ -116,6 +211,22 @@ namespace Ascua.Quests
             if (group != null && group.alpha > 0.01f) group.alpha = Mathf.Min(group.alpha + dt * 3.5f, swapFade);
         }
 
+        /// <summary>Doble objetivo: una línea por objetivo, con su estado al momento.</summary>
+        private static string DoubleAction(QuestRuntime q)
+        {
+            Quest d = q.Data;
+            ZoneHope zone = ZoneHope.Find(d.targetZoneId);
+            string zoneName = zone != null ? zone.DisplayName : d.targetZoneId;
+            float hope = zone != null ? zone.Hope : 0f;
+            string hopeColor = hope < q.EffThreshold ? "#DB7340" : "#FFC46B";
+            int remaining = Mathf.Max(0, q.DefeatTarget - q.Defeated);
+            int timeLeft = Mathf.Max(0, Mathf.CeilToInt(q.EffTimeLimit - q.Elapsed));
+            ZoneHope defeatZone = ZoneHope.Find(d.defeatZoneId);
+            string defeatName = defeatZone != null ? defeatZone.DisplayName : d.defeatZoneId;
+            return "A · " + zoneName + " ≥ " + q.EffThreshold.ToString("0") + ": <color=" + hopeColor + ">" + hope.ToString("0") + "</color>\n"
+                   + "B · sombras en " + defeatName + ": <color=#B8CCFF>" + remaining + "</color> · " + timeLeft + " s";
+        }
+
         /// <summary>Frase de acción: lenguaje simple, una acción por momento.</summary>
         private static string BuildAction(QuestRuntime q)
         {
@@ -123,6 +234,7 @@ namespace Ascua.Quests
             switch (q.State)
             {
                 case QuestState.Activa:
+                    if (data.type == QuestType.DobleObjetivo) return DoubleAction(q);
                     if (string.IsNullOrEmpty(data.shortInstruction)) return q.ProgressText;
                     return data.shortInstruction + "\n<color=#FFC46B>" + q.ProgressText + "</color>";
                 default:

@@ -17,6 +17,7 @@ namespace Ascua.Core
         private const string ShakeKey = "ascua_sacudidas";
         private const string SubtitlesKey = "ascua_subtitulos_sfx";
         private const string FlashesKey = "ascua_reducir_destellos";
+        private const string RumbleKey = "ascua_vibracion";
 
         public const float MinTextScale = 0.8f;
         public const float MaxTextScale = 1.5f;
@@ -29,6 +30,7 @@ namespace Ascua.Core
         private static bool cameraShake = true;
         private static bool sfxSubtitles;
         private static bool reduceFlashes;
+        private static bool rumble = true;
 
         public static float DialogueTextScale { get { Load(); return dialogueTextScale; } }
         public static bool CameraShake { get { Load(); return cameraShake; } }
@@ -39,6 +41,17 @@ namespace Ascua.Core
 
         /// <summary>Multiplicador para destellos y efectos de pantalla (1, o 0.3 si se reducen).</summary>
         public static float FlashScale => ReduceFlashes ? 0.3f : 1f;
+
+        /// <summary>Vibración del mando al recibir daño (si hay mando conectado).</summary>
+        public static bool Rumble { get { Load(); return rumble; } }
+
+        public static void SetRumble(bool value)
+        {
+            Load();
+            rumble = value;
+            PlayerPrefs.SetInt(RumbleKey, value ? 1 : 0);
+            Changed?.Invoke();
+        }
 
         public static void SetReduceFlashes(bool value)
         {
@@ -80,6 +93,7 @@ namespace Ascua.Core
             cameraShake = PlayerPrefs.GetInt(ShakeKey, 1) == 1;
             sfxSubtitles = PlayerPrefs.GetInt(SubtitlesKey, 0) == 1;
             reduceFlashes = PlayerPrefs.GetInt(FlashesKey, 0) == 1;
+            rumble = PlayerPrefs.GetInt(RumbleKey, 1) == 1;
         }
     }
 }

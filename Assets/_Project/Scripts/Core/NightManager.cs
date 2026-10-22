@@ -47,6 +47,9 @@ namespace Ascua.Core
         [Tooltip("Si hay un set asignado, SUS valores de dificultad mandan y el Ritmo se ignora. " +
                  "Diseñar una noche nueva = crear otro NightQuestSet y ponerlo aquí (o que lo genere la IA en la Fase 4).")]
         [SerializeField] private NightQuestSet questSet;
+        [Tooltip("Sets de las noches siguientes (2, 3, 4...). Se elige el de la noche actual; más allá del último, " +
+                 "se repite el último con la dificultad escalada (decayIncreasePerNight, una Polilla más por oleada).")]
+        [SerializeField] private NightQuestSet[] laterNights;
 
         [Header("Noche")]
         [SerializeField] private int nightNumber = 1;
@@ -79,12 +82,29 @@ namespace Ascua.Core
             if (playerInput == null) playerInput = FindFirstObjectByType<PlayerInputReader>();
             if (gameSession == null) gameSession = FindFirstObjectByType<GameSession>();
 
+            questSet = SelectSetForNight(GameProgress.CurrentNight);
             if (questSet != null) ApplyQuestSet(questSet);
             else
             {
                 ApplyPacing();
                 nightNumber = Mathf.Max(nightNumber, GameProgress.CurrentNight);
             }
+        }
+
+        /// <summary>
+        /// El "nivel" de la noche: el set cuyo número coincide; si no hay, el de número más alto
+        /// que no la supere (la dificultad extra la añade ApplyQuestSet). Datos, no código por noche.
+        /// </summary>
+        private NightQuestSet SelectSetForNight(int night)
+        {
+            NightQuestSet best = questSet;
+            if (laterNights == null) return best;
+            foreach (NightQuestSet set in laterNights)
+            {
+                if (set == null || set.nightNumber > night) continue;
+                if (best == null || set.nightNumber > best.nightNumber) best = set;
+            }
+            return best;
         }
 
         /// <summary>

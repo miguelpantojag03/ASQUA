@@ -119,6 +119,8 @@ namespace Ascua.EditorTools
             ok &= ValidateImprovements(sb, set);
             ok &= ValidateCombat(sb, set);
             ok &= ValidateGraphics(sb);
+            ok &= ValidateDesignAndImpact(sb);
+            ok &= ValidateLaterNights(sb, night);
 
             report = sb.ToString();
             return ok;
@@ -309,6 +311,85 @@ namespace Ascua.EditorTools
             ok &= RefsOk(sb, log);
             return ok;
         }
+
+        // ================================================================== Partes A + B
+
+        private static bool ValidateDesignAndImpact(StringBuilder sb)
+        {
+            bool ok = true;
+            UIStyleKit kit = AssetDatabase.LoadAssetAtPath<UIStyleKit>(AscuaAssetFactory.SettingsFolder + "/UIStyleKit.asset");
+            ok &= Check(sb, kit != null && kit.frameSprite != null && kit.panelSprite != null, "Kit de estilo de UI (marco angular ámbar + vidrio esmerilado)");
+
+            UIStyledPanel[] styled = Object.FindObjectsByType<UIStyledPanel>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            bool allKit = styled.All(p => p.Kit == kit && p.transform.Find("Marco") != null);
+            ok &= Check(sb, styled.Length >= 20 && allKit, $"Sistema de diseño aplicado a {styled.Length} elementos (todos con el mismo kit y marco)");
+            string[] mustHave = { "Energia", "Esperanza", "Objetivo_Actual", "Misiones", "Caja", "Aviso" };
+            foreach (string name in mustHave)
+            {
+                bool has = styled.Any(p => p.name == name);
+                ok &= Check(sb, has, $"Mismo marco en '{name}'");
+            }
+            GameObject box = GameObject.Find("Caja");
+            ok &= Check(sb, box != null && box.transform.Find("Filo") == null, "Diálogo: marco dorado completo (sin la línea suelta anterior)");
+
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<HudFocus>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<ThreatIndicator>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<HitFeedback>());
+            ok &= RefsOk(sb, Object.FindFirstObjectByType<DamageVignette>());
+
+            Shader creature = Shader.Find("Ascua/SombraCriatura");
+            ok &= Check(sb, creature != null && creature.FindPropertyIndex("_FarRimBoost") >= 0, "Criaturas: borde reforzado a distancia (legibilidad)");
+            return ok;
+        }
+
+        // ================================================================== Parte C
+
+        private static bool ValidateLaterNights(StringBuilder sb, NightManager night)
+        {
+            bool ok = true;
+            SerializedProperty later = night != null ? new SerializedObject(night).FindProperty("laterNights") : null;
+            int count = later != null ? later.arraySize : 0;
+            ok &= Check(sb, count == 3, $"Sets de las noches 2-4 enlazados en NightManager ({count})");
+
+            var npcs = Object.FindObjectsByType<NpcInteractable>(FindObjectsSortMode.None);
+            for (int i = 0; i < count; i++)
+            {
+                NightQuestSet set = later.GetArrayElementAtIndex(i).objectReferenceValue as NightQuestSet;
+                if (set == null) { ok &= Check(sb, false, "Set de noche vacío"); continue; }
+                ok &= Check(sb, set.nightNumber == i + 2 && set.waves.Count == 2 && set.waves.All(w => w.Total >= 3 && w.Total <= 4),
+                    $"{set.title}: noche {set.nightNumber}, {set.waves.Count} oleadas de 3-4 criaturas");
+                foreach (Quest quest in set.quests)
+                {
+                    bool giver = npcs.Any(n => n.GetComponent<NpcIdentity>().NpcId == quest.giverNpcId);
+                    bool offer = quest.offerDialogue != null && quest.offerDialogue.HasChoices;
+                    bool doubleOk = quest.type != QuestType.DobleObjetivo
+                                    || (ZoneById(quest.targetZoneId) != null && ZoneById(quest.defeatZoneId) != null && quest.defeatMoths + quest.defeatEchoes > 0 && quest.timeLimit > 0f);
+                    bool escortOk = quest.type != QuestType.Escolta || PointById(quest.escortDestinationId) != null;
+                    ok &= Check(sb, giver && offer && doubleOk && escortOk, $"  · {quest.title} ({quest.type}{(quest.energyBudget > 0f ? ", energía ≤ " + quest.energyBudget : "")}{(quest.conditions.Count > 0 ? ", " + quest.conditions.Count + " consecuencias" : "")})");
+                }
+            }
+
+            // Perpetua puede llegar caminando a la Casa de ancianos.
+            CharacterAI perpetua = Object.FindObjectsByType<CharacterAI>(FindObjectsSortMode.None).FirstOrDefault(c => c.GetComponent<NpcIdentity>().NpcId == "perpetua");
+            QuestPoint casa = PointById("casa_ancianos");
+            bool reachable = false;
+            if (perpetua != null && casa != null && NavMesh.SamplePosition(casa.transform.position, out NavMeshHit end, 1.5f, NavMesh.AllAreas))
+            {
+                NavMeshPath path = new NavMeshPath();
+                reachable = NavMesh.CalculatePath(perpetua.transform.position, end.position, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete;
+            }
+            ok &= Check(sb, reachable, "Perpetua llega caminando a la Casa de ancianos (NavMesh)");
+
+            DialogueRunner runner = Object.FindFirstObjectByType<DialogueRunner>();
+            ok &= Check(sb, runner != null && new SerializedObject(runner).FindProperty("offerSummaryText").objectReferenceValue != null, "Resumen multilínea al ofrecer misiones");
+            ObjectiveTrackerUI tracker = Object.FindFirstObjectByType<ObjectiveTrackerUI>();
+            ok &= Check(sb, tracker != null && new SerializedObject(tracker).FindProperty("secondaryFill").objectReferenceValue != null, "Progreso doble en el objetivo actual (barras A y B)");
+            return ok;
+        }
+
+        // En el editor (sin Play) los registros estáticos están vacíos: se busca en la escena.
+        private static ZoneHope ZoneById(string id) => Object.FindObjectsByType<ZoneHope>(FindObjectsSortMode.None).FirstOrDefault(z => z.ZoneId == id);
+        private static QuestPoint PointById(string id) => Object.FindObjectsByType<QuestPoint>(FindObjectsSortMode.None).FirstOrDefault(p => p.PointId == id);
 
         private static PickupKind KindOf(PickupItem item)
         {

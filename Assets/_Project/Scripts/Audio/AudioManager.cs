@@ -77,6 +77,15 @@ namespace Ascua.Audio
         [SerializeField] private AudioClip sfxWaveCleared;
         [SerializeField] private AudioClip sfxBruteWarning;
         [SerializeField] private AudioClip sfxShadowBolt;
+
+        [Header("Efectos · impacto y avisos")]
+        [Tooltip("Golpe final del combo y golpes fuertes.")]
+        [SerializeField] private AudioClip sfxComboFinisher;
+        [Tooltip("Daño recibido: apagón.")]
+        [SerializeField] private AudioClip sfxPowerDown;
+        [SerializeField] private AudioClip sfxCriticalEnergy;
+        [SerializeField] private float criticalRepeatSeconds = 4.5f;
+        [SerializeField] private AudioClip sfxThreat;
         [SerializeField] private int sfxVoices = 14;
 
         private const string MusicKey = "ascua_vol_musica";
@@ -92,6 +101,8 @@ namespace Ascua.Audio
         private float hopeLayer, tensionLayer, momentBoost;
         private bool surgeActive;
         private bool waveActive;
+        private bool energyCritical;
+        private float criticalTimer;
         private float lastWindowSound;
 
         public float MusicVolume => musicVolume;
@@ -161,6 +172,8 @@ namespace Ascua.Audio
             EventBus.AbilityUsed += OnAbility;
             EventBus.HeraldoConfronted += OnHeraldoConfronted;
             EventBus.RecuerdoUnlocked += OnRecuerdo;
+            EventBus.EnergyCritical += OnEnergyCritical;
+            EventBus.ThreatDetected += OnThreat;
             WindowLight.AnyWindowLit += OnWindowLit;
             ZoneHope.AnyZoneDied += OnZoneDied;
         }
@@ -192,6 +205,8 @@ namespace Ascua.Audio
             EventBus.AbilityUsed -= OnAbility;
             EventBus.HeraldoConfronted -= OnHeraldoConfronted;
             EventBus.RecuerdoUnlocked -= OnRecuerdo;
+            EventBus.EnergyCritical -= OnEnergyCritical;
+            EventBus.ThreatDetected -= OnThreat;
             WindowLight.AnyWindowLit -= OnWindowLit;
             ZoneHope.AnyZoneDied -= OnZoneDied;
         }
@@ -199,6 +214,17 @@ namespace Ascua.Audio
         private void Update()
         {
             UpdateLayers(Time.unscaledDeltaTime);
+
+            // Energía crítica: el latido se repite mientras dure (sin saturar).
+            if (energyCritical)
+            {
+                criticalTimer -= Time.unscaledDeltaTime;
+                if (criticalTimer <= 0f)
+                {
+                    criticalTimer = criticalRepeatSeconds;
+                    PlaySfx(sfxCriticalEnergy, 0.75f, 1f, "[Latido: al Farol le queda poca luz]");
+                }
+            }
         }
 
         // ================================================================== Música adaptativa
@@ -288,9 +314,22 @@ namespace Ascua.Audio
         // ------------------------------------------------------------------ Combate
 
         private void OnAttack(int step) => PlaySfx(sfxSwing, step == 4 ? 0.8f : 0.5f, step == 4 ? 0.75f : 0.95f + 0.07f * step);
-        private void OnShadowHit(Vector3 position, bool strong) => PlaySfx(sfxLightHit, strong ? 0.75f : 0.55f, strong ? 0.85f : UnityEngine.Random.Range(1f, 1.12f));
+        // Tres sonidos distintos: golpe normal, golpe fuerte/remate (ShadowHit fuerte) y disolución (ShadowDefeated).
+        private void OnShadowHit(Vector3 position, bool strong)
+        {
+            if (strong) PlaySfx(sfxComboFinisher != null ? sfxComboFinisher : sfxLightHit, 0.8f, UnityEngine.Random.Range(0.97f, 1.03f));
+            else PlaySfx(sfxLightHit, 0.55f, UnityEngine.Random.Range(1f, 1.12f));
+        }
+
+        private void OnEnergyCritical(bool critical)
+        {
+            energyCritical = critical;
+            criticalTimer = 0f; // suena ya al entrar
+        }
+
+        private void OnThreat(Vector3 position) => PlaySfx(sfxThreat, 0.6f, UnityEngine.Random.Range(0.95f, 1.05f), "[Una sombra se acerca]");
         private void OnShadowDefeated(string type, Vector3 position) => PlaySfx(sfxDissolve, 0.7f, UnityEngine.Random.Range(0.95f, 1.05f), "[Una sombra se deshace en luz]");
-        private void OnHurt(float amount) => PlaySfx(sfxHurt, 0.7f, UnityEngine.Random.Range(0.92f, 1.02f), "[El Farol tiembla]");
+        private void OnHurt(float amount) => PlaySfx(sfxPowerDown != null ? sfxPowerDown : sfxHurt, 0.75f, UnityEngine.Random.Range(0.94f, 1.04f), "[Apagón: el Farol tiembla]");
         private void OnPerfectDodge(Vector3 position) => PlaySfx(sfxPerfectDodge, 0.8f, 1f, "[Esquiva perfecta]");
         private void OnParried(Vector3 position) => PlaySfx(sfxPerfectDodge, 0.9f, 0.8f, "[Contraataque]");
         private void OnWaveCleared(string zoneId, string rating) => PlaySfx(sfxWaveCleared, 0.85f, 1f, "[La zona respira: oleada superada]");

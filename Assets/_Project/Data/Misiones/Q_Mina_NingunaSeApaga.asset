@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77dec953110fcae48b7efd4632c03438, type: 3}
+  m_Name: Q_Mina_NingunaSeApaga
+  m_EditorClassIdentifier: 
+  questId: mina_ninguna_se_apaga
+  giverNpcId: mina
+  title: Ninguna se apaga
+  description: "Mant\xE9n La Plaza sobre 55 de Esperanza mientras disuelves las sombras
+    que han entrado en El Mercado."
+  type: 6
+  shortInstruction: "Mant\xE9n La Plaza \u2265 55 mientras disuelves las sombras
+    del Mercado."
+  prerequisite: {fileID: 0}
+  targetZoneId: Plaza
+  hopeThreshold: 55
+  holdSeconds: 20
+  requiredCount: 3
+  collectRadiusMultiplier: 1.8
+  escortNpcId: mina
+  escortDestinationId: 
+  escortMaxDistance: 8
+  escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
+  defeatZoneId: Mercado
+  defeatMoths: 3
+  defeatEchoes: 1
+  timeLimit: 55
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
+  rewardEnergy: 15
+  rewardHope: 10
+  rewardHopeZoneId: Plaza
+  rewardBond: 1
+  penaltyHope: 0
+  penaltyZoneId: 
+  failIfTargetZoneDies: 1
+  offerDialogue: {fileID: 11400000, guid: fa6b8c183ce57474babb28062ce7ff4b, type: 2}
+  inProgressDialogue: {fileID: 11400000, guid: b9269b326ceb3b54fbbb26b2d7a11d00, type: 2}
+  completedDialogue: {fileID: 11400000, guid: 89fec288a89105b40aa5465da9152f82, type: 2}

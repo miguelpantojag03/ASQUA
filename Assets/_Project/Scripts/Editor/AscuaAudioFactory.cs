@@ -15,6 +15,8 @@ namespace Ascua.EditorTools
         public AudioClip Jump, Land, Dash, LanternResize, Surge, Bond, Moment, UiClick;
         // Combate de luz.
         public AudioClip Swing, LightHit, Dissolve, Hurt, PerfectDodge, WaveStart, WaveCleared, BruteWarning, ShadowBolt;
+        // Impacto y avisos (Partes A+B).
+        public AudioClip ComboFinisher, PowerDown, CriticalEnergy, Threat;
         // Audio Mixer "AM_Ascua" con 3 grupos bajo Master y sus volúmenes expuestos.
         public AudioMixer Mixer;
         public AudioMixerGroup MusicGroup, AmbientGroup, SfxGroup;
@@ -77,6 +79,14 @@ namespace Ascua.EditorTools
             a.WaveCleared = Clip("SFX_OleadaSuperada", () => Chime(new[] { 523.25f, 659.25f, 783.99f, 1046.5f, 1318.5f }, 0.1f, 2f, 0.5f));
             a.BruteWarning = Clip("SFX_AvisoEmbestida", () => Mix(Rumble(0.9f), Sweep(0.8f, 80f, 210f, 0.4f)));
             a.ShadowBolt = Clip("SFX_ProyectilSombra", () => Sweep(0.35f, 520f, 240f, 0.35f));
+            // Remate del combo: cristal brillante + golpe sordo (pesa más que un barrido normal).
+            a.ComboFinisher = Clip("SFX_GolpeRemate", () => Mix(Chime(new[] { 1318.5f, 1975.5f, 2637f }, 0.015f, 0.6f, 0.45f), SoftHit(0.3f)));
+            // Daño recibido: "apagón" (la luz cae de golpe, como una bombilla que se funde).
+            a.PowerDown = Clip("SFX_Apagon", () => Mix(Sweep(0.55f, 700f, 60f, 0.45f), Thump(0.45f)));
+            // Energía crítica: latido doble y grave.
+            a.CriticalEnergy = Clip("SFX_EnergiaCritica", () => Mix(Thump(0.35f), Thump(0.8f)));
+            // Amenaza detectada: dos notas graves descendentes.
+            a.Threat = Clip("SFX_Amenaza", () => Mix(Sweep(0.5f, 220f, 165f, 0.35f), Rumble(0.6f)));
 
             CreateMixer(a);
             return a;

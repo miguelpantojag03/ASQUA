@@ -31,6 +31,9 @@ Material:
     m_Floats:
     - _CrackStrength: 0
     - _Dissolve: 0
+    - _FarEnd: 22
+    - _FarRimBoost: 1.6
+    - _FarStart: 7
     - _FlashAmount: 0
     - _InnerGlow: 0.12
     - _NoiseScale: 1.6

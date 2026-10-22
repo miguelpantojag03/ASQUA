@@ -22,6 +22,9 @@ Shader "Ascua/SombraCriatura"
         [HDR] _DissolveEdge ("Borde de disolución", Color) = (4, 2.6, 1.2, 1)
         _Reveal ("Revelada", Range(0, 1)) = 1
         _CrackStrength ("Grietas al revelarse", Range(0, 1)) = 0
+        _FarStart ("Distancia: empieza el refuerzo del borde (m)", Float) = 7
+        _FarEnd ("Distancia: refuerzo máximo (m)", Float) = 22
+        _FarRimBoost ("Refuerzo del borde a distancia", Range(0, 4)) = 1.6
     }
 
     SubShader
@@ -45,6 +48,9 @@ Shader "Ascua/SombraCriatura"
             float4 _DissolveEdge;
             float _Reveal;
             float _CrackStrength;
+            float _FarStart;
+            float _FarEnd;
+            float _FarRimBoost;
         CBUFFER_END
 
         TEXTURE2D(_NoiseMap);
@@ -138,10 +144,13 @@ Shader "Ascua/SombraCriatura"
                     lighting += light.color * light.distanceAttenuation * saturate(dot(normalWS, light.direction));
                 LIGHT_LOOP_END
 
-                float rim = pow(1.0 - saturate(dot(normalWS, viewWS)), _RimPower);
+                // Legibilidad a distancia: el borde se ensancha y se intensifica cuanto más lejos está
+                // la cámara (de 7 a 22 m), así la silueta se lee aunque el cuerpo sea casi negro.
+                float far = smoothstep(_FarStart, _FarEnd, distance(_WorldSpaceCameraPos, input.positionWS));
+                float rim = pow(1.0 - saturate(dot(normalWS, viewWS)), lerp(_RimPower, 1.3, far));
                 float pulse = 0.8 + 0.2 * sin(_Time.y * 2.0 + noise * 6.0);
                 float3 color = _BaseColor.rgb * lighting;
-                color += _AccentColor.rgb * (rim * _RimIntensity + _InnerGlow * noise * pulse);
+                color += _AccentColor.rgb * (rim * _RimIntensity * (1.0 + far * _FarRimBoost) + _InnerGlow * noise * pulse);
 
                 // Grietas ámbar de la Sombra velada al revelarse.
                 float cracks = smoothstep(0.47, 0.5, noise) * smoothstep(0.53, 0.5, noise);

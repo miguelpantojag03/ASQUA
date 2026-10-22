@@ -6,8 +6,9 @@ namespace Ascua.Combat
 {
     /// <summary>
     /// Viñeta momentánea rojo-violeta al recibir daño (nunca roja "sangre": es la sombra que muerde
-    /// la luz). Su intensidad se reduce al 30 % con Accesibilidad > Reducir destellos.
-    /// Con energía muy baja deja un borde tenue permanente, como aviso.
+    /// la luz) más un destello de pantalla completa muy breve (0.15 s).
+    /// Energía crítica (&lt; 20 %): el borde late con fuerza (0.25-0.5) hasta recuperar el 25 %.
+    /// Todo se reduce al 30 % con Accesibilidad > Reducir destellos.
     /// </summary>
     public class DamageVignette : MonoBehaviour
     {
@@ -19,9 +20,18 @@ namespace Ascua.Combat
         [SerializeField] private float peakAlpha = 0.6f;
         [SerializeField] private float fadeSpeed = 1.8f;
         [SerializeField] private Lighting.PlayerEnergy energy;
-        [SerializeField, Range(0f, 1f)] private float lowEnergyThreshold = 0.15f;
+        [Header("Destello de daño")]
+        [SerializeField] private CanvasGroup flashGroup;
+        [SerializeField] private float flashPeak = 0.22f;
+        [SerializeField] private float flashSeconds = 0.15f;
+
+        [Header("Energía crítica")]
+        [SerializeField] private float criticalMin = 0.25f;
+        [SerializeField] private float criticalMax = 0.5f;
+        [SerializeField] private float criticalBeatsPerSecond = 1.6f;
 
         private float alpha;
+        private float flash;
 
         private void Awake()
         {
@@ -39,14 +49,25 @@ namespace Ascua.Combat
         public void Pulse(float strength)
         {
             alpha = Mathf.Max(alpha, Mathf.Lerp(0.35f, 1f, strength) * peakAlpha);
+            flash = 1f;
         }
 
         private void Update()
         {
-            alpha = Mathf.MoveTowards(alpha, 0f, fadeSpeed * Time.unscaledDeltaTime);
+            float dt = Time.unscaledDeltaTime;
+            alpha = Mathf.MoveTowards(alpha, 0f, fadeSpeed * dt);
+            flash = Mathf.MoveTowards(flash, 0f, dt / flashSeconds);
+
+            // Energía crítica: latido fuerte y regular (como un corazón que se apaga).
             float floor = 0f;
-            if (energy != null && energy.Normalized < lowEnergyThreshold) floor = 0.18f * (1f - energy.Normalized / lowEnergyThreshold);
-            if (group != null) group.alpha = Mathf.Max(alpha, floor) * AccessibilitySettings.FlashScale;
+            if (energy != null && energy.IsCritical)
+            {
+                float beat = Mathf.Pow(Mathf.Abs(Mathf.Sin(Time.unscaledTime * Mathf.PI * criticalBeatsPerSecond)), 3f);
+                floor = Mathf.Lerp(criticalMin, criticalMax, beat);
+            }
+            float scale = AccessibilitySettings.FlashScale;
+            if (group != null) group.alpha = Mathf.Max(alpha, floor) * scale;
+            if (flashGroup != null) flashGroup.alpha = flash * flashPeak * scale;
         }
     }
 }

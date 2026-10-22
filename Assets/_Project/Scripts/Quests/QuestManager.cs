@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Ascua.Characters;
+using Ascua.Combat;
 using Ascua.Core;
 using Ascua.Lighting;
 using Ascua.Narrative;
@@ -16,6 +18,11 @@ namespace Ascua.Quests
     /// - Sigue el progreso solo, escuchando el juego (Esperanza, luciérnagas, zonas perdidas, escoltas).
     /// - Lleva el Vínculo (0-5) con cada personaje, que persiste entre noches.
     /// - Avisa por eventos (y por EventBus) de cada cambio, para la UI, los gestos de Ilse y la Fase 4.
+    /// Parte C (misiones más difíciles pero claras):
+    /// - Doble objetivo simultáneo (A: mantener una zona MIENTRAS B: disolver sombras, con tiempo).
+    /// - Límite de recurso (energía máxima gastada durante la misión).
+    /// - Consecuencias tardías: las decisiones de noches anteriores cambian umbrales y tiempos.
+    /// - Resumen multilínea al ofrecerla y fallos que SIEMPRE explican el porqué.
     /// </summary>
     [DefaultExecutionOrder(-50)]
     public class QuestManager : MonoBehaviour
@@ -38,6 +45,8 @@ namespace Ascua.Quests
         private Transform player;
         private FireflyPool fireflyPool;
         private float textTimer;
+        private float lastEnergy = -1f;
+        private readonly List<KeyValuePair<string, float>> pendingHopeBonus = new List<KeyValuePair<string, float>>();
 
         public event Action<QuestRuntime> QuestStateChanged;
         public event Action<QuestRuntime> QuestProgressChanged;
@@ -87,8 +96,15 @@ namespace Ascua.Quests
             bondsAtNightStart.Clear();
             foreach (KeyValuePair<string, int> pair in bonds) bondsAtNightStart[pair.Key] = pair.Value;
 
+            if (playerEnergy != null) playerEnergy.EnergyChanged -= OnEnergyChanged;
             playerEnergy = FindFirstObjectByType<PlayerEnergy>();
+            if (playerEnergy != null)
+            {
+                playerEnergy.EnergyChanged += OnEnergyChanged;
+                lastEnergy = playerEnergy.Current;
+            }
             fireflyPool = FindFirstObjectByType<FireflyPool>();
+            pendingHopeBonus.Clear();
             GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
             player = playerObject != null ? playerObject.transform : null;
 
@@ -101,7 +117,9 @@ namespace Ascua.Quests
                 {
                     // Lo ya cumplido en noches anteriores no se repite.
                     if (quest == null || GameProgress.IsQuestCompleted(quest.questId)) continue;
-                    quests.Add(new QuestRuntime(quest, QuestState.Bloqueada));
+                    QuestRuntime runtime = new QuestRuntime(quest, QuestState.Bloqueada);
+                    ApplyConditions(runtime);
+                    quests.Add(runtime);
                 }
             }
 
@@ -136,6 +154,39 @@ namespace Ascua.Quests
             foreach (KeyValuePair<string, int> pair in bondsAtNightStart) bonds[pair.Key] = pair.Value;
             foreach (string questId in completedThisNight) GameProgress.UnmarkQuest(questId);
             completedThisNight.Clear();
+            GameProgress.RevertNightFlags();
+        }
+
+        /// <summary>
+        /// Valores efectivos = los del asset + las consecuencias de decisiones anteriores (marcas de GameProgress).
+        /// La Esperanza extra se aplica en el primer frame (las zonas aún no han arrancado en BeginNight).
+        /// </summary>
+        private void ApplyConditions(QuestRuntime q)
+        {
+            Quest d = q.Data;
+            q.EffThreshold = d.hopeThreshold;
+            q.EffHoldSeconds = d.holdSeconds;
+            q.EffTimeLimit = d.timeLimit;
+            q.EffEnergyBudget = d.energyBudget;
+            q.ConditionNote = "";
+            if (d.conditions == null) return;
+
+            StringBuilder notes = new StringBuilder();
+            foreach (QuestCondition c in d.conditions)
+            {
+                if (c == null || !GameProgress.HasFlag(c.flag)) continue;
+                q.EffThreshold = Mathf.Clamp(q.EffThreshold + c.thresholdDelta, 0f, 100f);
+                q.EffHoldSeconds = Mathf.Max(1f, q.EffHoldSeconds + c.holdSecondsDelta);
+                if (q.EffTimeLimit > 0f) q.EffTimeLimit = Mathf.Max(5f, q.EffTimeLimit + c.timeLimitDelta);
+                if (q.EffEnergyBudget > 0f) q.EffEnergyBudget = Mathf.Max(5f, q.EffEnergyBudget + c.energyBudgetDelta);
+                if (c.startHopeBonus != 0f) pendingHopeBonus.Add(new KeyValuePair<string, float>(d.targetZoneId, c.startHopeBonus));
+                if (!string.IsNullOrEmpty(c.note))
+                {
+                    if (notes.Length > 0) notes.Append('\n');
+                    notes.Append(c.note);
+                }
+            }
+            q.ConditionNote = notes.ToString();
         }
 
         // ================================================================== Objetivo actual (HUD y flecha)
@@ -194,6 +245,20 @@ namespace Ascua.Quests
                     QuestPoint destination = QuestPoint.Find(data.escortDestinationId);
                     if (destination == null) return false;
                     position = destination.transform.position;
+                    return true;
+
+                case QuestType.DobleObjetivo:
+                    // Si la zona A está en peligro, la flecha manda allí; si no, a la sombra más cercana.
+                    ZoneHope holdZone = ZoneHope.Find(data.targetZoneId);
+                    if (holdZone != null && holdZone.Hope < q.EffThreshold + 6f)
+                    {
+                        position = holdZone.Center;
+                        return true;
+                    }
+                    if (TryNearestTagged(q.CreatureTag, out position)) return true;
+                    ZoneHope defeatZone = ZoneHope.Find(data.defeatZoneId);
+                    if (defeatZone == null) return false;
+                    position = defeatZone.Center;
                     return true;
 
                 case QuestType.Entrega:
@@ -306,7 +371,23 @@ namespace Ascua.Quests
                     }
                     npc.StartEscort(destination.transform.position);
                     break;
+
+                case QuestType.DobleObjetivo:
+                    q.CreatureTag = "mision:" + q.Data.questId;
+                    q.Elapsed = 0f;
+                    q.BelowTimer = 0f;
+                    q.Defeated = 0;
+                    CombatWaveDirector director = CombatWaveDirector.Instance;
+                    List<ShadowCreature> group = director != null
+                        ? director.SpawnGroup(q.Data.defeatZoneId, q.Data.defeatMoths, q.Data.defeatEchoes, q.CreatureTag)
+                        : new List<ShadowCreature>();
+                    q.DefeatTarget = group.Count;
+                    break;
             }
+
+            // Presupuesto de energía: se cuenta desde este momento.
+            q.EnergySpent = 0f;
+            if (playerEnergy != null) lastEnergy = playerEnergy.Current;
 
             UpdateProgressText(q);
             Toast("Nueva misión: " + q.Data.title);
@@ -367,6 +448,7 @@ namespace Ascua.Quests
             }
             if (choice.energyDelta > 0f && playerEnergy != null) playerEnergy.Restore(choice.energyDelta);
             if (choice.bondDelta != 0 && !string.IsNullOrEmpty(npcId)) AddBond(npcId, choice.bondDelta);
+            if (!string.IsNullOrEmpty(choice.setFlag)) GameProgress.SetFlag(choice.setFlag);
             if (!string.IsNullOrEmpty(choice.toast)) Toast(choice.toast);
         }
 
@@ -389,6 +471,16 @@ namespace Ascua.Quests
             float dt = Time.deltaTime;
             if (dt <= 0f || quests.Count == 0) return;
 
+            if (pendingHopeBonus.Count > 0)
+            {
+                foreach (KeyValuePair<string, float> bonus in pendingHopeBonus)
+                {
+                    ZoneHope zone = ZoneHope.Find(bonus.Key);
+                    if (zone != null) zone.AddHope(bonus.Value);
+                }
+                pendingHopeBonus.Clear();
+            }
+
             textTimer += dt;
             bool refreshTexts = textTimer >= progressTextInterval;
             if (refreshTexts) textTimer = 0f;
@@ -402,6 +494,7 @@ namespace Ascua.Quests
                 {
                     case QuestType.RescateEsperanza: UpdateRescue(q, dt); break;
                     case QuestType.Escolta: UpdateEscort(q, dt); break;
+                    case QuestType.DobleObjetivo: UpdateDouble(q, dt); break;
                     case QuestType.Entrega:
                         if (Ascua.Player.PickupSystem.Instance != null && Ascua.Player.PickupSystem.Instance.Has(q.Data.deliverItemId)) ObjectiveMet(q);
                         break;
@@ -417,10 +510,137 @@ namespace Ascua.Quests
             if (zone == null || zone.IsDead) return;
 
             // Hay que sostenerlo: si la Esperanza cae por debajo, el contador retrocede.
-            q.Timer = zone.Hope >= q.Data.hopeThreshold ? q.Timer + dt : Mathf.Max(0f, q.Timer - dt);
-            q.Progress01 = Mathf.Clamp01(q.Timer / Mathf.Max(0.01f, q.Data.holdSeconds));
+            q.Timer = zone.Hope >= q.EffThreshold ? q.Timer + dt : Mathf.Max(0f, q.Timer - dt);
+            q.Progress01 = Mathf.Clamp01(q.Timer / Mathf.Max(0.01f, q.EffHoldSeconds));
 
-            if (q.Timer >= q.Data.holdSeconds) ObjectiveMet(q);
+            if (q.Timer >= q.EffHoldSeconds) ObjectiveMet(q);
+        }
+
+        /// <summary>Doble objetivo: A (zona ≥ umbral) se vigila todo el tiempo; B (sombras) tiene reloj.</summary>
+        private void UpdateDouble(QuestRuntime q, float dt)
+        {
+            Quest d = q.Data;
+            q.Elapsed += dt;
+
+            ZoneHope holdZone = ZoneHope.Find(d.targetZoneId);
+            if (holdZone != null)
+            {
+                q.BelowTimer = holdZone.Hope < q.EffThreshold ? q.BelowTimer + dt : 0f;
+                if (q.BelowTimer > d.holdGraceSeconds || holdZone.IsDead)
+                {
+                    Fail(q, holdZone.DisplayName + " bajó de " + q.EffThreshold.ToString("0") + " de Esperanza mientras combatías en " + GetZoneName(d.defeatZoneId) + ".");
+                    return;
+                }
+            }
+
+            int remaining = CountTagged(q.CreatureTag);
+            q.Defeated = Mathf.Max(0, q.DefeatTarget - remaining);
+            q.Progress01 = q.DefeatTarget > 0 ? Mathf.Clamp01(1f - (float)remaining / q.DefeatTarget) : 1f;
+            if (remaining == 0)
+            {
+                ObjectiveMet(q);
+                return;
+            }
+
+            if (q.EffTimeLimit > 0f && q.Elapsed >= q.EffTimeLimit)
+            {
+                Fail(q, "Se acabó el tiempo: " + (remaining == 1 ? "quedaba 1 sombra" : "quedaban " + remaining + " sombras") + " en " + GetZoneName(d.defeatZoneId) + ".");
+            }
+        }
+
+        /// <summary>Energía gastada (Farol, ataques, daño) cuenta para los presupuestos de las misiones activas.</summary>
+        private void OnEnergyChanged(float current, float max)
+        {
+            float spent = lastEnergy >= 0f ? lastEnergy - current : 0f;
+            lastEnergy = current;
+            if (spent <= 0f) return;
+            for (int i = 0; i < quests.Count; i++)
+            {
+                QuestRuntime q = quests[i];
+                if (q.State != QuestState.Activa || q.EffEnergyBudget <= 0f) continue;
+                q.EnergySpent += spent;
+                if (q.EnergySpent > q.EffEnergyBudget)
+                {
+                    Fail(q, "Gastaste " + Mathf.CeilToInt(q.EnergySpent) + " de " + q.EffEnergyBudget.ToString("0") + " de Energía: no quedó luz para el camino.");
+                }
+            }
+        }
+
+        private static int CountTagged(string tag)
+        {
+            if (string.IsNullOrEmpty(tag)) return 0;
+            int count = 0;
+            var targets = LightTargetRegistry.All;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                if (targets[i] is ShadowCreature c && c.IsAlive && c.ZoneId == tag) count++;
+            }
+            return count;
+        }
+
+        private bool TryNearestTagged(string tag, out Vector3 position)
+        {
+            position = Vector3.zero;
+            float best = float.MaxValue;
+            Vector3 from = player != null ? player.position : Vector3.zero;
+            var targets = LightTargetRegistry.All;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                if (!(targets[i] is ShadowCreature c) || !c.IsAlive || c.ZoneId != tag) continue;
+                float d = (c.transform.position - from).sqrMagnitude;
+                if (d >= best) continue;
+                best = d;
+                position = c.transform.position;
+            }
+            return best < float.MaxValue;
+        }
+
+        // ================================================================== Claridad: resumen al ofrecer
+
+        /// <summary>
+        /// Resumen multilínea que se muestra junto a "Aceptar / Ahora no": condición principal,
+        /// secundaria, límite de tiempo o de recurso y, si las hay, las consecuencias de decisiones pasadas.
+        /// </summary>
+        public string BuildOfferSummary(QuestRuntime q)
+        {
+            if (q == null) return "";
+            Quest d = q.Data;
+            StringBuilder sb = new StringBuilder();
+            switch (d.type)
+            {
+                case QuestType.RescateEsperanza:
+                    sb.Append("<b>Objetivo:</b> mantén ").Append(GetZoneName(d.targetZoneId)).Append(" con Esperanza ≥ ").Append(q.EffThreshold.ToString("0"))
+                      .Append(" durante ").Append(q.EffHoldSeconds.ToString("0")).Append(" s.\n<b>Ojo:</b> si baja, el contador retrocede.");
+                    break;
+                case QuestType.Recoleccion:
+                    sb.Append("<b>Objetivo:</b> recoge ").Append(d.requiredCount).Append(" luciérnagas");
+                    if (d.collectRadiusMultiplier > 0f) sb.Append(" en ").Append(GetZoneName(d.targetZoneId));
+                    sb.Append('.');
+                    break;
+                case QuestType.Escolta:
+                    sb.Append("<b>Objetivo:</b> acompaña a ").Append(GetNpcName(d.escortNpcId));
+                    if (!string.IsNullOrEmpty(d.escortDestinationName)) sb.Append(" hasta ").Append(d.escortDestinationName);
+                    sb.Append(".\n<b>Además:</b> no te alejes más de ").Append(d.escortMaxDistance.ToString("0")).Append(" m ni dejes que la Penumbra la alcance.");
+                    break;
+                case QuestType.Entrega:
+                    sb.Append("<b>Objetivo:</b> recoge ").Append(d.deliverItemName).Append(" y llévaselo a ").Append(GetNpcName(d.TurnInNpcId)).Append('.');
+                    break;
+                case QuestType.DobleObjetivo:
+                    ZoneHope holdZone = ZoneHope.Find(d.targetZoneId);
+                    sb.Append("<b>A, todo el rato:</b> ").Append(GetZoneName(d.targetZoneId)).Append(" con Esperanza ≥ ").Append(q.EffThreshold.ToString("0"));
+                    if (holdZone != null) sb.Append(" (ahora ").Append(holdZone.Hope.ToString("0")).Append(')');
+                    sb.Append(". Si baja más de ").Append(d.holdGraceSeconds.ToString("0")).Append(" s, fallas.");
+                    sb.Append("\n<b>B, a la vez:</b> disuelve las ").Append(d.defeatMoths + d.defeatEchoes).Append(" sombras que aparecerán en ").Append(GetZoneName(d.defeatZoneId)).Append('.');
+                    break;
+                default:
+                    sb.Append("<b>Objetivo:</b> ").Append(string.IsNullOrEmpty(d.shortInstruction) ? d.title : d.shortInstruction);
+                    break;
+            }
+
+            if (q.EffTimeLimit > 0f && d.type == QuestType.DobleObjetivo) sb.Append("\n<b>Límite:</b> ").Append(q.EffTimeLimit.ToString("0")).Append(" s para B.");
+            if (q.EffEnergyBudget > 0f) sb.Append("\n<b>Límite:</b> no gastes más de ").Append(q.EffEnergyBudget.ToString("0")).Append(" de Energía (el Farol, los barridos y los golpes que recibas cuentan).");
+            if (!string.IsNullOrEmpty(q.ConditionNote)) sb.Append("\n<color=#FFE3A0>").Append(q.ConditionNote).Append("</color>");
+            return sb.ToString();
         }
 
         private void UpdateEscort(QuestRuntime q, float dt)
@@ -486,7 +706,7 @@ namespace Ascua.Quests
                 QuestRuntime q = quests[i];
                 if (q.State != QuestState.Activa || !q.Data.failIfTargetZoneDies) continue;
                 bool usesZone = q.Data.type == QuestType.RescateEsperanza || q.Data.type == QuestType.Recoleccion;
-                if (usesZone && q.Data.targetZoneId == zone.ZoneId) Fail(q, zone.DisplayName + " se apagó.");
+                if (usesZone && q.Data.targetZoneId == zone.ZoneId) Fail(q, zone.DisplayName + " se apagó antes de que pudieras sostenerla.");
             }
         }
 
@@ -537,6 +757,10 @@ namespace Ascua.Quests
 
             // Limpiezas al salir del estado Activa.
             if (state != QuestState.Activa && fireflyPool != null) fireflyPool.ClearHotspot(q.Data.questId);
+            if (state != QuestState.Activa && !string.IsNullOrEmpty(q.CreatureTag) && CombatWaveDirector.Instance != null)
+            {
+                CombatWaveDirector.Instance.VanishGroup(q.CreatureTag);
+            }
             if (q.Data.type == QuestType.Escolta && (state == QuestState.Completada || state == QuestState.Fallida || state == QuestState.Expirada))
             {
                 CharacterAI npc = CharacterAI.Find(q.Data.escortNpcId);
@@ -611,8 +835,15 @@ namespace Ascua.Quests
             switch (data.type)
             {
                 case QuestType.RescateEsperanza:
-                    return "Esperanza de " + GetZoneName(data.targetZoneId) + " ≥ " + data.hopeThreshold.ToString("0") + " · "
-                           + Mathf.FloorToInt(q.Timer) + "/" + data.holdSeconds.ToString("0") + " s";
+                    return "Esperanza de " + GetZoneName(data.targetZoneId) + " ≥ " + q.EffThreshold.ToString("0") + " · "
+                           + Mathf.FloorToInt(q.Timer) + "/" + q.EffHoldSeconds.ToString("0") + " s";
+
+                case QuestType.DobleObjetivo:
+                    ZoneHope holdZone = ZoneHope.Find(data.targetZoneId);
+                    int remaining = CountTagged(q.CreatureTag);
+                    int timeLeft = Mathf.Max(0, Mathf.CeilToInt(q.EffTimeLimit - q.Elapsed));
+                    return "A · " + GetZoneName(data.targetZoneId) + " ≥ " + q.EffThreshold.ToString("0") + ": " + (holdZone != null ? holdZone.Hope.ToString("0") : "?")
+                           + "   B · sombras: " + remaining + " · " + timeLeft + " s";
 
                 case QuestType.Recoleccion:
                     string where = data.collectRadiusMultiplier > 0f ? " en " + GetZoneName(data.targetZoneId) : "";
@@ -623,7 +854,8 @@ namespace Ascua.Quests
                     if (npc == null || player == null) return "Acompaña a " + GetNpcName(data.escortNpcId);
                     float distance = Vector3.Distance(player.position, npc.transform.position);
                     string warning = distance > data.escortMaxDistance ? "  ¡acércate!" : "";
-                    return "Acompaña a " + GetNpcName(data.escortNpcId) + " · " + Mathf.RoundToInt(npc.EscortProgress01 * 100f) + "% del camino" + warning;
+                    string budget = q.EffEnergyBudget > 0f ? " · Energía " + Mathf.CeilToInt(q.EnergySpent) + "/" + q.EffEnergyBudget.ToString("0") : "";
+                    return "Acompaña a " + GetNpcName(data.escortNpcId) + " · " + Mathf.RoundToInt(npc.EscortProgress01 * 100f) + "% del camino" + budget + warning;
 
                 case QuestType.Entrega:
                     return "Recoge " + data.deliverItemName;

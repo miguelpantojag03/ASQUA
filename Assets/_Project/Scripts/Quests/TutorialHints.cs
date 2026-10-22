@@ -57,7 +57,8 @@ namespace Ascua.Quests
         private void Start()
         {
             lantern = FindFirstObjectByType<LanternController>();
-            if (!GameProgress.TutorialPending)
+            // El tutorial es de la Noche 1: en noches siguientes no vuelve aunque quedara a medias.
+            if (!GameProgress.TutorialPending || GameProgress.CurrentNight > 1)
             {
                 enabled = false;
                 return;

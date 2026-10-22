@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Ascua.Narrative;
 using UnityEngine;
 
@@ -17,7 +18,35 @@ namespace Ascua.Quests
         /// <summary>"Misión inversa" del Heraldo: aceptar da un beneficio inmediato y penaliza otra zona.</summary>
         TratoHeraldo,
         /// <summary>"Lleva X a Y": recoger un objeto (PickupItem) y entregárselo a un personaje.</summary>
-        Entrega
+        Entrega,
+        /// <summary>
+        /// Doble objetivo simultáneo: A = mantener la Esperanza de una zona sobre un umbral
+        /// MIENTRAS B = disolver las sombras que aparecen en otra zona, con límite de tiempo.
+        /// </summary>
+        DobleObjetivo
+    }
+
+    /// <summary>
+    /// Consecuencia tardía: si una decisión de una noche anterior dejó una marca (GameProgress.HasFlag),
+    /// esta misión cambia sus condiciones. La nota se muestra al ofrecerla, para que se entienda por qué.
+    /// </summary>
+    [System.Serializable]
+    public class QuestCondition
+    {
+        [Tooltip("Marca que activa este cambio (la pone una elección de diálogo con 'setFlag').")]
+        public string flag;
+        [Tooltip("Suma al umbral de Esperanza (negativo = más fácil).")]
+        public float thresholdDelta;
+        [Tooltip("Suma a los segundos que hay que aguantar.")]
+        public float holdSecondsDelta;
+        [Tooltip("Suma al límite de tiempo (doble objetivo).")]
+        public float timeLimitDelta;
+        [Tooltip("Suma al presupuesto de energía.")]
+        public float energyBudgetDelta;
+        [Tooltip("Esperanza extra en la zona objetivo al empezar la noche.")]
+        public float startHopeBonus;
+        [Tooltip("Frase que explica el cambio al ofrecer la misión.")]
+        [TextArea(2, 3)] public string note;
     }
 
     /// <summary>Estado de una misión durante la noche (vive en QuestManager, nunca en el asset).</summary>
@@ -81,6 +110,28 @@ namespace Ascua.Quests
         public string deliverItemName;
         [Tooltip("A quién se entrega (id de NpcIdentity). Vacío = a quien dio la misión.")]
         public string deliverToNpcId;
+
+        [Header("Objetivo · Doble (A: mantener 'targetZoneId' ≥ umbral MIENTRAS B: disolver sombras)")]
+        [Tooltip("Zona donde aparecen las sombras del objetivo B.")]
+        public string defeatZoneId = "Plaza";
+        [Tooltip("Polillas que aparecen al aceptar (objetivo B).")]
+        [Min(0)] public int defeatMoths = 3;
+        [Tooltip("Ecos que aparecen al aceptar (objetivo B).")]
+        [Min(0)] public int defeatEchoes;
+        [Tooltip("Segundos para cumplir B (0 = sin límite).")]
+        public float timeLimit = 45f;
+        [Tooltip("Segundos que se tolera la zona A por debajo del umbral antes de fallar (justicia: un tropiezo no es derrota).")]
+        public float holdGraceSeconds = 2f;
+
+        [Header("Límite de recurso")]
+        [Tooltip("Energía máxima que se puede gastar mientras dura (0 = sin límite). Cuentan el Farol, los ataques y el daño recibido.")]
+        public float energyBudget;
+
+        [Header("Escolta · nombre del destino (para el resumen)")]
+        public string escortDestinationName;
+
+        [Header("Consecuencias de decisiones de noches anteriores")]
+        public List<QuestCondition> conditions = new List<QuestCondition>();
 
         [Header("Recompensa")]
         public float rewardEnergy;

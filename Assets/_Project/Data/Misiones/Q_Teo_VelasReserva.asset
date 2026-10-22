@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77dec953110fcae48b7efd4632c03438, type: 3}
+  m_Name: Q_Teo_VelasReserva
+  m_EditorClassIdentifier: 
+  questId: teo_velas_reserva
+  giverNpcId: teo
+  title: Las velas de reserva
+  description: "Teo no sabe qu\xE9 hacer con sus \xFAltimas velas buenas. La decisi\xF3n
+    es tuya, y se notar\xE1 m\xE1s adelante."
+  type: 3
+  shortInstruction: "Habla con Teo y decide ad\xF3nde van sus velas de reserva."
+  prerequisite: {fileID: 11400000, guid: 378c92cb79376dd4d8befde3b3a969e8, type: 2}
+  targetZoneId: Plaza
+  hopeThreshold: 50
+  holdSeconds: 20
+  requiredCount: 3
+  collectRadiusMultiplier: 1.8
+  escortNpcId: mina
+  escortDestinationId: 
+  escortMaxDistance: 8
+  escortGraceSeconds: 6
+  deliverItemId: 
+  deliverItemName: 
+  deliverToNpcId: 
+  defeatZoneId: Plaza
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 45
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
+  rewardEnergy: 0
+  rewardHope: 0
+  rewardHopeZoneId: 
+  rewardBond: 1
+  penaltyHope: 0
+  penaltyZoneId: 
+  failIfTargetZoneDies: 1
+  offerDialogue: {fileID: 11400000, guid: 42d81ba4783178e4687ad0de4b9f205d, type: 2}
+  inProgressDialogue: {fileID: 0}
+  completedDialogue: {fileID: 11400000, guid: ff3b8061c93235a409f1dde9a2f0d1a7, type: 2}

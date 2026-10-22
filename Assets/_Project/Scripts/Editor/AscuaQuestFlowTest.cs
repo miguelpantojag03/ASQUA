@@ -78,7 +78,7 @@ namespace Ascua.EditorTools
 
         private static void Tick()
         {
-            if (EditorApplication.timeSinceStartup - realStart > 600.0)
+            if (EditorApplication.timeSinceStartup - realStart > 900.0)
             {
                 Fail("se superó el tiempo máximo de la prueba (paso " + stepIndex + ")");
                 Finish();
@@ -178,7 +178,15 @@ namespace Ascua.EditorTools
             // --- Mina · Recolección (Brasa)
             steps.Add(() => { Talk("mina"); return true; });
             steps.Add(() => Elapsed() > 1.5);
-            steps.Add(() => { Capture("f3_05_dialogo_mina"); Runner().SkipToEnd(); return true; });
+            steps.Add(() =>
+            {
+                HudFocus focus = UnityEngine.Object.FindFirstObjectByType<HudFocus>();
+                Check(focus != null && focus.Mode == "Dialogo" && focus.SecondaryAlpha < 0.5f,
+                    $"Diálogo abierto: el resto del HUD se atenúa (capa secundaria {(focus != null ? focus.SecondaryAlpha : 1f):0.00})");
+                Capture("f3_05_dialogo_mina");
+                Runner().SkipToEnd();
+                return true;
+            });
             steps.Add(() => Elapsed() > 0.4);
             steps.Add(() => { Capture("f3_06_elecciones"); Runner().SelectChoice(0); return true; });
             steps.Add(() => Expect("mina_brasa", QuestState.Activa));
@@ -487,9 +495,136 @@ namespace Ascua.EditorTools
             steps.Add(() =>
             {
                 Capture("f4_15_modo_foto");
+                AddLaterNightSteps();
                 Log("Audio: AudioManager " + (Ascua.Audio.AudioManager.Instance != null ? "activo" : "ausente"));
                 return Check(PhotoMode.Instance != null && PhotoMode.Instance.IsActive, "Modo foto desde el resumen (HUD oculto, cámara libre)");
             });
+        }
+
+        // ================================================================== Parte C: noches 2 y 4
+
+        private static string SummaryText()
+        {
+            SerializedObject so = new SerializedObject(Runner());
+            TMPro.TMP_Text text = so.FindProperty("offerSummaryText").objectReferenceValue as TMPro.TMP_Text;
+            CanvasGroup group = so.FindProperty("offerSummaryGroup").objectReferenceValue as CanvasGroup;
+            return group != null && group.alpha > 0.5f && text != null ? text.text : "";
+        }
+
+        private static string TrackerTitle()
+        {
+            ObjectiveTrackerUI tracker = UnityEngine.Object.FindFirstObjectByType<ObjectiveTrackerUI>();
+            TMPro.TMP_Text text = new SerializedObject(tracker).FindProperty("titleText").objectReferenceValue as TMPro.TMP_Text;
+            return text != null ? text.text : "";
+        }
+
+        /// <summary>Tras el resumen de la Noche 1: siguiente noche, doble objetivo, fallo explicado y consecuencia en la Noche 4.</summary>
+        private static void AddLaterNightSteps()
+        {
+            steps.Add(() => { Log("--- Noches 2-4 (misiones difíciles pero claras) ---"); NightManager.Instance.StartNextNight(); return true; });
+            steps.Add(() => (NightManager.Instance != null && NightManager.Instance.NightNumber == 2 && NightManager.Instance.IsRunning && Elapsed() > 2.5) || TimedOut(40));
+            steps.Add(() =>
+            {
+                Time.timeScale = 1f;
+                if (CombatWaveDirector.Instance != null) CombatWaveDirector.Instance.Configure(new List<CombatWave>(), 0);
+                foreach (PenumbraSentinel s in UnityEngine.Object.FindObjectsByType<PenumbraSentinel>(FindObjectsSortMode.None)) s.gameObject.SetActive(false);
+                if (Heraldo_AI.Instance != null) Heraldo_AI.Instance.enabled = false;
+                return Check(QuestManager.Instance.CurrentSet != null && QuestManager.Instance.CurrentSet.nightNumber == 2, "Noche 2 con su propio set: " + QuestManager.Instance.CurrentSet?.title);
+            });
+
+            // --- Doble objetivo: resumen claro al ofrecer, dos barras y victoria.
+            steps.Add(() => { HoldNight(0.3f); Talk("teo"); return true; });
+            steps.Add(() => Elapsed() > 0.4);
+            steps.Add(() => { Runner().SkipToEnd(); return true; });
+            steps.Add(() => Elapsed() > 0.4);
+            steps.Add(() =>
+            {
+                string summary = SummaryText();
+                Capture("f7_01_resumen_doble");
+                Check(summary.Contains("todo el rato") && summary.Contains("a la vez") && summary.Contains("Límite"), "Resumen al ofrecer: objetivo A, objetivo B y límite de tiempo");
+                Runner().SelectChoice(0);
+                return true;
+            });
+            steps.Add(() => Expect("teo_dos_frentes", QuestState.Activa));
+            steps.Add(() => { HoldNight(0.3f); return Elapsed() > 1.5; });
+            steps.Add(() => { Capture("f7_02_doble_progreso"); return true; });
+            steps.Add(() =>
+            {
+                HoldNight(0.3f);
+                if (State("teo_dos_frentes") != QuestState.Activa || TimedOut(45)) return true;
+                ShadowCreature next = null;
+                float best = float.MaxValue;
+                foreach (ShadowCreature c in UnityEngine.Object.FindObjectsByType<ShadowCreature>(FindObjectsSortMode.None))
+                {
+                    if (!c.IsAlive || c.ZoneId != "mision:teo_dos_frentes") continue;
+                    float d = (c.transform.position - Player().position).sqrMagnitude;
+                    if (d < best) { best = d; next = c; }
+                }
+                if (next != null) StrikeAt(next, 1.1f);
+                return false;
+            });
+            steps.Add(() => Expect("teo_dos_frentes", QuestState.PorEntregar));
+            steps.Add(() => TurnIn("teo", "teo_dos_frentes"));
+
+            // --- Elección con consecuencia tardía (Noche 2 -> Noche 4).
+            steps.Add(() => CloseDialogues(0.6));
+            steps.Add(() => { Talk("teo"); return true; });
+            steps.Add(() => Elapsed() > 0.4);
+            steps.Add(() => { Runner().SkipToEnd(); return true; });
+            steps.Add(() => Elapsed() > 0.4);
+            steps.Add(() => { Runner().SelectChoice(0); return true; });
+            steps.Add(() => CloseDialogues(0.4));
+            steps.Add(() => Check(GameProgress.HasFlag(AscuaNarrativeNights.FlagVelasMercado), "Decisión guardada: las velas de reserva se quedan en el Mercado"));
+
+            // --- Recurso limitado: el fallo explica el porqué.
+            steps.Add(() => { HoldNight(0.3f); Talk("perpetua"); return true; });
+            steps.Add(() => Elapsed() > 0.4);
+            steps.Add(() => { Runner().SkipToEnd(); return true; });
+            steps.Add(() => Elapsed() > 0.4);
+            steps.Add(() =>
+            {
+                Check(SummaryText().Contains("Energía"), "Resumen de la escolta: límite de 30 de Energía explicado");
+                Runner().SelectChoice(0);
+                return true;
+            });
+            steps.Add(() => Expect("perpetua_camino", QuestState.Activa));
+            steps.Add(() => Elapsed() > 1.0);
+            steps.Add(() => { Energy().ApplyDamage(35f); return true; });
+            steps.Add(() => Elapsed() > 0.6);
+            steps.Add(() =>
+            {
+                Capture("f7_03_fallo_explicado");
+                QuestRuntime q = QuestManager.Instance.FindById("perpetua_camino");
+                bool explained = q != null && q.State == QuestState.Fallida && q.FailReason.Contains("Energía") && TrackerTitle().Contains("fallida");
+                Energy().Restore(100f);
+                return Check(explained, "Fallo explicado: «" + q?.FailReason + "»");
+            });
+
+            // --- Noche 4: la vigilia cambia por la decisión de la Noche 2.
+            steps.Add(() => { GameProgress.AdvanceNight(); NightManager.Instance.StartNextNight(); return true; });
+            steps.Add(() => (NightManager.Instance != null && NightManager.Instance.NightNumber == 4 && NightManager.Instance.IsRunning && Elapsed() > 2.5) || TimedOut(40));
+            steps.Add(() =>
+            {
+                Time.timeScale = 1f;
+                if (CombatWaveDirector.Instance != null) CombatWaveDirector.Instance.Configure(new List<CombatWave>(), 0);
+                if (Heraldo_AI.Instance != null) Heraldo_AI.Instance.enabled = false;
+                QuestRuntime vigilia = QuestManager.Instance.FindById("teo_vigilia");
+                Check(QuestManager.Instance.CurrentSet != null && QuestManager.Instance.CurrentSet.nightNumber == 4, "Noche 4 con su propio set: " + QuestManager.Instance.CurrentSet?.title);
+                return Check(vigilia != null && Mathf.Approximately(vigilia.EffThreshold, 50f) && vigilia.ConditionNote.Contains("Noche 2"),
+                    $"Consecuencia tardía aplicada: la vigilia pide {vigilia?.EffThreshold:0} (no 60) por las velas de la Noche 2");
+            });
+            steps.Add(() => { HoldNight(0.3f); Talk("teo"); return true; });
+            steps.Add(() => Elapsed() > 0.4);
+            steps.Add(() => { Runner().SkipToEnd(); return true; });
+            steps.Add(() => Elapsed() > 0.4);
+            steps.Add(() =>
+            {
+                Capture("f7_04_consecuencia_explicada");
+                bool ok = Check(SummaryText().Contains("Noche 2"), "Al ofrecerla, la vigilia explica por qué cambió (decisión de la Noche 2)");
+                Runner().SelectChoice(1);
+                return ok;
+            });
+            steps.Add(() => CloseDialogues(0.3));
         }
 
         // ================================================================== Combate de luz
@@ -532,6 +667,13 @@ namespace Ascua.EditorTools
                 return Elapsed() > 0.6;
             });
             steps.Add(() => Check(!target.IsAlive, $"Polilla de Olvido disuelta en luz ({swings} barridos, combo hasta el paso {Mathf.Max(Attack().ComboStep, 1)})"));
+            steps.Add(() =>
+            {
+                HitFeedback fb = HitFeedback.Instance;
+                ThreatIndicator threat = UnityEngine.Object.FindFirstObjectByType<ThreatIndicator>();
+                Check(fb != null && fb.FreezeCount > 0 && fb.ShakeCount > 0, $"Impacto: freeze-frame ({fb?.FreezeCount}) y sacudida ({fb?.ShakeCount}) en cada golpe conectado");
+                return Check(threat != null && threat.ShownCount > 0, $"Amenaza detectada: pulso en el borde de la pantalla ({threat?.ShownCount})");
+            });
 
             // --- 2) Sombra Mayor: embestida telegrafiada y esquiva perfecta.
             steps.Add(() =>
@@ -763,7 +905,12 @@ namespace Ascua.EditorTools
                 return Check(director.StartWaveNow(0), "Oleada 1 lanzada: " + QuestManager.Instance.CurrentSet.waves[0].label);
             });
             steps.Add(() => { HoldNight(0.5f); return Elapsed() > 1.4; });
-            steps.Add(() => { Capture("f5_09_oleada"); return true; });
+            steps.Add(() =>
+            {
+                Capture("f5_09_oleada");
+                HudFocus focus = UnityEngine.Object.FindFirstObjectByType<HudFocus>();
+                return Check(focus != null && focus.Mode == "Combate", "Combate: energía y combo al frente, lo secundario atenuado");
+            });
             steps.Add(() =>
             {
                 HoldNight(0.5f);
@@ -837,6 +984,34 @@ namespace Ascua.EditorTools
                 Energy().Restore(100f);
                 return ok;
             });
+
+            // --- 11b) Energía crítica (< 20 %): borde que late, Farol que parpadea y latido sonoro.
+            steps.Add(() =>
+            {
+                Energy().Restore(100f);
+                Energy().ApplyDamage(Energy().Current - 12f);
+                return true;
+            });
+            steps.Add(() => Elapsed() > 0.5);
+            steps.Add(() =>
+            {
+                Capture("f6_energia_critica");
+                bool ok = Check(Energy().IsCritical, "Energía crítica: aviso visual y sonoro activo bajo el 20 %");
+                Energy().Restore(100f);
+                return ok;
+            });
+            steps.Add(() => Check(!Energy().IsCritical, "Al recuperar energía (> 25 %) el aviso crítico se apaga"));
+
+            // --- 11c) Daño recibido: destello breve, apagón y empujón.
+            steps.Add(() =>
+            {
+                float before = Energy().Current;
+                IncomingHitResult r = PlayerCombatState.Instance.ReceiveHit(10f, Player().position + Player().forward * 1.5f);
+                Check(r == IncomingHitResult.Hit && Energy().Current < before, $"Daño recibido: {before - Energy().Current:0} de energía, destello y apagón");
+                return true;
+            });
+            steps.Add(() => Elapsed() > 0.05);
+            steps.Add(() => { Capture("f6_dano_recibido"); Energy().Restore(100f); return true; });
 
             // --- 12) Reducir destellos (accesibilidad).
             steps.Add(() =>

@@ -106,7 +106,7 @@ namespace Ascua.Combat
 
         private IEnumerator SlowMotionRoutine(float scale, float realSeconds)
         {
-            float previous = Time.timeScale;
+            float previous = HitFeedback.UnfrozenTimeScale;
             // Si ya había otra cámara lenta, se vuelve a la velocidad "normal" guardada en ella.
             if (previous < 1f && previous > 0f) previous = 1f;
             Time.timeScale = previous * scale;

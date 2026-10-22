@@ -80,7 +80,7 @@ namespace Ascua.UI
             pausedByMe = !fromPause && !PauseMenu.IsPaused;
             if (pausedByMe)
             {
-                previousTimeScale = Time.timeScale;
+                previousTimeScale = Ascua.Combat.HitFeedback.UnfrozenTimeScale;
                 Time.timeScale = 0f;
                 PlayerInputReader input = FindFirstObjectByType<PlayerInputReader>();
                 if (input != null) input.SetGameplayEnabled(false);
