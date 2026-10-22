@@ -21,7 +21,11 @@ namespace Ascua.EditorTools
         public Material AwningA, AwningB;
         public Material Firefly, FireflyParticle;
         public Material Mist, PenumbraWall, PenumbraEdge;
+        /// <summary>Paleta de colores de edificio (se aplica por instancia con SurfaceTint sobre BrickWall).</summary>
         public Material[] Buildings;
+        /// <summary>Ladrillo compartido por TODOS los edificios.</summary>
+        public Material BrickWall;
+        public SurfaceTextures Surfaces;
     }
 
     /// <summary>Todo lo que generan las fábricas de assets.</summary>
@@ -35,6 +39,7 @@ namespace Ascua.EditorTools
         public NarrativeAssets Narrative;
         public AudioAssets Audio;
         public VolumeProfile PhotoFilterProfile;
+        public CombatAssets Combat;
     }
 
     /// <summary>
@@ -77,6 +82,7 @@ namespace Ascua.EditorTools
             assets.Narrative = AscuaNarrativeContent.CreateAll();
             assets.Audio = AscuaAudioFactory.CreateAll();
             assets.PhotoFilterProfile = CreatePhotoFilterProfile();
+            assets.Combat = AscuaCombatAssets.Create(assets.Materials, assets.Character);
             AssetDatabase.SaveAssets();
             return assets;
         }
@@ -152,19 +158,28 @@ namespace Ascua.EditorTools
             // Ilse-recuerdo es translúcida.
             MakeTransparent(m.IlseBody, true, false);
 
-            // Relieve sutil: ruido tileable en color (base map) + normal map.
-            // Coste: 2 texturas de 512 px compartidas, sin shader custom.
-            CreateSurfaceNoiseTextures(out Texture2D noiseAlbedo, out Texture2D noiseNormal);
-            ApplySurfaceNoise(m.Ground, noiseAlbedo, noiseNormal, new Vector2(14f, 14f), 0.7f);
-            ApplySurfaceNoise(m.Paving, noiseAlbedo, noiseNormal, new Vector2(6f, 6f), 0.5f);
-            ApplySurfaceNoise(m.PavingInset, noiseAlbedo, noiseNormal, new Vector2(3f, 3f), 0.4f);
-            ApplySurfaceNoise(m.Sidewalk, noiseAlbedo, noiseNormal, new Vector2(5f, 5f), 0.5f);
-            ApplySurfaceNoise(m.Stone, noiseAlbedo, noiseNormal, new Vector2(2f, 2f), 0.6f);
-            ApplySurfaceNoise(m.Roof, noiseAlbedo, noiseNormal, new Vector2(3f, 3f), 0.5f);
-            foreach (Material building in m.Buildings)
-            {
-                ApplySurfaceNoise(building, noiseAlbedo, noiseNormal, new Vector2(3f, 3f), 0.45f);
-            }
+            // Ruido genérico (lo siguen usando los shaders de personajes como textura de matiz).
+            CreateSurfaceNoiseTextures(out _, out _);
+
+            // Relieve real por superficie: 7 juegos PBR tileables (color + normal map + máscara con
+            // suavidad, metálico y oclusión). 4-6 materiales base reutilizables; el color de cada
+            // edificio/caja va por instancia (SurfaceTint) sin duplicar materiales.
+            SurfaceTextures surfaces = AscuaSurfaceTextures.CreateAll();
+            m.Surfaces = surfaces;
+            AscuaSurfaceTextures.Apply(m.Ground, surfaces.Asphalt, new Vector2(14f, 14f));
+            AscuaSurfaceTextures.Apply(m.Paving, surfaces.Cobble, new Vector2(11f, 11f));
+            AscuaSurfaceTextures.Apply(m.PavingInset, surfaces.Cobble, new Vector2(5f, 5f));
+            AscuaSurfaceTextures.Apply(m.Sidewalk, surfaces.Cobble, new Vector2(8f, 8f));
+            AscuaSurfaceTextures.Apply(m.Stone, surfaces.CarvedStone, new Vector2(2f, 2f));
+            AscuaSurfaceTextures.Apply(m.Trim, surfaces.CarvedStone, new Vector2(4f, 1f));
+            AscuaSurfaceTextures.Apply(m.Roof, surfaces.RoofTiles, new Vector2(4f, 4f));
+            AscuaSurfaceTextures.Apply(m.Wood, surfaces.Wood, Vector2.one);
+            AscuaSurfaceTextures.Apply(m.Door, surfaces.Wood, Vector2.one);
+            AscuaSurfaceTextures.Apply(m.Metal, surfaces.Metal, Vector2.one);
+            AscuaSurfaceTextures.Apply(m.LanternFrame, surfaces.Metal, Vector2.one);
+
+            m.BrickWall = Lit("M_Edificio_Ladrillo", Color.white, 1f);
+            AscuaSurfaceTextures.Apply(m.BrickWall, surfaces.Brick, new Vector2(5f, 6f));
 
             // Niebla: Unlit transparente con textura suave, doble cara.
             Texture2D fogTexture = CreateFogTexture();
@@ -551,16 +566,19 @@ namespace Ascua.EditorTools
             AnimationClip start = CreateOneShotClip("Chibi_Arranque", 0.32f, ArranquePose);
             AnimationClip celebrate = CreateOneShotClip("Chibi_Celebracion", 0.9f, CelebracionPose);
             AnimationClip pick = CreateOneShotClip("Chibi_Recoger", 0.5f, RecogerPose);
+            AnimationClip attack1 = CreateOneShotClip("Chibi_Ataque1", 0.32f, t => AtaquePose(t, 1));
+            AnimationClip attack2 = CreateOneShotClip("Chibi_Ataque2", 0.32f, t => AtaquePose(t, 2));
+            AnimationClip attack3 = CreateOneShotClip("Chibi_Ataque3", 0.4f, t => AtaquePose(t, 3));
 
-            // Si ya existe con los estados de la Fase 3 se reutiliza (no rompe referencias);
-            // si es el de la Fase 1/2 (sin "Celebrar"), se rehace.
+            // Si ya existe con los estados de combate se reutiliza (no rompe referencias);
+            // si es de una fase anterior (sin "Ataque1"), se rehace.
             string path = AnimationFolder + "/AC_Chibi.controller";
             AnimatorController existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
             if (existing != null)
             {
                 foreach (AnimatorControllerParameter parameter in existing.parameters)
                 {
-                    if (parameter.name == "Recoger") return existing;
+                    if (parameter.name == "Ataque1") return existing;
                 }
                 AssetDatabase.DeleteAsset(path);
             }
@@ -570,6 +588,9 @@ namespace Ascua.EditorTools
             controller.AddParameter("Arrancar", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Celebrar", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Recoger", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("Ataque1", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("Ataque2", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("Ataque3", AnimatorControllerParameterType.Trigger);
 
             AnimatorState locomotion = controller.CreateBlendTreeInController("Locomocion", out BlendTree tree, 0);
             tree.blendType = BlendTreeType.Simple1D;
@@ -619,8 +640,70 @@ namespace Ascua.EditorTools
             fromPick.exitTime = 0.9f;
             fromPick.duration = 0.12f;
 
+            // Combate: 3 barridos de luz desde cualquier estado. Transición casi instantánea
+            // (0.04 s) para que el golpe se sienta ágil; salida al 85 % para encadenar el combo.
+            AddAttackState(machine, locomotion, "Ataque1", attack1);
+            AddAttackState(machine, locomotion, "Ataque2", attack2);
+            AddAttackState(machine, locomotion, "Ataque3", attack3);
+
             EditorUtility.SetDirty(controller);
             return controller;
+        }
+
+        private static void AddAttackState(AnimatorStateMachine machine, AnimatorState locomotion, string trigger, AnimationClip clip)
+        {
+            AnimatorState state = machine.AddState(trigger);
+            state.motion = clip;
+            state.speed = 1f;
+            AnimatorStateTransition to = machine.AddAnyStateTransition(state);
+            to.AddCondition(AnimatorConditionMode.If, 0f, trigger);
+            to.hasExitTime = false;
+            to.duration = 0.04f;
+            to.canTransitionToSelf = true;
+            AnimatorStateTransition back = state.AddTransition(locomotion);
+            back.hasExitTime = true;
+            back.exitTime = 0.85f;
+            back.duration = 0.1f;
+        }
+
+        /// <summary>
+        /// Barrido de luz: el brazo del Farol cruza por delante del cuerpo.
+        /// 1: de derecha a izquierda · 2: de izquierda a derecha · 3: remate de arriba abajo con un saltito.
+        /// </summary>
+        private static GesturePose AtaquePose(float t, int step)
+        {
+            // Anticipación corta (20 %), golpe rápido (35 %) y recuperación.
+            float strike = t < 0.2f ? -0.25f * Mathf.Sin(Mathf.PI * 0.5f * t / 0.2f) : t < 0.55f ? Mathf.SmoothStep(-0.25f, 1f, (t - 0.2f) / 0.35f) : Mathf.Lerp(1f, 0f, (t - 0.55f) / 0.45f);
+            float body = Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.7f));
+            GesturePose pose = new GesturePose
+            {
+                HipsOffset = -0.03f * body,
+                Lean = 8f * body,
+                HeadPitch = 4f * body,
+                LegL = -10f * body,
+                LegR = 8f * body,
+                ArmLPitch = 10f * body,
+                ArmLRoll = -14f * body
+            };
+            switch (step)
+            {
+                case 1:
+                    pose.ArmRPitch = -78f * Mathf.Abs(strike);
+                    pose.ArmRRoll = Mathf.Lerp(40f, -35f, Mathf.Clamp01(strike));
+                    break;
+                case 2:
+                    pose.ArmRPitch = -72f * Mathf.Abs(strike);
+                    pose.ArmRRoll = Mathf.Lerp(-30f, 42f, Mathf.Clamp01(strike));
+                    break;
+                default:
+                    float hop = Mathf.Sin(Mathf.PI * Mathf.Clamp01((t - 0.1f) / 0.4f));
+                    pose.HipsOffset = 0.05f * hop - 0.03f * body;
+                    pose.Lean = 14f * body;
+                    pose.ArmRPitch = Mathf.Lerp(-155f, -35f, Mathf.Clamp01(strike));
+                    pose.ArmRRoll = 10f;
+                    break;
+            }
+            return pose;
         }
 
         /// <summary>Pose del rig en un instante t (0-1) de un gesto.</summary>
@@ -827,18 +910,21 @@ namespace Ascua.EditorTools
                 profile.components.Clear();
             }
 
+            // Bloom calibrado: umbral 1.0 (solo lo que de verdad emite: Farol, ventanas, luciérnagas),
+            // más suave y amplio, con filtrado de alta calidad para que no "queme" la imagen.
             Bloom bloom = AddComponent<Bloom>(profile);
-            bloom.threshold.Override(0.92f);
-            bloom.intensity.Override(0.9f);
-            bloom.scatter.Override(0.65f);
+            bloom.threshold.Override(1f);
+            bloom.intensity.Override(0.75f);
+            bloom.scatter.Override(0.72f);
             bloom.tint.Override(new Color(1f, 0.86f, 0.72f));
+            bloom.highQualityFiltering.Override(true);
 
             Tonemapping tonemapping = AddComponent<Tonemapping>(profile);
             tonemapping.mode.Override(TonemappingMode.Neutral);
 
             ColorAdjustments color = AddComponent<ColorAdjustments>(profile);
             color.postExposure.Override(0.45f);
-            color.contrast.Override(10f);
+            color.contrast.Override(14f);
             color.colorFilter.Override(new Color(0.92f, 0.95f, 1f));
             color.saturation.Override(-8f);
 
@@ -851,19 +937,26 @@ namespace Ascua.EditorTools
             splitToning.highlights.Override(AscuaPalette.Ambar);
             splitToning.balance.Override(-25f);
 
+            // Curva de contraste "cinematográfica": negros algo hundidos y azulados, altas luces cálidas.
+            LiftGammaGain lgg = AddComponent<LiftGammaGain>(profile);
+            lgg.lift.Override(new Vector4(0.98f, 0.99f, 1.04f, -0.03f));
+            lgg.gamma.Override(new Vector4(1f, 1f, 1f, 0f));
+            lgg.gain.Override(new Vector4(1.03f, 1f, 0.96f, 0.02f));
+
             Vignette vignette = AddComponent<Vignette>(profile);
             vignette.color.Override(Hex("#070A1A"));
             vignette.center.Override(new Vector2(0.5f, 0.5f));
             vignette.intensity.Override(0.28f);
             vignette.smoothness.Override(0.4f);
 
+            // Grano fino y sutil (antes era ruidoso).
             FilmGrain grain = AddComponent<FilmGrain>(profile);
-            grain.type.Override(FilmGrainLookup.Medium3);
-            grain.intensity.Override(0.22f);
-            grain.response.Override(0.75f);
+            grain.type.Override(FilmGrainLookup.Thin2);
+            grain.intensity.Override(0.12f);
+            grain.response.Override(0.85f);
 
-            ChromaticAberration aberration = AddComponent<ChromaticAberration>(profile);
-            aberration.intensity.Override(0.06f);
+            // Sin aberración cromática permanente: PostFxDirector la añade solo con energía baja,
+            // ráfaga de la Penumbra, oleadas y golpes recibidos.
 
             EditorUtility.SetDirty(profile);
             return profile;

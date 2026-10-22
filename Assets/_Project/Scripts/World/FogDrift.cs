@@ -56,7 +56,7 @@ namespace Ascua.World
 
             Color c = tint;
             c.a = alpha;
-            fogRenderer.GetPropertyBlock(propertyBlock);
+            fogRenderer.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
             propertyBlock.SetColor(BaseColorId, c);
             fogRenderer.SetPropertyBlock(propertyBlock);
         }

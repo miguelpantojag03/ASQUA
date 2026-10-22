@@ -86,6 +86,8 @@ namespace Ascua.Lighting
         private float noiseSeed;
         private float resizePulse;
         private int resizeDirection;
+        private float hurtTimer;
+        private const float HurtFlickerDuration = 0.5f;
 
         public event Action<int> RadiusChanged;
         public event Action<bool> ActiveChanged;
@@ -188,12 +190,18 @@ namespace Ascua.Lighting
 
             if (coreRenderer != null)
             {
-                coreRenderer.GetPropertyBlock(propertyBlock);
+                coreRenderer.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
                 propertyBlock.SetColor(EmissionColorId, lightColor * (Mathf.Lerp(coreEmissionIdle, coreEmissionActive, eased) * flicker));
                 coreRenderer.SetPropertyBlock(propertyBlock);
             }
 
             UpdateSway();
+        }
+
+        /// <summary>Combate: al recibir un golpe de sombra, el Farol tiembla y casi se apaga medio segundo.</summary>
+        public void PlayHurtFlicker()
+        {
+            hurtTimer = HurtFlickerDuration;
         }
 
         /// <summary>Cambia el tamaño del Farol (0 = pequeño ... 3 = Farol grande, si está desbloqueado).</summary>
@@ -235,7 +243,17 @@ namespace Ascua.Lighting
             {
                 amount += lowEnergyFlicker * (1f - energy.Normalized / lowEnergyThreshold);
             }
-            return 1f + noise * amount;
+            float value = 1f + noise * amount;
+
+            // Golpe recibido: parpadeo brusco que se recupera (se ve incluso con el Farol en reposo).
+            if (hurtTimer > 0f)
+            {
+                hurtTimer -= Time.deltaTime;
+                float stutter = Mathf.PerlinNoise(Time.time * 28f, noiseSeed + 7f);
+                float recovery = 1f - Mathf.Clamp01(hurtTimer / HurtFlickerDuration);
+                value *= Mathf.Lerp(stutter > 0.45f ? 0.55f : 0.12f, 1f, recovery);
+            }
+            return value;
         }
 
         private void UpdateSway()

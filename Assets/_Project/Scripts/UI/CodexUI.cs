@@ -145,6 +145,10 @@ namespace Ascua.UI
                 if (current || page == null) builder.Append("</color>");
                 builder.Append('\n');
             }
+            // Recuerdos: los que ya enseñaron un movimiento; el resto, por descubrir.
+            builder.Append("\n<b>RECUERDOS</b>\n");
+            builder.Append(GameProgress.HasRecuerdo("lupa_mina") ? "   La lupa de Mina · haz cargado\n" : "<color=#B8C4EC55>   ???</color>\n");
+            builder.Append(GameProgress.HasRecuerdo("reloj_nadir") ? "   El reloj de Nadir · contraataque\n" : "<color=#B8C4EC55>   ???</color>\n");
             builder.Append("\n<color=#B8C4EC88>").Append(found).Append("/").Append(totalPages).Append(" páginas · ←/→ pasar · J o Esc cerrar</color>");
             if (indexText != null) indexText.SetText(builder);
 

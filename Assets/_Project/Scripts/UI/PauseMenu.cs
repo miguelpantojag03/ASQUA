@@ -40,6 +40,8 @@ namespace Ascua.UI
         [SerializeField] private TMP_Text textScaleLabel;
         [SerializeField] private Toggle shakeToggle;
         [SerializeField] private Toggle subtitlesToggle;
+        [Tooltip("Reducir destellos (viñeta de daño, aberración cromática, destellos del combate).")]
+        [SerializeField] private Toggle flashesToggle;
 
         private bool paused;
         private float previousTimeScale = 1f;
@@ -68,6 +70,7 @@ namespace Ascua.UI
             if (textScaleSlider != null) textScaleSlider.onValueChanged.AddListener(OnTextScale);
             if (shakeToggle != null) shakeToggle.onValueChanged.AddListener(v => { if (!syncing) AccessibilitySettings.SetCameraShake(v); });
             if (subtitlesToggle != null) subtitlesToggle.onValueChanged.AddListener(v => { if (!syncing) AccessibilitySettings.SetSfxSubtitles(v); });
+            if (flashesToggle != null) flashesToggle.onValueChanged.AddListener(v => { if (!syncing) AccessibilitySettings.SetReduceFlashes(v); });
         }
 
         private void OnDestroy()
@@ -198,6 +201,7 @@ namespace Ascua.UI
             }
             if (shakeToggle != null) shakeToggle.isOn = AccessibilitySettings.CameraShake;
             if (subtitlesToggle != null) subtitlesToggle.isOn = AccessibilitySettings.SfxSubtitles;
+            if (flashesToggle != null) flashesToggle.isOn = AccessibilitySettings.ReduceFlashes;
             syncing = false;
         }
 

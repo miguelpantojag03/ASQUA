@@ -38,6 +38,8 @@ namespace Ascua.Controls
         private InputAction pulseAction;
         private InputAction jumpAction;
         private InputAction dashAction;
+        private InputAction attackAction;
+        private InputAction abilityAction;
 
         /// <summary>Movimiento normalizado (x = lateral, y = adelante).</summary>
         public Vector2 Move { get; private set; }
@@ -59,6 +61,14 @@ namespace Ascua.Controls
         public bool JumpPressed { get; private set; }
         /// <summary>Esquivar pulsado este frame (Ctrl / botón B).</summary>
         public bool DashPressed { get; private set; }
+        /// <summary>Barrido de luz pulsado este frame (clic izquierdo / gatillo derecho).</summary>
+        public bool AttackPressed { get; private set; }
+        /// <summary>True mientras se mantiene el ataque (para el ataque cargado de la Lupa de Mina).</summary>
+        public bool AttackHeld { get; private set; }
+        /// <summary>Ataque soltado este frame.</summary>
+        public bool AttackReleased { get; private set; }
+        /// <summary>Habilidad de Vínculo pulsada este frame (G / cruceta arriba).</summary>
+        public bool AbilityPressed { get; private set; }
         /// <summary>
         /// Cerca de un NPC la tecla E sirve para hablar: mientras sea true, E no cambia el tamaño del Farol
         /// (Q y los bumpers siguen funcionando).
@@ -113,9 +123,16 @@ namespace Ascua.Controls
             sprintAction.AddBinding("<Gamepad>/leftStickPress");
 
             // Farol activo: click izquierdo, F o gatillo derecho.
-            lanternAction = gameplayMap.AddAction("Lantern", InputActionType.Button, "<Mouse>/leftButton");
+            // Farol: clic DERECHO / F / gatillo izquierdo (el clic izquierdo es el barrido de luz).
+            lanternAction = gameplayMap.AddAction("Lantern", InputActionType.Button, "<Mouse>/rightButton");
             lanternAction.AddBinding("<Keyboard>/f");
-            lanternAction.AddBinding("<Gamepad>/rightTrigger");
+            lanternAction.AddBinding("<Gamepad>/leftTrigger");
+
+            // Combate: barrido de luz y habilidad de Vínculo.
+            attackAction = gameplayMap.AddAction("Attack", InputActionType.Button, "<Mouse>/leftButton");
+            attackAction.AddBinding("<Gamepad>/rightTrigger");
+            abilityAction = gameplayMap.AddAction("Ability", InputActionType.Button, "<Keyboard>/g");
+            abilityAction.AddBinding("<Gamepad>/dpad/up");
 
             // Tamaño del Farol: Q/E o bumpers.
             radiusUpAction = gameplayMap.AddAction("RadiusUp", InputActionType.Button, "<Keyboard>/e");
@@ -173,6 +190,13 @@ namespace Ascua.Controls
             PulsePressed = pulseAction.WasPressedThisFrame();
             JumpPressed = jumpAction.WasPressedThisFrame();
             DashPressed = dashAction.WasPressedThisFrame();
+            // Con el cursor libre (menús, clic para volver al juego) el clic no ataca.
+            bool cursorFree = Cursor.lockState != CursorLockMode.Locked && Mouse.current != null && Mouse.current.leftButton.isPressed
+                              && (Gamepad.current == null || !Gamepad.current.rightTrigger.isPressed);
+            AttackPressed = attackAction.WasPressedThisFrame() && !cursorFree;
+            AttackHeld = attackAction.IsPressed() && !cursorFree;
+            AttackReleased = attackAction.WasReleasedThisFrame();
+            AbilityPressed = abilityAction.WasPressedThisFrame();
             RadiusDownPressed = radiusDownAction.WasPressedThisFrame();
 
             // La rueda se trata como pasos discretos (los valores crudos varían según plataforma).
@@ -207,6 +231,10 @@ namespace Ascua.Controls
             PulsePressed = false;
             JumpPressed = false;
             DashPressed = false;
+            AttackPressed = false;
+            AttackHeld = false;
+            AttackReleased = false;
+            AbilityPressed = false;
         }
     }
 }

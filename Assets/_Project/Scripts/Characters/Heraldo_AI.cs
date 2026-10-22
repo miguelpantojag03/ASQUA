@@ -13,6 +13,8 @@ namespace Ascua.Characters
     /// merodea y persigue a Ilse si se acerca; a su lado el Farol se apaga (drena energía).
     /// El Pulso de luz lo repele. La primera vez que la alcanza le ofrece un Trato, que es una
     /// misión de tipo TratoHeraldo (la misma arquitectura de misiones, no un sistema aparte).
+    /// En Persecución Activa se le puede "enfrentar" con luz (HeraldoConfrontation): nunca se le
+    /// derrota, solo retrocede, se desvanece y reaparece, y al final se aleja revelando una pista.
     /// </summary>
     [RequireComponent(typeof(NavMeshAgent))]
     public class Heraldo_AI : MonoBehaviour
@@ -73,6 +75,48 @@ namespace Ascua.Characters
 
         /// <summary>True si está en la escena (visible y activo).</summary>
         public bool IsPresent => state != State.Dormido;
+
+        /// <summary>Persecución Activa: el único momento en que se le puede enfrentar.</summary>
+        public bool IsChasing => state == State.Persiguiendo;
+
+        /// <summary>
+        /// Se desvanece y reaparece a 'minRadius'-'maxRadius' m de 'center' (enfrentamiento).
+        /// Devuelve false si no encontró sitio en el NavMesh.
+        /// </summary>
+        public bool TeleportAround(Vector3 center, float minRadius, float maxRadius)
+        {
+            if (!IsPresent || !agent.enabled) return false;
+            for (int attempt = 0; attempt < 10; attempt++)
+            {
+                float angle = Random.value * Mathf.PI * 2f;
+                float radius = Random.Range(minRadius, maxRadius);
+                Vector3 p = center + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+                if (!NavMesh.SamplePosition(p, out NavMeshHit hit, 2f, NavMesh.AllAreas)) continue;
+                agent.Warp(hit.position);
+                if (player != null)
+                {
+                    Vector3 look = player.position - hit.position;
+                    look.y = 0f;
+                    if (look.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(look.normalized, Vector3.up);
+                }
+                // Tras reaparecer, observa un instante antes de seguir.
+                state = State.Repelido;
+                stateTimer = 1.2f;
+                agent.ResetPath();
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Se aleja y no vuelve en 'seconds' (fin del enfrentamiento).</summary>
+        public void RetreatFor(float seconds)
+        {
+            if (!IsPresent) return;
+            state = State.Retirado;
+            stateTimer = seconds;
+            Transform far = FarthestLurkPoint();
+            if (far != null && agent.enabled) agent.SetDestination(far.position);
+        }
 
         private void Awake()
         {
@@ -306,7 +350,7 @@ namespace Ascua.Characters
             if (violetLight != null) violetLight.intensity = 1.6f * factor;
             if (lanternRenderer != null)
             {
-                lanternRenderer.GetPropertyBlock(propertyBlock);
+                lanternRenderer.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
                 propertyBlock.SetColor(EmissionColorId, lanternColor * (lanternEmission * factor));
                 lanternRenderer.SetPropertyBlock(propertyBlock);
             }

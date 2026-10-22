@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Ascua.Combat;
 using UnityEngine;
 
 namespace Ascua.Quests
@@ -60,6 +61,10 @@ namespace Ascua.Quests
         [Header("Progresión entre noches")]
         [Tooltip("Cada noche que se repite este set, la caída de Esperanza sube este porcentaje.")]
         [Range(0f, 0.5f)] public float decayIncreasePerNight = 0.15f;
+
+        [Header("Combate · oleadas de sombras (1-2 por noche)")]
+        [Tooltip("Picos de intensidad: 3-4 criaturas que atacan una zona en un momento concreto.")]
+        public List<CombatWave> waves = new List<CombatWave>();
 
         [Header("Dificultad · Heraldo")]
         public bool heraldoEnabled = true;

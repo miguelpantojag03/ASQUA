@@ -120,7 +120,7 @@ namespace Ascua.Player
             if (flick > 0f) flick = Mathf.Max(0f, flick - flickDecay * dt);
             if (capeRenderer != null)
             {
-                capeRenderer.GetPropertyBlock(propertyBlock);
+                capeRenderer.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
                 propertyBlock.SetFloat(FlickId, flick);
                 capeRenderer.SetPropertyBlock(propertyBlock);
             }

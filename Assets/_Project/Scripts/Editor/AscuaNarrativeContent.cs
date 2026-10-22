@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Ascua.Combat;
 using Ascua.Narrative;
 using Ascua.Quests;
 using UnityEditor;
@@ -15,6 +16,8 @@ namespace Ascua.EditorTools
         public Quest TeoPostal;
         public DialogueSequence TeoGift;
         public DiaryPage[] Pages;
+        // Combate: lo que el Heraldo deja caer al alejarse tras un enfrentamiento.
+        public DialogueSequence[] HeraldoRevelations;
     }
 
     /// <summary>
@@ -329,6 +332,30 @@ namespace Ascua.EditorTools
                     "Desde el tejado del quiosco se ve toda la bahía. Las luces de Vesper parecen pocas desde aquí.\n\nPero no están todas apagadas. Todavía no.")
             };
 
+            // ============================================================ Heraldo · revelaciones (enfrentamientos)
+            // No son amenazas: son pistas. El Heraldo sabe quién era Ilse, y lo dice a medias.
+            n.HeraldoRevelations = new[]
+            {
+                Dialogue("heraldo_revela_1", new[]
+                {
+                    L(Heraldo, "Tu luz quema, pequeña luz. Como la suya."),
+                    L(Heraldo, "Él también encendía faroles en esta ciudad. Y también acabó cansándose."),
+                    L(Ilse, "¿Quién? ¿De quién hablas?")
+                }),
+                Dialogue("heraldo_revela_2", new[]
+                {
+                    L(Heraldo, "No vengo a apagarte. Vengo a que descanses."),
+                    L(Heraldo, "Todo lo que se olvida deja de doler. ¿No te lo prometieron así?"),
+                    L(Ilse, "Nadie me prometió nada. Recuerdo un farol… y una voz.")
+                }),
+                Dialogue("heraldo_revela_3", new[]
+                {
+                    L(Heraldo, "La voz que recuerdas te pidió que alumbraras. No te dijo hasta cuándo."),
+                    L(Heraldo, "Cuando la ciudad entera te olvide, ¿quién quedará para recordarte a ti?"),
+                    L(Ilse, "Mina. Teo. Las ventanas que encendí. Eso queda.")
+                })
+            };
+
             // ============================================================ Actualización suave de datos existentes
             // Solo rellena campos vacíos: nunca pisa lo que hayas escrito a mano.
             FillInstruction(n.MinaBrasa, "Recoge 3 luciérnagas en La Plaza. Se esconden donde no hay luz.");
@@ -366,6 +393,19 @@ namespace Ascua.EditorTools
             if (!n.Night1.quests.Contains(n.TeoPostal))
             {
                 n.Night1.quests.Add(n.TeoPostal);
+                EditorUtility.SetDirty(n.Night1);
+            }
+
+            // Oleadas de sombras de la Noche 1 (solo si el set aún no tiene ninguna).
+            if (n.Night1.waves == null || n.Night1.waves.Count == 0)
+            {
+                n.Night1.waves = new List<CombatWave>
+                {
+                    // 1ª: introduce el combate con lo más legible (Polillas) y el Eco que se divide.
+                    new CombatWave { label = "Polillas en La Plaza", atProgress = 0.32f, zoneId = "Plaza", moths = 2, echoes = 1 },
+                    // 2ª: más variada (embestida telegrafiada, robo de páginas, sombra velada).
+                    new CombatWave { label = "La Sombra Mayor del Mercado", atProgress = 0.66f, zoneId = "Mercado", moths = 1, brutes = 1, whispers = 1, veiledBrutes = 1, echoes = 0 }
+                };
                 EditorUtility.SetDirty(n.Night1);
             }
 

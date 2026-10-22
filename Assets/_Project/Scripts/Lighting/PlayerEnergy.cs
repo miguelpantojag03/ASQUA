@@ -7,6 +7,8 @@ namespace Ascua.Lighting
     /// Energía del Farol (0-100). Separada del propio Farol para que en fases futuras
     /// otros sistemas (Pulso de luz, luciérnagas, Recuerdos) puedan consumirla o restaurarla.
     /// Si llega a 0 entra en "agotamiento" hasta recuperar un porcentaje mínimo.
+    /// En combate no hay barra de vida: el daño de las sombras resta energía (ApplyDamage).
+    /// Agotada, Ilse no muere: no puede atacar ni iluminar hasta recuperar el 25 %.
     /// </summary>
     [DisallowMultipleComponent]
     public class PlayerEnergy : MonoBehaviour
@@ -22,7 +24,7 @@ namespace Ascua.Lighting
 
         [Header("Agotamiento")]
         [Tooltip("Fracción de energía necesaria para salir del agotamiento.")]
-        [SerializeField, Range(0f, 1f)] private float exhaustedRecoverFraction = 0.2f;
+        [SerializeField, Range(0f, 1f)] private float exhaustedRecoverFraction = 0.25f;
 
         private float current;
         private float lastConsumeTime = -999f;
@@ -31,6 +33,8 @@ namespace Ascua.Lighting
         /// <summary>(actual, máximo)</summary>
         public event Action<float, float> EnergyChanged;
         public event Action<bool> ExhaustedChanged;
+        /// <summary>Daño recibido de una sombra (cantidad realmente perdida).</summary>
+        public event Action<float> Damaged;
 
         public float Current => current;
         public float Max => maxEnergy;
@@ -65,6 +69,22 @@ namespace Ascua.Lighting
             SetEnergy(current - amount);
             if (current <= 0f) SetExhausted(true);
             return true;
+        }
+
+        /// <summary>
+        /// Daño de una criatura de sombra: resta energía aunque esté agotada y retrasa la regeneración.
+        /// Devuelve la energía realmente perdida.
+        /// </summary>
+        public float ApplyDamage(float amount)
+        {
+            if (amount <= 0f) return 0f;
+            float before = current;
+            lastConsumeTime = Time.time;
+            SetEnergy(current - amount);
+            if (current <= 0f) SetExhausted(true);
+            float lost = before - current;
+            if (lost > 0f) Damaged?.Invoke(lost);
+            return lost;
         }
 
         /// <summary>Restaura energía (luciérnagas, Recuerdos... en fases futuras).</summary>

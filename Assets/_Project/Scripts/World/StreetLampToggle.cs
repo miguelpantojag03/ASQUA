@@ -180,7 +180,7 @@ namespace Ascua.World
             if (glassRenderer != null)
             {
                 if (propertyBlock == null) propertyBlock = new MaterialPropertyBlock();
-                glassRenderer.GetPropertyBlock(propertyBlock);
+                glassRenderer.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
                 propertyBlock.SetColor(EmissionColorId, litColor * (emissionIntensity * eased));
                 glassRenderer.SetPropertyBlock(propertyBlock);
             }

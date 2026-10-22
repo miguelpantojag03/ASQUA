@@ -65,11 +65,11 @@ namespace Ascua.Quests
 
             // Una frase, una acción. Se avanza haciendo, no leyendo.
             steps.Add(new Step { Line = "Algo brilla en el suelo, justo delante. Me acerco y pulso E.", Done = () => itemPicked, MinSeconds = 2f });
-            steps.Add(new Step { Line = "Si mantengo el clic izquierdo (o F), el Farol se aviva.", Done = () => lanternTime > 1f, MinSeconds = 2f });
+            steps.Add(new Step { Line = "Si mantengo el clic derecho (o F), el Farol se aviva.", Done = () => lanternTime > 1f, MinSeconds = 2f });
             steps.Add(new Step { Line = "Mina me espera junto a la fuente. Sigo la flecha y mantengo E para hablar.", Done = () => GetQuestState("mina_brasa") != QuestState.Disponible, MinSeconds = 2f });
             steps.Add(new Step { Line = "Las luciérnagas se esconden donde no hay luz. Si las toco, recargan el Farol.", Done = () => fireflyCollected, MinSeconds = 3f });
             steps.Add(new Step { Line = "Cada barrio necesita luz. Si su Esperanza llega a cero, se apaga.", Done = () => stepTime > 6f, MinSeconds = 6f });
-            steps.Add(new Step { Line = "Espacio para saltar · Shift para correr · Ctrl para esquivar · Tab: misiones.", Done = () => stepTime > 7f, MinSeconds = 7f });
+            steps.Add(new Step { Line = "Clic izquierdo: barrido de luz contra las sombras · Ctrl para esquivar · Tab: misiones.", Done = () => stepTime > 7f, MinSeconds = 7f });
             Show(0);
         }
 

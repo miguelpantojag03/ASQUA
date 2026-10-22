@@ -116,10 +116,30 @@ namespace Ascua.Player
                     if (zone != null && item.HopeAmount > 0f) zone.AddHope(item.HopeAmount);
                     if (item.Kind == PickupKind.LuciernagaDorada) Toast("Una luciérnaga dorada · el Farol se llena de luz");
                     break;
+
+                case PickupKind.Recuerdo:
+                    // El id del Recuerdo viaja en el mismo campo que el de las páginas.
+                    if (GameProgress.UnlockRecuerdo(item.DiaryPageId))
+                    {
+                        Toast(RecuerdoText(item.DiaryPageId, item.DisplayName));
+                        EventBus.RaiseRecuerdoUnlocked(item.DiaryPageId);
+                    }
+                    break;
             }
 
             EventBus.RaiseItemPickedUp(item.ItemId, item.DisplayName);
             EventBus.RaiseCelebration("objeto");
+        }
+
+        /// <summary>Qué enseña cada Recuerdo (texto corto y claro).</summary>
+        private static string RecuerdoText(string id, string name)
+        {
+            switch (id)
+            {
+                case "lupa_mina": return "Recuerdo: " + name + " · mantén clic izquierdo y suelta: haz de luz";
+                case "reloj_nadir": return "Recuerdo: " + name + " · ataca justo antes de un golpe: contraataque";
+                default: return "Recuerdo: " + name;
+            }
         }
 
         private static ZoneHope NearestZone(Vector3 position)

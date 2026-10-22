@@ -400,6 +400,15 @@ namespace Ascua.EditorTools
             Wire(audio, "sfxBond", a.Bond);
             Wire(audio, "sfxMoment", a.Moment);
             Wire(audio, "sfxUiClick", a.UiClick);
+            Wire(audio, "sfxSwing", a.Swing);
+            Wire(audio, "sfxLightHit", a.LightHit);
+            Wire(audio, "sfxDissolve", a.Dissolve);
+            Wire(audio, "sfxHurt", a.Hurt);
+            Wire(audio, "sfxPerfectDodge", a.PerfectDodge);
+            Wire(audio, "sfxWaveStart", a.WaveStart);
+            Wire(audio, "sfxWaveCleared", a.WaveCleared);
+            Wire(audio, "sfxBruteWarning", a.BruteWarning);
+            Wire(audio, "sfxShadowBolt", a.ShadowBolt);
         }
 
         // ================================================================== HUD nuevo
@@ -424,25 +433,54 @@ namespace Ascua.EditorTools
             vignette.blocksRaycasts = false;
 
             // --- Objetivo actual (arriba a la izquierda, bajo el logo): siempre visible.
-            RectTransform objective = UIRect("Objetivo_Actual", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(32f, -128f), new Vector2(600f, 96f));
+            // Pivote a la izquierda: la animación de cambio "crece" desde el borde de la pantalla.
+            RectTransform objective = UIRect("Objetivo_Actual", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(32f, -128f), new Vector2(620f, 120f));
             Image objectiveBack = objective.gameObject.AddComponent<Image>();
-            objectiveBack.color = new Color(0.02f, 0.03f, 0.08f, 0.55f);
+            objectiveBack.color = new Color(0.02f, 0.03f, 0.08f, 0.62f);
             objectiveBack.raycastTarget = false;
-            RectTransform accentLine = UIRect("Filo", objective, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(4f, 0f));
-            accentLine.gameObject.AddComponent<Image>().color = amber;
+            Image objectiveFrame = UIRect("Marco", objective, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero).gameObject.AddComponent<Image>();
+            objectiveFrame.sprite = assets.Combat.FrameSprite;
+            objectiveFrame.type = Image.Type.Sliced;
+            objectiveFrame.color = new Color(amber.r, amber.g, amber.b, 0.75f);
+            objectiveFrame.raycastTarget = false;
             CanvasGroup objectiveGroup = objective.gameObject.AddComponent<CanvasGroup>();
             objectiveGroup.alpha = 0f;
             objectiveGroup.blocksRaycasts = false;
+            RectTransform iconRect = UIRect("Icono", objective, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(18f, -16f), new Vector2(40f, 40f));
+            Image objectiveIcon = iconRect.gameObject.AddComponent<Image>();
+            objectiveIcon.sprite = assets.Combat.QuestIcons[1];
+            objectiveIcon.color = amber;
+            objectiveIcon.preserveAspect = true;
+            objectiveIcon.raycastTarget = false;
             TextMeshProUGUI objectiveTitle = UIText("Titulo", objective, "Brasa", 26f, amber, TextAlignmentOptions.TopLeft,
-                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(-36f, 34f));
+                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(70f, -12f), new Vector2(-90f, 34f));
             objectiveTitle.fontStyle = FontStyles.Bold;
-            TextMeshProUGUI objectiveAction = UIText("Accion", objective, "Busca a la gata de Mina", 24f, cold, TextAlignmentOptions.TopLeft,
-                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -46f), new Vector2(-36f, 40f));
+            TextMeshProUGUI objectiveAction = UIText("Accion", objective, "Busca a la gata de Mina", 23f, cold, TextAlignmentOptions.TopLeft,
+                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(70f, -46f), new Vector2(-90f, 44f));
             objectiveAction.richText = true;
+            RectTransform progressBack = UIRect("Progreso", objective, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
+            progressBack.offsetMin = new Vector2(70f, 9f);
+            progressBack.offsetMax = new Vector2(-24f, 13f);
+            Image progressBackImage = progressBack.gameObject.AddComponent<Image>();
+            progressBackImage.color = new Color(0.08f, 0.1f, 0.2f, 0.9f);
+            progressBackImage.raycastTarget = false;
+            Image progressFill = UIRect("Relleno", progressBack, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero).gameObject.AddComponent<Image>();
+            progressFill.sprite = assets.Character.WhiteSprite;
+            progressFill.type = Image.Type.Filled;
+            progressFill.fillMethod = Image.FillMethod.Horizontal;
+            progressFill.color = amber;
+            progressFill.raycastTarget = false;
+            progressBack.gameObject.SetActive(false);
             ObjectiveTrackerUI tracker = objective.gameObject.AddComponent<ObjectiveTrackerUI>();
             Wire(tracker, "group", objectiveGroup);
             Wire(tracker, "titleText", objectiveTitle);
             Wire(tracker, "actionText", objectiveAction);
+            Wire(tracker, "popRoot", objective);
+            Wire(tracker, "icon", objectiveIcon);
+            Wire(tracker, "progressRoot", progressBack.gameObject);
+            Wire(tracker, "progressFill", progressFill);
+            WireArray(tracker, "typeIcons", assets.Combat.QuestIcons);
+            Wire(tracker, "combatIcon", assets.Combat.CombatIcon);
 
             // --- Flecha de dirección: marcador centrado que el script recoloca cada frame.
             RectTransform marker = UIRect("Flecha_Objetivo", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120f, 110f));
@@ -593,8 +631,10 @@ namespace Ascua.EditorTools
             TextMeshProUGUI textScaleLabel = UIText("Valor", access, "100 %", 28f, amber, TextAlignmentOptions.Left,
                 new Vector2(0.25f, 0.68f), new Vector2(0.25f, 0.68f), new Vector2(0f, 0.5f), new Vector2(550f, -14f), new Vector2(160f, 40f));
             textScaleLabel.fontStyle = FontStyles.Bold;
-            Toggle shake = UIToggle("Sacudidas", access, "Sacudidas de cámara", new Vector2(0.25f, 0.46f));
-            Toggle subtitles = UIToggle("Subtitulos", access, "Subtítulos de efectos de sonido", new Vector2(0.25f, 0.32f));
+            Toggle shake = UIToggle("Sacudidas", access, "Sacudidas de cámara", new Vector2(0.25f, 0.5f));
+            Toggle subtitles = UIToggle("Subtitulos", access, "Subtítulos de efectos de sonido", new Vector2(0.25f, 0.38f));
+            Toggle flashes = UIToggle("Destellos", access, "Reducir destellos (daño, aberración, combate)", new Vector2(0.25f, 0.26f));
+            flashes.isOn = false;
             UIText("Ayuda", access, "Esc · volver", 20f, new Color(cold.r, cold.g, cold.b, 0.55f), TextAlignmentOptions.Center,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(600f, 30f));
 
@@ -613,6 +653,7 @@ namespace Ascua.EditorTools
             Wire(menu, "textScaleLabel", textScaleLabel);
             Wire(menu, "shakeToggle", shake);
             Wire(menu, "subtitlesToggle", subtitles);
+            Wire(menu, "flashesToggle", flashes);
 
             // --- Diario de Ilse (Codex)
             RectTransform codex = UIRect("Diario", root, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);

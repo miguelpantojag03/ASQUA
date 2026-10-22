@@ -1,4 +1,5 @@
 using System;
+using Ascua.Combat;
 using Ascua.Controls;
 using Ascua.Core;
 using UnityEngine;
@@ -9,6 +10,9 @@ namespace Ascua.Player
     /// Esquiva corta (Ctrl / botón B): un deslizamiento rápido en la dirección del movimiento,
     /// con cooldown y coste de Stamina. Pensada para zafarse del Heraldo: mientras dura,
     /// su abrazo no drena el Farol. Deja una estela de chispas, sin espectacularidad de acción.
+    /// Combate: es la defensa principal. Los primeros 0.25 s son invulnerables (i-frames); un golpe
+    /// que llega en ese instante cuenta como "esquiva perfecta" (destello y cámara lenta breve,
+    /// ver PlayerCombatState). También cancela el barrido de luz en curso.
     /// </summary>
     [DisallowMultipleComponent]
     public class PlayerDash : MonoBehaviour
@@ -18,12 +22,15 @@ namespace Ascua.Player
         [SerializeField] private PlayerStamina stamina;
         [SerializeField] private PlayerJump jumpFx;
         [SerializeField] private ParticleSystem trail;
+        [SerializeField] private PlayerCombatState combatState;
 
         [Header("Esquiva")]
         [SerializeField] private float distance = 3.2f;
         [SerializeField] private float duration = 0.18f;
         [SerializeField] private float cooldown = 1.1f;
         [SerializeField] private float staminaCost = 22f;
+        [Tooltip("Invulnerabilidad al inicio de la esquiva (segundos).")]
+        [SerializeField] private float invulnerableSeconds = 0.25f;
 
         public event Action Dashed;
 
@@ -39,6 +46,7 @@ namespace Ascua.Player
             if (controller == null) controller = GetComponent<PlayerController>();
             if (stamina == null) stamina = GetComponent<PlayerStamina>();
             if (jumpFx == null) jumpFx = GetComponent<PlayerJump>();
+            if (combatState == null) combatState = GetComponent<PlayerCombatState>();
         }
 
         private void Update()
@@ -64,6 +72,7 @@ namespace Ascua.Player
 
             Vector3 direction = controller.DesiredDirection.sqrMagnitude > 0.01f ? controller.DesiredDirection : transform.forward;
             controller.Dash(direction, distance, duration);
+            if (combatState != null) combatState.GrantInvulnerability(invulnerableSeconds);
             cooldownTimer = cooldown;
             trailTimer = duration;
             if (jumpFx != null) jumpFx.PlayLean(14f, duration + 0.1f);

@@ -203,7 +203,7 @@ namespace Ascua.World
             float emission = Mathf.Max(hint, litEmissionIntensity * eased * alive) * visibility;
             float glow = glowLightIntensity * eased * alive * visibility;
 
-            windowRenderer.GetPropertyBlock(propertyBlock);
+            windowRenderer.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
             propertyBlock.SetColor(EmissionColorId, litColor * emission);
             windowRenderer.SetPropertyBlock(propertyBlock);
 

@@ -242,7 +242,7 @@ namespace Ascua.World
             Color c = cardBaseColors[index];
             c.a *= fade;
 
-            r.GetPropertyBlock(propertyBlock);
+            r.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
             propertyBlock.SetColor(BaseColorId, c);
             r.SetPropertyBlock(propertyBlock);
             r.enabled = fade > 0.01f;

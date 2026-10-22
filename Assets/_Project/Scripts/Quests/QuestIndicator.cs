@@ -58,7 +58,7 @@ namespace Ascua.Quests
 
             bool turnIn = shownState == QuestState.PorEntregar;
             float pulse = turnIn ? 0.6f + 0.4f * Mathf.Sin(t * 6f) : 1f;
-            diamond.GetPropertyBlock(propertyBlock);
+            diamond.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
             propertyBlock.SetColor(EmissionColorId, (turnIn ? turnInColor : availableColor) * (intensity * pulse));
             diamond.SetPropertyBlock(propertyBlock);
         }
