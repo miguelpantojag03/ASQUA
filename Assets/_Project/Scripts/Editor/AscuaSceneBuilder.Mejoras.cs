@@ -413,6 +413,8 @@ namespace Ascua.EditorTools
             Wire(audio, "sfxPowerDown", a.PowerDown);
             Wire(audio, "sfxCriticalEnergy", a.CriticalEnergy);
             Wire(audio, "sfxThreat", a.Threat);
+            Wire(audio, "sfxLockOn", a.LockOn);
+            Wire(audio, "sfxWhisper", a.Whisper);
         }
 
         // ================================================================== HUD nuevo

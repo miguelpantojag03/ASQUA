@@ -45,9 +45,14 @@ MonoBehaviour:
   rewardHope: 10
   rewardHopeZoneId: Plaza
   rewardBond: 1
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 0
   offerDialogue: {fileID: 11400000, guid: 236e018d8c9c1d94aacfb5ddc71b02b7, type: 2}
   inProgressDialogue: {fileID: 11400000, guid: 9aa4bd7d845396d4b8369be801a73e98, type: 2}
   completedDialogue: {fileID: 11400000, guid: 1f4fbdbb21964664b87ce3d9f6e8550d, type: 2}
+  emotionalContext: "Desde que se fue Ram\xF3n, nadie me espera despierto. Pero mi
+    ventana, s\xED.\nMe gusta llegar y encenderla, como si \xE9l fuera a verla."
+  progressNervousDialogue: {fileID: 11400000, guid: 65adda90b540a604eac2e16827a00e4a, type: 2}
+  progressReliefDialogue: {fileID: 11400000, guid: 5a3a7ef7831878b4fb44dffb3155ad1f, type: 2}

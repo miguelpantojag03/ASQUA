@@ -1264,6 +1264,8 @@ namespace Ascua.EditorTools
             // Parte A: mismo marco y fondo para toda la UI + capas de prioridad (diálogo / combate).
             ApplyHudDesign(canvas, player, assets);
             BuildNightEvent(assets, canvas);
+            // Parte D: fijar objetivo, presagio de la Noche 2 y objetos de las secundarias.
+            BuildStoryAndCombatReading(assets, canvas, player);
             BuildSurge(surgeVignette);
             root.Find("Resumen_Noche").SetAsLastSibling(); // el resumen tapa todo el HUD de juego
             fade.transform.SetAsLastSibling(); // el fundido siempre por encima de todo el HUD

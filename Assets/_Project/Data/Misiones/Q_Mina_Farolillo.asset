@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77dec953110fcae48b7efd4632c03438, type: 3}
+  m_Name: Q_Mina_Farolillo
+  m_EditorClassIdentifier: 
+  questId: mina_farolillo
+  giverNpcId: mina
+  title: El farolillo de papel
+  description: "El padre de Mina colgaba un farolillo de papel rojo en el callej\xF3n
+    de los faroleros. Encu\xE9ntralo y ll\xE9vaselo."
+  type: 5
+  shortInstruction: "Busca el farolillo de papel en el callej\xF3n de los faroleros
+    y ll\xE9vaselo a Mina."
+  prerequisite: {fileID: 0}
+  targetZoneId: Plaza
+  hopeThreshold: 50
+  holdSeconds: 20
+  requiredCount: 3
+  collectRadiusMultiplier: 1.8
+  escortNpcId: mina
+  escortDestinationId: 
+  escortMaxDistance: 8
+  escortGraceSeconds: 6
+  deliverItemId: farolillo_papel
+  deliverItemName: el farolillo de papel
+  deliverToNpcId: mina
+  defeatZoneId: Plaza
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 45
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
+  rewardEnergy: 15
+  rewardHope: 8
+  rewardHopeZoneId: Plaza
+  rewardBond: 1
+  rewardDiaryPage: {fileID: 11400000, guid: 705e9f499da1dc14597053c37d50502d, type: 2}
+  penaltyHope: 0
+  penaltyZoneId: 
+  failIfTargetZoneDies: 0
+  offerDialogue: {fileID: 11400000, guid: 796c134c50fffd046b4a2da9c268d363, type: 2}
+  inProgressDialogue: {fileID: 11400000, guid: 7fe2f59dd88fbae42b27ef4a28108bcc, type: 2}
+  completedDialogue: {fileID: 11400000, guid: de091ba23bd90434ca2e9f8f44e2741e, type: 2}
+  emotionalContext: "Pap\xE1 ya no est\xE1 para cont\xE1rmelo otra vez. Si tengo
+    su farolillo, por lo menos tengo algo que me lo recuerde.\nNo quiero que se me
+    olvide su voz."
+  progressNervousDialogue: {fileID: 11400000, guid: 2af5c718cbee45348ac5007a277b5585, type: 2}
+  progressReliefDialogue: {fileID: 0}

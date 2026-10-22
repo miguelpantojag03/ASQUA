@@ -62,9 +62,14 @@ MonoBehaviour:
   rewardHope: 15
   rewardHopeZoneId: Mercado
   rewardBond: 1
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 1
   offerDialogue: {fileID: 11400000, guid: 350a00a923e322c478d8513b77d264e1, type: 2}
   inProgressDialogue: {fileID: 11400000, guid: 937a05c211e4f5846a66513b7d1da541, type: 2}
   completedDialogue: {fileID: 11400000, guid: 6415e9f3da972e74fa7484c787b90bee, type: 2}
+  emotionalContext: "Llevo noches pregunt\xE1ndome si sirve de algo. Si el mercado
+    aguanta esta, sabr\xE9 que s\xED."
+  progressNervousDialogue: {fileID: 11400000, guid: 5cba6ec3049096c4fb376a2078a98cf1, type: 2}
+  progressReliefDialogue: {fileID: 11400000, guid: fe3204ba664769642919997f32150660, type: 2}

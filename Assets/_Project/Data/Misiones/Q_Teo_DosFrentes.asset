@@ -45,9 +45,14 @@ MonoBehaviour:
   rewardHope: 10
   rewardHopeZoneId: Mercado
   rewardBond: 1
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 1
   offerDialogue: {fileID: 11400000, guid: 9e166f80c5f5e634190c10d8a3ed5b51, type: 2}
   inProgressDialogue: {fileID: 11400000, guid: 38d8e3f17a1e8bb45ba73cc540c8c67b, type: 2}
   completedDialogue: {fileID: 11400000, guid: 7d6b00a5155aca04abf61001c9b1a880, type: 2}
+  emotionalContext: "Si pierdo el mercado, pierdo lo \xFAnico que s\xE9 hacer. Si
+    pierdo a Mina, pierdo algo peor."
+  progressNervousDialogue: {fileID: 11400000, guid: bca33c1e7698ed544accd446e61b670f, type: 2}
+  progressReliefDialogue: {fileID: 11400000, guid: 7af0e3d698cce2142b5dbabc55af77ad, type: 2}

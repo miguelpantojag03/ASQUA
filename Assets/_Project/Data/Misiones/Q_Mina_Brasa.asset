@@ -33,13 +33,26 @@ MonoBehaviour:
   deliverItemId: 
   deliverItemName: 
   deliverToNpcId: 
+  defeatZoneId: Plaza
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 45
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
   rewardEnergy: 20
   rewardHope: 0
   rewardHopeZoneId: 
   rewardBond: 2
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 1
   offerDialogue: {fileID: 11400000, guid: 260e412d796c66146968b382e64ad4ae, type: 2}
   inProgressDialogue: {fileID: 11400000, guid: 62e70b717fccd404caf9b198e169bb14, type: 2}
   completedDialogue: {fileID: 11400000, guid: c6e3283998c373c48bc0352b5533bf68, type: 2}
+  emotionalContext: "Brasa es lo \xFAltimo que me queda de cuando la plaza estaba
+    llena de gente.\nSi ella se apaga, ya no s\xE9 a qui\xE9n cuidar."
+  progressNervousDialogue: {fileID: 11400000, guid: ad8b9e543b99a3b45b5b6d5c37b61d96, type: 2}
+  progressReliefDialogue: {fileID: 11400000, guid: 9f9e7d27454248744a3af7ba7029bbce, type: 2}

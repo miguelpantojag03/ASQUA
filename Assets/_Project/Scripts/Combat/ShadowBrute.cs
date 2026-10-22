@@ -70,13 +70,19 @@ namespace Ascua.Combat
                 case Phase.Stalk:
                     ChasePlayer(walkSpeed, 1.2f);
                     TryContactDamage();
-                    if (distance < chargeTriggerDistance && cooldownTimer <= 0f) StartTelegraph();
+                    if (distance < chargeTriggerDistance && cooldownTimer <= 0f)
+                    {
+                        // Turnos: si ya atacan 2, espera medio segundo más acechando.
+                        if (RequestAttackTurn()) StartTelegraph();
+                        else cooldownTimer = 0.5f;
+                    }
                     break;
 
                 case Phase.Telegraph:
                     FacePlayer(dt, 6f);
                     // Se agacha y la franja crece: 0.8 s para leerlo y esquivar.
                     float t = Mathf.Clamp01(phaseTimer / telegraphTime);
+                    ShowWarning(t);
                     if (body != null) body.localScale = new Vector3(bodyBaseScale.x * (1f + 0.12f * t), bodyBaseScale.y * (1f - 0.18f * t), bodyBaseScale.z * (1f + 0.12f * t));
                     if (telegraphStripe != null) telegraphStripe.localScale = new Vector3(1f, 1f, chargeDistance * t);
                     if (phaseTimer >= telegraphTime)
@@ -143,6 +149,7 @@ namespace Ascua.Combat
             phaseTimer = 0f;
             cooldownTimer = chargeCooldown;
             if (telegraphStripe != null) telegraphStripe.gameObject.SetActive(false);
+            EndAttackTurn();
         }
 
         protected override void OnHit(HitInfo hit)

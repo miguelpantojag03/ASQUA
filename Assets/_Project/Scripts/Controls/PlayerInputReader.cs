@@ -40,6 +40,7 @@ namespace Ascua.Controls
         private InputAction dashAction;
         private InputAction attackAction;
         private InputAction abilityAction;
+        private InputAction lockOnAction;
 
         /// <summary>Movimiento normalizado (x = lateral, y = adelante).</summary>
         public Vector2 Move { get; private set; }
@@ -69,6 +70,8 @@ namespace Ascua.Controls
         public bool AttackReleased { get; private set; }
         /// <summary>Habilidad de Vínculo pulsada este frame (G / cruceta arriba).</summary>
         public bool AbilityPressed { get; private set; }
+        /// <summary>Fijar / soltar objetivo pulsado este frame (T / clic central / R3).</summary>
+        public bool LockOnPressed { get; private set; }
         /// <summary>
         /// Cerca de un NPC la tecla E sirve para hablar: mientras sea true, E no cambia el tamaño del Farol
         /// (Q y los bumpers siguen funcionando).
@@ -162,6 +165,11 @@ namespace Ascua.Controls
             // Esquivar: Ctrl izquierdo o botón B / Círculo.
             dashAction = gameplayMap.AddAction("Dash", InputActionType.Button, "<Keyboard>/leftCtrl");
             dashAction.AddBinding("<Gamepad>/buttonEast");
+
+            // Fijar objetivo en combate: T, clic central o pulsar el stick derecho (R3).
+            lockOnAction = gameplayMap.AddAction("LockOn", InputActionType.Button, "<Keyboard>/t");
+            lockOnAction.AddBinding("<Mouse>/middleButton");
+            lockOnAction.AddBinding("<Gamepad>/rightStickPress");
         }
 
         private void Update()
@@ -197,6 +205,7 @@ namespace Ascua.Controls
             AttackHeld = attackAction.IsPressed() && !cursorFree;
             AttackReleased = attackAction.WasReleasedThisFrame();
             AbilityPressed = abilityAction.WasPressedThisFrame();
+            LockOnPressed = lockOnAction.WasPressedThisFrame();
             RadiusDownPressed = radiusDownAction.WasPressedThisFrame();
 
             // La rueda se trata como pasos discretos (los valores crudos varían según plataforma).
@@ -235,6 +244,7 @@ namespace Ascua.Controls
             AttackHeld = false;
             AttackReleased = false;
             AbilityPressed = false;
+            LockOnPressed = false;
         }
     }
 }

@@ -49,6 +49,20 @@ namespace Ascua.Quests
         [TextArea(2, 3)] public string note;
     }
 
+    /// <summary>
+    /// Ánimo de quien dio la misión mientras está en curso (Parte D): decide qué diálogo de progreso se oye.
+    /// Lo calcula QuestManager.GetMood con el avance REAL (tiempo, Esperanza, margen de energía, progreso).
+    /// </summary>
+    public enum QuestMood
+    {
+        /// <summary>Ni bien ni mal: diálogo de progreso normal.</summary>
+        Normal,
+        /// <summary>Queda poco tiempo, la zona flojea o se acaba el margen: versión nerviosa.</summary>
+        Nerviosa,
+        /// <summary>Ya va por más de la mitad y sin apuros: versión aliviada.</summary>
+        Aliviada
+    }
+
     /// <summary>Estado de una misión durante la noche (vive en QuestManager, nunca en el asset).</summary>
     public enum QuestState
     {
@@ -140,6 +154,9 @@ namespace Ascua.Quests
         [Tooltip("Vínculo que gana el NPC que la dio (0-5 en total).")]
         public int rewardBond = 1;
 
+        [Tooltip("Página del Diario de Ilse que se desbloquea al completarla (opcional).")]
+        public DiaryPage rewardDiaryPage;
+
         [Header("Penalización (Tratos del Heraldo)")]
         public float penaltyHope;
         public string penaltyZoneId;
@@ -155,6 +172,15 @@ namespace Ascua.Quests
         public DialogueSequence inProgressDialogue;
         [Tooltip("Al entregarla (o justo después de elegir, en Diálogo/Trato).")]
         public DialogueSequence completedDialogue;
+
+        [Header("Contexto emocional (Parte D)")]
+        [Tooltip("1-2 frases de POR QUÉ le importa a quien la pide. Las dice justo antes de 'Aceptar / Ahora no'. " +
+                 "Una frase por línea. Vacío = no se añade nada.")]
+        [TextArea(2, 4)] public string emotionalContext;
+        [Tooltip("Progreso con apuros (poco tiempo, zona bajo el umbral, poco margen de energía). Vacío = el normal.")]
+        public DialogueSequence progressNervousDialogue;
+        [Tooltip("Progreso con más de la mitad hecha y sin apuros. Vacío = el normal.")]
+        public DialogueSequence progressReliefDialogue;
 
         /// <summary>Diálogo y Trato se completan en el momento de elegir, sin objetivo en el mundo.</summary>
         public bool CompletesOnChoice => type == QuestType.Dialogo || type == QuestType.TratoHeraldo;

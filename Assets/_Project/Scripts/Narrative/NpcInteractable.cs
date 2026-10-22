@@ -98,10 +98,12 @@ namespace Ascua.Narrative
             switch (quest.State)
             {
                 case QuestState.Disponible:
-                    runner.Play(quest.Data.offerDialogue, this, quest, speaker);
+                    // Oferta + 1-2 frases de por qué le importa (contexto emocional).
+                    runner.Play(QuestDialogues.Offer(quest, DisplayName), this, quest, speaker);
                     break;
                 case QuestState.Activa:
-                    runner.Play(quest.Data.inProgressDialogue != null ? quest.Data.inProgressDialogue : idleDialogue, this, quest, speaker);
+                    // Nerviosa, aliviada o normal según cómo vaya de verdad la misión.
+                    runner.Play(QuestDialogues.Progress(quest, idleDialogue), this, quest, speaker);
                     break;
                 case QuestState.PorEntregar:
                     runner.Play(quest.Data.completedDialogue, this, quest, speaker, turnInOnClose: true);

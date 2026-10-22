@@ -32,13 +32,26 @@ MonoBehaviour:
   deliverItemId: postal_abuela
   deliverItemName: la postal
   deliverToNpcId: mina
+  defeatZoneId: Plaza
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 45
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
   rewardEnergy: 15
   rewardHope: 10
   rewardHopeZoneId: Plaza
   rewardBond: 1
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 1
   offerDialogue: {fileID: 11400000, guid: 740676c169244a749a2275016d4fb019, type: 2}
   inProgressDialogue: {fileID: 11400000, guid: 31b9ec2eb301b014f86f83a45b97ed3f, type: 2}
   completedDialogue: {fileID: 11400000, guid: d33b8aaceaa53914da746758f3566a84, type: 2}
+  emotionalContext: "Esa mujer me fi\xF3 pan el a\xF1o que no vend\xED nada. Se lo
+    debo.\nY Mina necesita algo de su abuela m\xE1s que yo una caja llena de papeles."
+  progressNervousDialogue: {fileID: 11400000, guid: bd9d43a0700eee94f9baf55c12cbc79c, type: 2}
+  progressReliefDialogue: {fileID: 0}

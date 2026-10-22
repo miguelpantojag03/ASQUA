@@ -32,13 +32,26 @@ MonoBehaviour:
   deliverItemId: 
   deliverItemName: 
   deliverToNpcId: 
+  defeatZoneId: Plaza
+  defeatMoths: 3
+  defeatEchoes: 0
+  timeLimit: 45
+  holdGraceSeconds: 2
+  energyBudget: 0
+  escortDestinationName: 
+  conditions: []
   rewardEnergy: 15
   rewardHope: 10
   rewardHopeZoneId: Plaza
   rewardBond: 1
+  rewardDiaryPage: {fileID: 0}
   penaltyHope: 0
   penaltyZoneId: 
   failIfTargetZoneDies: 1
   offerDialogue: {fileID: 11400000, guid: f8dc7454c26e8c744a8205f3b88c0374, type: 2}
   inProgressDialogue: {fileID: 11400000, guid: 14076079d591b4a49a5b6f98339fce90, type: 2}
   completedDialogue: {fileID: 11400000, guid: 88a9c5d41453c4141842fbf34ea34b82, type: 2}
+  emotionalContext: "Mi abuela me prometi\xF3 que un d\xEDa ver\xEDamos el mar juntas.
+    Ella ya no puede.\nQuiero cumplirlo yo, aunque sea con Brasa."
+  progressNervousDialogue: {fileID: 11400000, guid: 3baa43f59056084448ec48613e7eb907, type: 2}
+  progressReliefDialogue: {fileID: 11400000, guid: 5bd852dda9e26d74cb478a50f9a2c666, type: 2}
