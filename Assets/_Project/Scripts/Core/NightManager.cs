@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using Ascua.AILevelGen;
 using Ascua.Characters;
 using Ascua.Controls;
+using Ascua.LevelGen;
 using Ascua.Quests;
 using Ascua.World;
 using UnityEngine;
@@ -51,6 +54,11 @@ namespace Ascua.Core
                  "se repite el último con la dificultad escalada (decayIncreasePerNight, una Polilla más por oleada).")]
         [SerializeField] private NightQuestSet[] laterNights;
 
+        [Header("Noches generadas (IA de niveles)")]
+        [Tooltip("Pasada la última noche diseñada a mano, cada noche nueva la genera AIDirector a partir del ADN de la Noche 1 " +
+                 "(banco de IA validado o reglas locales, siempre sin internet). Desmarcar = se repite la última noche diseñada.")]
+        [SerializeField] private bool generateNightsAfterAuthored = true;
+
         [Header("Noche")]
         [SerializeField] private int nightNumber = 1;
         [Tooltip("Duración de la noche en segundos (solo se usa tal cual en 'Personalizado').")]
@@ -65,6 +73,14 @@ namespace Ascua.Core
 
         public event Action<NightManager> NightStarted;
         public event Action<NightResult> NightEnded;
+
+        /// <summary>ADN del nivel que se está jugando (extraído del set o generado). Null si no hay set.</summary>
+        public LevelDNA CurrentDna { get; private set; }
+        /// <summary>Copia del ADN de la Noche 1 (BASE_DNA), para compararlo en el panel "Ver ADN".</summary>
+        public LevelDNA BaseDna { get; private set; }
+        /// <summary>El nivel generado de esta noche (null si la noche está diseñada a mano).</summary>
+        public AIDirector.GeneratedLevel GeneratedLevel { get; private set; }
+        public bool IsGeneratedNight => GeneratedLevel != null;
 
         public NightPacing Pacing => pacing;
         public NightQuestSet QuestSet => questSet;
@@ -82,13 +98,68 @@ namespace Ascua.Core
             if (playerInput == null) playerInput = FindFirstObjectByType<PlayerInputReader>();
             if (gameSession == null) gameSession = FindFirstObjectByType<GameSession>();
 
+            // Las noches diseñadas a mano se recogen ANTES de que questSet se reasigne.
+            List<NightQuestSet> authored = CollectAuthoredSets();
             questSet = SelectSetForNight(GameProgress.CurrentNight);
+            ResolveLevelDna(authored);
             if (questSet != null) ApplyQuestSet(questSet);
             else
             {
                 ApplyPacing();
                 nightNumber = Mathf.Max(nightNumber, GameProgress.CurrentNight);
             }
+        }
+
+        private List<NightQuestSet> CollectAuthoredSets()
+        {
+            List<NightQuestSet> list = new List<NightQuestSet>();
+            if (questSet != null) list.Add(questSet);
+            if (laterNights != null)
+            {
+                foreach (NightQuestSet set in laterNights)
+                {
+                    if (set != null && !list.Contains(set)) list.Add(set);
+                }
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Fija el ADN de esta noche. Si ya pasó la última noche diseñada a mano, AIDirector genera el nivel
+        /// (a partir de la Noche 1) y se juega ese set; si no, el ADN se extrae del set diseñado.
+        /// </summary>
+        private void ResolveLevelDna(List<NightQuestSet> authored)
+        {
+            if (authored.Count == 0) return;
+
+            NightQuestSet first = authored[0];
+            NightQuestSet last = authored[0];
+            List<Quest> pool = new List<Quest>();
+            foreach (NightQuestSet set in authored)
+            {
+                if (set.nightNumber < first.nightNumber) first = set;
+                if (set.nightNumber > last.nightNumber) last = set;
+                if (set.quests == null) continue;
+                foreach (Quest quest in set.quests)
+                {
+                    if (quest != null && !pool.Contains(quest)) pool.Add(quest);
+                }
+            }
+            BaseDna = AIDirector.GetBaseDna(first);
+
+            int night = GameProgress.CurrentNight;
+            if (generateNightsAfterAuthored && night > last.nightNumber)
+            {
+                AIDirector.GeneratedLevel level = AIDirector.GetOrGenerate(night, first, last, pool);
+                if (level != null && level.Set != null)
+                {
+                    GeneratedLevel = level;
+                    CurrentDna = level.Dna;
+                    questSet = level.Set;
+                    return;
+                }
+            }
+            CurrentDna = LevelDnaConverter.FromSet(questSet, questSet == first ? LevelDnaOrigin.Base : LevelDnaOrigin.Manual);
         }
 
         /// <summary>
@@ -218,6 +289,8 @@ namespace Ascua.Core
             }
 
             LastSummary = NightSummary.Capture(nightNumber, endedEarly);
+            // Solo números anónimos: de aquí sale la dificultad de las noches generadas.
+            PlayerProfileTracker.Record(LastSummary);
 
             // Pausa: se congela todo lo que usa Time.deltaTime; la UI usa tiempo sin escalar.
             Time.timeScale = 0f;

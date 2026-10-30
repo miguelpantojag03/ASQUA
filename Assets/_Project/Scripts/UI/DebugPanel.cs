@@ -50,6 +50,12 @@ namespace Ascua.UI
         {
             Keyboard keyboard = Keyboard.current;
             if (IsAllowed && keyboard != null && keyboard.f1Key.wasPressedThisFrame) SetVisible(!visible);
+            // F5 (solo con el panel abierto): salta a la noche siguiente. Sirve para probar las noches generadas.
+            if (IsAllowed && visible && keyboard != null && keyboard.f5Key.wasPressedThisFrame && NightManager.Instance != null)
+            {
+                NightManager.Instance.StartNextNight();
+                return;
+            }
 
             // Los FPS se miden siempre (es barato) para que el dato sea fiable al abrir el panel.
             fpsFrames++;
@@ -85,7 +91,7 @@ namespace Ascua.UI
             if (text == null) return;
             builder.Clear();
 
-            builder.Append("<b>DEBUG</b>  (F1 para ocultar)\n");
+            builder.Append("<b>DEBUG</b>  (F1 oculta · F5 salta de noche)\n");
             builder.Append("FPS: ").Append(Mathf.RoundToInt(fps)).Append("  (").Append((1000f / Mathf.Max(1f, fps)).ToString("0.0")).Append(" ms)\n");
 
             NightManager night = NightManager.Instance;
