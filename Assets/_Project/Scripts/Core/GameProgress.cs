@@ -56,6 +56,8 @@ namespace Ascua.Core
             flags.Clear();
             flagsThisNight.Clear();
             WavesDefended = 0;
+            // Partida nueva: se olvidan los niveles generados y el perfil del jugador (IA de niveles).
+            Ascua.AILevelGen.AIDirector.ResetAll();
         }
 
         public static void AdvanceNight()
