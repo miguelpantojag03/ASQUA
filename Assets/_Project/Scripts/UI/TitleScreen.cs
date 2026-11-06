@@ -10,7 +10,8 @@ namespace Ascua.UI
 {
     /// <summary>
     /// Pantalla de título: fundido de entrada, título "Ascua" que respira como una brasa,
-    /// deriva lenta de cámara sobre el skyline de Vesper y botones Jugar / Salir.
+    /// deriva lenta de cámara sobre el skyline de Vesper y botones Jugar / Continuar / Finales / Salir.
+    /// "Continuar" y "Finales" se crean por código copiando el botón Jugar (la escena no cambia).
     /// </summary>
     public class TitleScreen : MonoBehaviour
     {
@@ -38,11 +39,46 @@ namespace Ascua.UI
         private Quaternion cameraStartRotation;
         private bool loading;
 
+        // Creados por código (copias de playButton).
+        private Button continueButton;
+        private Button endingsButton;
+        private EndingGallery gallery;
+
         private void Awake()
         {
             if (playButton != null) playButton.onClick.AddListener(OnPlay);
             if (quitButton != null) quitButton.onClick.AddListener(OnQuit);
             if (cameraTransform == null && Camera.main != null) cameraTransform = Camera.main.transform;
+            BuildExtraButtons();
+        }
+
+        /// <summary>Añade "Continuar" y "Finales" y reparte los cuatro botones en columna.</summary>
+        private void BuildExtraButtons()
+        {
+            if (playButton == null) return;
+            Transform parent = playButton.transform.parent;
+
+            continueButton = EndingUi.CloneButton(playButton, parent, "Boton_Continuar", "Continuar");
+            continueButton.onClick.AddListener(OnContinue);
+            continueButton.gameObject.SetActive(SaveSystem.HasProgress);
+
+            endingsButton = EndingUi.CloneButton(playButton, parent, "Boton_Finales", "Finales");
+            endingsButton.onClick.AddListener(OnEndings);
+
+            SetAnchorY(playButton, 0.42f);
+            SetAnchorY(continueButton, 0.33f);
+            SetAnchorY(endingsButton, 0.24f);
+            SetAnchorY(quitButton, 0.15f);
+
+            // La galería usa la tipografía del título y el estilo de los botones.
+            if (titleText != null) gallery = new EndingGallery(transform, titleText, playButton);
+        }
+
+        private static void SetAnchorY(Button button, float y)
+        {
+            if (button == null) return;
+            RectTransform rect = (RectTransform)button.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, y);
         }
 
         private void Start()
@@ -55,10 +91,11 @@ namespace Ascua.UI
                 cameraStartRotation = cameraTransform.rotation;
             }
 
-            // Selección inicial para poder navegar con mando.
-            if (playButton != null && EventSystem.current != null)
+            // Selección inicial para poder navegar con mando (Continuar si hay partida guardada).
+            Button first = continueButton != null && continueButton.gameObject.activeSelf ? continueButton : playButton;
+            if (first != null && EventSystem.current != null)
             {
-                EventSystem.current.SetSelectedGameObject(playButton.gameObject);
+                EventSystem.current.SetSelectedGameObject(first.gameObject);
             }
 
             if (fadeGroup != null) StartCoroutine(Fade(1f, 0f));
@@ -86,10 +123,34 @@ namespace Ascua.UI
             if (loading) return;
             loading = true;
             // "Jugar" desde el título empieza una partida nueva: noche 1, sin mejoras ni Vínculos.
+            // Los finales vistos no se tocan: viven solo en SaveSystem.
             GameProgress.ResetAll();
             Ascua.Player.PlayerUpgrades.ResetAll();
+            Ascua.Quests.QuestManager.ClearPendingBonds();
             if (Ascua.Quests.QuestManager.Instance != null) Ascua.Quests.QuestManager.Instance.ResetAll();
             StartCoroutine(LoadGameplay());
+        }
+
+        /// <summary>"Continuar": restaura la partida guardada y carga la escena jugable.</summary>
+        private void OnContinue()
+        {
+            if (loading) return;
+            if (!SaveSystem.RestoreProgress())
+            {
+                // Sin partida válida: se oculta el botón y se vuelve a "Jugar".
+                continueButton.gameObject.SetActive(false);
+                if (playButton != null && EventSystem.current != null) EventSystem.current.SetSelectedGameObject(playButton.gameObject);
+                return;
+            }
+            loading = true;
+            StartCoroutine(LoadGameplay());
+        }
+
+        private void OnEndings()
+        {
+            if (loading || gallery == null) return;
+            EndingUi.Click();
+            gallery.Open(() => EndingUi.Select(endingsButton));
         }
 
         private void OnQuit()
@@ -105,6 +166,8 @@ namespace Ascua.UI
         {
             if (playButton != null) playButton.interactable = false;
             if (quitButton != null) quitButton.interactable = false;
+            if (continueButton != null) continueButton.interactable = false;
+            if (endingsButton != null) endingsButton.interactable = false;
             if (fadeGroup != null) yield return Fade(fadeGroup.alpha, 1f);
             SceneManager.LoadScene(gameplaySceneName);
         }
