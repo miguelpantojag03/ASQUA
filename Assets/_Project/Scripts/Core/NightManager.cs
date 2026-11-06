@@ -319,11 +319,13 @@ namespace Ascua.Core
         /// <summary>
         /// Pasa a la noche siguiente: avanza GameProgress y recarga la escena. Las mejoras elegidas
         /// (PlayerUpgrades), los Vínculos y las misiones ya cumplidas se conservan.
+        /// Aquí se guarda la partida en disco (guardado automático).
         /// </summary>
         public void StartNextNight()
         {
             Time.timeScale = 1f;
             GameProgress.AdvanceNight();
+            SaveSystem.SaveProgress();
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 

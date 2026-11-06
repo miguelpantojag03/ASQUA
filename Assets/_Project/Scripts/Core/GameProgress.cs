@@ -7,7 +7,7 @@ namespace Ascua.Core
     /// Progreso de la partida que sobrevive entre noches (y a recargar la escena):
     /// número de noche, misiones ya completadas, páginas del Diario, atajos descubiertos,
     /// Recuerdos con movimiento de combate y oleadas defendidas (que desbloquean la Vara de luz).
-    /// Las mejoras del Farol viven en PlayerUpgrades. Todo en memoria: en la Fase 4 se guardará en disco.
+    /// Las mejoras del Farol viven en PlayerUpgrades. SaveSystem lo guarda en disco con Snapshot() / Restore().
     /// </summary>
     public static class GameProgress
     {
@@ -134,5 +134,49 @@ namespace Ascua.Core
 
         /// <summary>True si el momento ya se vio (sin marcarlo).</summary>
         public static bool HasSeenMoment(string id) => seenMoments.Contains(id);
+
+        // ================================================================== Guardado (SaveSystem)
+
+        /// <summary>Copia del progreso para guardarla en disco.</summary>
+        public static GameProgressData Snapshot()
+        {
+            return new GameProgressData
+            {
+                currentNight = CurrentNight,
+                tutorialPending = TutorialPending,
+                completedQuests = new List<string>(completedQuests),
+                foundPages = new List<string>(foundPages),
+                shortcuts = new List<string>(discoveredShortcuts),
+                seenMoments = new List<string>(seenMoments),
+                recuerdos = new List<string>(recuerdos),
+                flags = new List<string>(flags),
+                wavesDefended = WavesDefended
+            };
+        }
+
+        /// <summary>Vuelve al progreso guardado (empieza desde una partida limpia y copia los datos).</summary>
+        public static void Restore(GameProgressData data)
+        {
+            ResetAll();
+            if (data == null) return;
+            CurrentNight = Mathf.Max(1, data.currentNight);
+            TutorialPending = data.tutorialPending;
+            WavesDefended = Mathf.Max(0, data.wavesDefended);
+            CopyInto(data.completedQuests, completedQuests);
+            CopyInto(data.foundPages, foundPages);
+            CopyInto(data.shortcuts, discoveredShortcuts);
+            CopyInto(data.seenMoments, seenMoments);
+            CopyInto(data.recuerdos, recuerdos);
+            CopyInto(data.flags, flags);
+        }
+
+        private static void CopyInto(List<string> source, HashSet<string> target)
+        {
+            if (source == null) return;
+            foreach (string id in source)
+            {
+                if (!string.IsNullOrEmpty(id)) target.Add(id);
+            }
+        }
     }
 }

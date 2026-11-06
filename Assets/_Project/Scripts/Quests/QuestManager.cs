@@ -67,6 +67,70 @@ namespace Ascua.Quests
             Instance = this;
             if (transform.parent != null) transform.SetParent(null);
             DontDestroyOnLoad(gameObject);
+
+            // "Continuar" desde el título: los Vínculos guardados esperaban a que existiera el gestor.
+            if (pendingBonds != null)
+            {
+                RestoreBonds(pendingBonds);
+                pendingBonds = null;
+            }
+        }
+
+        // ================================================================== Guardado (SaveSystem)
+
+        // Vínculos cargados en el título, donde QuestManager aún no existe (solo vive en la escena Plaza).
+        private static List<BondEntry> pendingBonds;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            pendingBonds = null;
+        }
+
+        /// <summary>
+        /// Aplica Vínculos guardados: al momento si el gestor ya existe; si no, quedan pendientes
+        /// y se aplican en su Awake.
+        /// </summary>
+        public static void LoadBonds(List<BondEntry> saved)
+        {
+            if (Instance != null)
+            {
+                // El gestor sigue vivo de una partida anterior: se limpia antes de cargar.
+                Instance.ResetAll();
+                Instance.RestoreBonds(saved);
+            }
+            else pendingBonds = saved != null ? new List<BondEntry>(saved) : new List<BondEntry>();
+        }
+
+        /// <summary>Partida nueva: se descartan los Vínculos pendientes de "Continuar".</summary>
+        public static void ClearPendingBonds() => pendingBonds = null;
+
+        /// <summary>Vínculos actuales para guardar (los pendientes si el gestor aún no existe).</summary>
+        public static List<BondEntry> GetBondsForSave()
+        {
+            if (Instance != null) return Instance.SnapshotBonds();
+            return pendingBonds != null ? new List<BondEntry>(pendingBonds) : new List<BondEntry>();
+        }
+
+        /// <summary>Copia de los Vínculos (los diccionarios no se guardan con JsonUtility).</summary>
+        public List<BondEntry> SnapshotBonds()
+        {
+            List<BondEntry> list = new List<BondEntry>();
+            foreach (KeyValuePair<string, int> pair in bonds) list.Add(new BondEntry(pair.Key, pair.Value));
+            return list;
+        }
+
+        /// <summary>Sustituye los Vínculos por los guardados (sin celebraciones ni avisos).</summary>
+        public void RestoreBonds(List<BondEntry> saved)
+        {
+            bonds.Clear();
+            bondsAtNightStart.Clear();
+            if (saved == null) return;
+            foreach (BondEntry entry in saved)
+            {
+                if (entry == null || string.IsNullOrEmpty(entry.npcId)) continue;
+                bonds[entry.npcId] = Mathf.Clamp(entry.value, 0, MaxBond);
+            }
         }
 
         private void OnEnable()
