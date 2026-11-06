@@ -2,7 +2,9 @@ using System.Text;
 using Ascua.AILevelGen;
 using Ascua.Audio;
 using Ascua.Core;
+using Ascua.Endings;
 using Ascua.LevelGen;
+using Ascua.Narrative;
 using Ascua.Player;
 using TMPro;
 using UnityEngine;
@@ -17,6 +19,7 @@ namespace Ascua.UI
     ///  2) Elegir 1 de 3 mejoras del Farol (PlayerUpgrades), que se conserva en las noches siguientes.
     ///  3) Siguiente noche · Modo foto · Reintentar · Título.
     /// Si Vesper se apagó entera no hay mejora: solo reintentar o volver.
+    /// En la última noche (NightManager.FinalNight) no hay mejoras ni "Siguiente noche": aparece "Ver el final".
     /// </summary>
     public class NightSummaryPanel : MonoBehaviour
     {
@@ -49,6 +52,11 @@ namespace Ascua.UI
         private CanvasGroup dnaViewer;
         private TMP_Text dnaText;
 
+        // Final de la partida (también por código): botón "Ver el final" y pantalla de final.
+        private Button endingButton;
+        private EndingScreen endingScreen;
+        private NightResult lastResult;
+
         private void Awake()
         {
             if (night == null) night = FindFirstObjectByType<NightManager>();
@@ -64,6 +72,7 @@ namespace Ascua.UI
             SetVisible(group, 0f);
             SetVisible(upgradeGroup, 0f);
             BuildDnaUi();
+            BuildEndingUi();
         }
 
         private void OnEnable()
@@ -87,7 +96,9 @@ namespace Ascua.UI
         {
             showing = true;
             upgradeChosen = false;
+            lastResult = result;
             bool survived = result.ZonesSaved > 0;
+            bool isFinalNight = IsFinal;
 
             if (titleText != null) titleText.text = survived ? "Amanece en Vesper" : "Vesper se apagó";
 
@@ -107,12 +118,17 @@ namespace Ascua.UI
                 (string title, string description) = PlayerUpgrades.Describe(Offer[i]);
                 upgradeLabels[i].text = "<b>" + title + "</b>\n<size=75%>" + description + "</size>";
             }
-            SetVisible(upgradeGroup, survived ? 1f : 0f);
+            // En la última noche no hay mejoras: se ve el final (también si Vesper se apagó: Ceniza).
+            SetVisible(upgradeGroup, survived && !isFinalNight ? 1f : 0f);
             SetActive(nextNightButton, false);
             SetActive(photoButton, true);
+            SetActive(endingButton, isFinalNight);
 
-            Select(survived && upgradeButtons != null && upgradeButtons.Length > 0 ? upgradeButtons[0] : retryButton);
+            if (isFinalNight) Select(endingButton);
+            else Select(survived && upgradeButtons != null && upgradeButtons.Length > 0 ? upgradeButtons[0] : retryButton);
         }
+
+        private bool IsFinal => night != null && night.IsFinalNight;
 
         private void ChooseUpgrade(int index)
         {
@@ -143,8 +159,38 @@ namespace Ascua.UI
             PhotoMode.Instance.Enter(() =>
             {
                 SetVisible(summary, 1f);
-                Select(upgradeChosen ? nextNightButton : retryButton);
+                Select(IsFinal ? endingButton : upgradeChosen ? nextNightButton : retryButton);
             });
+        }
+
+        // ================================================================== Final de la partida
+
+        private void BuildEndingUi()
+        {
+            if (group == null || bodyText == null) return;
+            Button template = nextNightButton != null ? nextNightButton : photoButton;
+            if (template == null) return;
+
+            // Botón: copia de "Siguiente noche" (mismo estilo y mismo sitio, que en la última noche queda libre).
+            endingButton = EndingUi.CloneButton(template, template.transform.parent, "Boton_VerFinal", "Ver el final");
+            endingButton.onClick.AddListener(OnShowEnding);
+            endingButton.gameObject.SetActive(false);
+
+            TMP_Text titleTemplate = titleText != null ? titleText : bodyText;
+            endingScreen = EndingScreen.Create(group.transform, titleTemplate, bodyText, template, OnTitle);
+        }
+
+        private void OnShowEnding()
+        {
+            Click();
+            if (endingScreen == null) return;
+
+            EndingInput input = EndingContext.Collect(night != null ? night.LastSummary : null, lastResult);
+            EndingInfo ending = EndingContext.Resolve(input);
+            SaveSystem.MarkEndingSeen(ending.SaveKey);
+
+            group.interactable = false;   // el teclado y el mando no deben "caer" en los botones de debajo
+            endingScreen.Show(ending, EndingContext.CompanionLines(input));
         }
 
         // ================================================================== Ver ADN del nivel

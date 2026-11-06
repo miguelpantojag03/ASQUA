@@ -67,6 +67,10 @@ namespace Ascua.Core
         [SerializeField] private bool endWhenAllZonesDead = true;
         [SerializeField] private string titleSceneName = "Title";
 
+        [Header("Final de la partida")]
+        [Tooltip("Al terminar esta noche (o una posterior) no hay mejoras ni 'Siguiente noche': se muestra el final.")]
+        [SerializeField] private int finalNight = 5;
+
         [Header("Referencias (se buscan solas si están vacías)")]
         [SerializeField] private PlayerInputReader playerInput;
         [SerializeField] private GameSession gameSession;
@@ -90,6 +94,9 @@ namespace Ascua.Core
         public float Remaining => Mathf.Max(0f, nightDuration - Elapsed);
         public float Progress01 => Mathf.Clamp01(Elapsed / nightDuration);
         public bool IsRunning { get; private set; }
+        public int FinalNight => finalNight;
+        /// <summary>True en la última noche: al terminarla se ve el final.</summary>
+        public bool IsFinalNight => nightNumber >= finalNight;
 
         private void Awake()
         {
