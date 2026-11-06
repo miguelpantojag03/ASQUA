@@ -63,6 +63,29 @@ namespace Ascua.Player
             Changed?.Invoke();
         }
 
+        /// <summary>Copia de las mejoras para guardarla en disco.</summary>
+        public static Ascua.Core.UpgradesData Snapshot()
+        {
+            return new Ascua.Core.UpgradesData
+            {
+                chosen = new List<UpgradeType>(chosen),
+                largeLanternUnlocked = LargeLanternUnlocked
+            };
+        }
+
+        /// <summary>Vuelve a las mejoras guardadas.</summary>
+        public static void Restore(Ascua.Core.UpgradesData data)
+        {
+            chosen.Clear();
+            LargeLanternUnlocked = false;
+            if (data != null)
+            {
+                if (data.chosen != null) chosen.AddRange(data.chosen);
+                LargeLanternUnlocked = data.largeLanternUnlocked;
+            }
+            Changed?.Invoke();
+        }
+
         public static int Count(UpgradeType upgrade)
         {
             int n = 0;
