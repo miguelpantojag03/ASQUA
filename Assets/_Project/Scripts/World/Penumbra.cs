@@ -1,4 +1,5 @@
 using Ascua.Core;
+using Ascua.Player;
 using UnityEngine;
 
 namespace Ascua.World
@@ -90,7 +91,8 @@ namespace Ascua.World
                 ? NightManager.Instance.Progress01
                 : Mathf.Clamp01(Time.timeSinceLevelLoad / fallbackDuration);
 
-            Advance = Mathf.Clamp01(advanceCurve.Evaluate(progress));
+            // Recuerdo "Reloj de Nadir": la Penumbra recorre su curva un 15% más lenta.
+            Advance = Mathf.Clamp01(advanceCurve.Evaluate(progress * PlayerUpgrades.PenumbraSpeedMultiplier));
             // La ráfaga (PenumbraSurge) empuja el muro unos metros más hacia dentro durante unos segundos.
             currentRadius = Mathf.Max(endRadius * 0.6f, Mathf.Lerp(startRadius, endRadius, Advance) - surgeOffset);
 
