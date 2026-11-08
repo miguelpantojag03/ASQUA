@@ -178,8 +178,36 @@ namespace Ascua.World
             onExtinguished?.Invoke();
         }
 
+        private float endingGlow = -1f;
+        private Color endingColor;
+
+        /// <summary>
+        /// Brillo fijo para la secuencia del final (el juego está en pausa y el Update normal no avanza):
+        /// amount 0-1 de la emisión completa en el color dado. Ignora bloqueo, Penumbra y Esperanza.
+        /// </summary>
+        public void SetEndingGlow(Color color, float amount)
+        {
+            endingColor = color;
+            endingGlow = Mathf.Clamp01(amount);
+            ApplyVisuals();
+        }
+
         private void ApplyVisuals()
         {
+            if (endingGlow >= 0f)
+            {
+                windowRenderer.GetPropertyBlock(propertyBlock ??= new MaterialPropertyBlock());
+                propertyBlock.SetColor(EmissionColorId, endingColor * (litEmissionIntensity * endingGlow));
+                windowRenderer.SetPropertyBlock(propertyBlock);
+                if (glowLight != null)
+                {
+                    glowLight.color = endingColor;
+                    glowLight.intensity = glowLightIntensity * endingGlow;
+                    glowLight.enabled = endingGlow > 0.001f;
+                }
+                return;
+            }
+
             // Lerp suavizado entre la pista de carga y la emisión completa.
             float eased = level * level * (3f - 2f * level);
             float alive = 1f + (Mathf.PerlinNoise(Time.time * 1.3f, noiseSeed) - 0.5f) * 0.06f;
