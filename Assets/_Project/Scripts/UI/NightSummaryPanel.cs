@@ -203,6 +203,7 @@ namespace Ascua.UI
             SaveSystem.MarkEndingSeen(ending.SaveKey);
 
             group.interactable = false;   // el teclado y el mando no deben "caer" en los botones de debajo
+            showing = false;              // la escena del final oculta el resumen: Update no debe volver a mostrarlo
             endingScreen.Show(ending, EndingContext.CompanionLines(input));
         }
 
