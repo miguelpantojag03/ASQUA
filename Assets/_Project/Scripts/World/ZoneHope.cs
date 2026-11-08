@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Ascua.Lighting;
+using Ascua.Player;
 using UnityEngine;
 
 namespace Ascua.World
@@ -11,6 +12,8 @@ namespace Ascua.World
     /// está dentro de la zona y baja cuando nadie la ilumina; la Penumbra acelera la caída.
     /// Las ventanas y farolas de la zona se encienden por umbrales: a más Esperanza, más luces.
     /// Si llega a 0 la zona muere: todo se apaga y queda bloqueado hasta la siguiente noche.
+    /// Recuerdos: "Libro de Amelia" (+5 al empezar la noche) y "Última vela" (una vez por partida,
+    /// la primera zona que fuera a apagarse se queda en 10).
     /// </summary>
     public class ZoneHope : MonoBehaviour
     {
@@ -132,7 +135,7 @@ namespace Ascua.World
 
         private void Start()
         {
-            hope = Mathf.Clamp(startHope, 0f, maxHope);
+            hope = Mathf.Clamp(startHope + PlayerUpgrades.StartHopeBonus, 0f, maxHope);
             hopeLevel = Mathf.FloorToInt(hope / maxHope * 4f + 0.001f);
             GlobalDecayMultiplier = 1f;
             CollectLights();
@@ -170,6 +173,12 @@ namespace Ascua.World
         private void SetHope(float value)
         {
             float clamped = Mathf.Clamp(value, 0f, maxHope);
+            // Última vela: la primera zona que iba a apagarse en la partida se queda en 10.
+            if (clamped <= 0f && PlayerUpgrades.TryUseUltimaVela())
+            {
+                clamped = RecuerdoRules.UltimaVelaHope;
+                Debug.Log("[Recuerdos] La Última vela sostiene " + displayName + " en " + clamped + " de Esperanza.");
+            }
             if (Mathf.Approximately(clamped, hope)) return;
 
             hope = clamped;

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Ascua.Player;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -8,6 +9,7 @@ namespace Ascua.World
     /// Pool de velas de Teo (habilidad de Vínculo). Las velas son PickupItem de tipo Vela que existen
     /// en la escena desactivados; con la habilidad activa, cada intervalo aparece una en un punto
     /// caminable de El Mercado, y Ilse la recoge con E (energía + Esperanza para el Mercado).
+    /// Recuerdo "Carrito de Teo": el intervalo se divide entre 1.3 (velas un 30% más seguido).
     /// </summary>
     public class CandleSpawner : MonoBehaviour
     {
@@ -51,7 +53,7 @@ namespace Ascua.World
 
             if (!spawning) return;
             timer += Time.deltaTime;
-            if (timer < interval) return;
+            if (timer < interval * PlayerUpgrades.CandleIntervalMultiplier) return;
 
             int free = candles.FindIndex(c => !c.gameObject.activeSelf);
             if (free < 0) return;
