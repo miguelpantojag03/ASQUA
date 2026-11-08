@@ -9,8 +9,9 @@ using UnityEngine.UI;
 namespace Ascua.UI
 {
     /// <summary>
-    /// Pantalla de final a pantalla completa: título del final, epílogo línea a línea y una línea
-    /// por cada personaje con Vínculo alto. Después, "Galería de finales" y "Volver al título".
+    /// Pantalla de final a pantalla completa. Primero la escena del final (EndingSequence: cámara sobre
+    /// la ciudad, tono, farolillos y música, ~20 s); después título, epílogo línea a línea y una línea
+    /// por cada personaje con Vínculo alto. Al final, "Galería de finales" y "Volver al título".
     /// El juego está en pausa (timeScale = 0): todo usa Time.unscaledDeltaTime.
     /// Se construye por código con EndingScreen.Create (sin tocar escenas ni prefabs).
     /// </summary>
@@ -27,6 +28,8 @@ namespace Ascua.UI
         private Button galleryButton;
         private Button titleButton;
         private EndingGallery gallery;
+        private EndingSequence sequence;
+        private EndingInfo pendingInfo;
         private Action onReturnToTitle;
 
         private readonly List<string> lines = new List<string>();
@@ -65,27 +68,41 @@ namespace Ascua.UI
 
             // La galería va en el mismo panel, por encima de esta pantalla al abrirse.
             gallery = new EndingGallery(transform.parent, bodyTemplate, buttonTemplate);
+
+            // Escena del final (cámara, tono, farolillos y música) antes del epílogo.
+            sequence = EndingSequence.Create(gameObject, GetComponent<Image>(), bodyTemplate);
             SetButtonsVisible(false);
         }
 
-        /// <summary>Muestra el final y empieza a revelar el epílogo.</summary>
+        /// <summary>Muestra el final: primero la escena (EndingSequence) y después el epílogo línea a línea.</summary>
         public void Show(EndingInfo info, List<string> companionLines)
         {
-            titleText.text = info.Name + "\n<size=45%><i>" + info.ShortTitle + "</i></size>";
-
+            pendingInfo = info;
             lines.Clear();
             lines.AddRange(info.Epilogue);
             companionStart = lines.Count;
             if (companionLines != null) lines.AddRange(companionLines);
 
-            shown = lines.Count > 0 ? 1 : 0;
-            timer = 0f;
-            revealing = true;
-            bodyText.text = BuildBody();
+            titleText.text = "";
+            bodyText.text = "";
+            revealing = false;
 
             transform.SetAsLastSibling();
             EndingUi.SetVisible(overlay, true);
             SetButtonsVisible(false);
+
+            if (sequence != null) sequence.Play(info.Id, BeginReveal);
+            else BeginReveal();
+        }
+
+        /// <summary>Empieza a revelar el título y el epílogo (al terminar la escena del final).</summary>
+        private void BeginReveal()
+        {
+            titleText.text = pendingInfo.Name + "\n<size=45%><i>" + pendingInfo.ShortTitle + "</i></size>";
+            shown = lines.Count > 0 ? 1 : 0;
+            timer = 0f;
+            revealing = true;
+            bodyText.text = BuildBody();
         }
 
         private void Update()
