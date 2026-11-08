@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Ascua.Player;
 
 namespace Ascua.Core
 {
@@ -60,11 +59,5 @@ namespace Ascua.Core
         }
     }
 
-    /// <summary>Copia de PlayerUpgrades: mejoras elegidas y el Farol grande.</summary>
-    [Serializable]
-    public class UpgradesData
-    {
-        public List<UpgradeType> chosen = new List<UpgradeType>();
-        public bool largeLanternUnlocked;
-    }
+    // UpgradesData (copia de PlayerUpgrades) vive en Player/Recuerdos/UpgradesData.cs (ensamblado Ascua.Recuerdos).
 }
