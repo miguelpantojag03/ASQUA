@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using Ascua.AILevelGen;
 using Ascua.Audio;
@@ -16,7 +17,8 @@ namespace Ascua.UI
     /// <summary>
     /// Pantalla al terminar la noche:
     ///  1) Resumen (NightSummary): zonas salvadas/perdidas, misiones y Vínculos.
-    ///  2) Elegir 1 de 3 mejoras del Farol (PlayerUpgrades), que se conserva en las noches siguientes.
+    ///  2) Elegir 1 de 3 Recuerdos (PlayerUpgrades), al azar entre los que aún no se eligieron; se conserva
+    ///     en las noches siguientes. Si ya no queda ninguno, se salta la elección.
     ///  3) Siguiente noche · Modo foto · Reintentar · Título.
     /// Si Vesper se apagó entera no hay mejora: solo reintentar o volver.
     /// En la última noche (NightManager.FinalNight) no hay mejoras ni "Siguiente noche": aparece "Ver el final".
@@ -40,7 +42,8 @@ namespace Ascua.UI
         [SerializeField] private Button nextNightButton;
         [SerializeField] private Button photoButton;
 
-        private static readonly UpgradeType[] Offer = { UpgradeType.RadioAmplio, UpgradeType.Eficiencia, UpgradeType.Regeneracion };
+        /// <summary>Recuerdos ofrecidos esta noche (0 a 3, sin repetir los ya elegidos).</summary>
+        private List<UpgradeType> offer = new List<UpgradeType>();
 
         private bool showing;
         private bool upgradeChosen;
@@ -112,33 +115,43 @@ namespace Ascua.UI
             }
             if (dnaButton != null) dnaButton.gameObject.SetActive(night != null && night.CurrentDna != null);
 
-            // Mejoras solo si amaneció.
-            for (int i = 0; upgradeLabels != null && i < upgradeLabels.Length && i < Offer.Length; i++)
+            // Recuerdos solo si amaneció: hasta 3 al azar entre los que aún no se eligieron.
+            offer = PlayerUpgrades.OfferForNight(result.NightNumber);
+            for (int i = 0; upgradeButtons != null && i < upgradeButtons.Length; i++)
             {
-                (string title, string description) = PlayerUpgrades.Describe(Offer[i]);
+                bool offered = i < offer.Count;
+                SetActive(upgradeButtons[i], offered);
+                if (!offered || upgradeLabels == null || i >= upgradeLabels.Length) continue;
+                (string title, string description) = PlayerUpgrades.Describe(offer[i]);
                 upgradeLabels[i].text = "<b>" + title + "</b>\n<size=75%>" + description + "</size>";
             }
-            // En la última noche no hay mejoras: se ve el final (también si Vesper se apagó: Ceniza).
-            SetVisible(upgradeGroup, survived && !isFinalNight ? 1f : 0f);
-            SetActive(nextNightButton, false);
+
+            // En la última noche no hay Recuerdos: se ve el final (también si Vesper se apagó: Ceniza).
+            bool canChoose = survived && !isFinalNight && offer.Count > 0 && upgradeButtons != null && upgradeButtons.Length > 0;
+            // Ya se eligieron los 7: se salta la elección y se pasa directo a "Siguiente noche".
+            bool skipChoice = survived && !isFinalNight && offer.Count == 0;
+            upgradeChosen = skipChoice;
+            SetVisible(upgradeGroup, canChoose ? 1f : 0f);
+            SetActive(nextNightButton, skipChoice);
             SetActive(photoButton, true);
             SetActive(endingButton, isFinalNight);
 
             if (isFinalNight) Select(endingButton);
-            else Select(survived && upgradeButtons != null && upgradeButtons.Length > 0 ? upgradeButtons[0] : retryButton);
+            else if (skipChoice) Select(nextNightButton);
+            else Select(canChoose ? upgradeButtons[0] : retryButton);
         }
 
         private bool IsFinal => night != null && night.IsFinalNight;
 
         private void ChooseUpgrade(int index)
         {
-            if (upgradeChosen || index < 0 || index >= Offer.Length) return;
+            if (upgradeChosen || index < 0 || index >= offer.Count) return;
             upgradeChosen = true;
-            PlayerUpgrades.Choose(Offer[index]);
+            PlayerUpgrades.Choose(offer[index]);
             Click();
 
-            (string title, _) = PlayerUpgrades.Describe(Offer[index]);
-            if (bodyText != null) bodyText.text += "\n\n<color=#FFC46B>Mejora elegida: " + title + "</color>";
+            (string title, _) = PlayerUpgrades.Describe(offer[index]);
+            if (bodyText != null) bodyText.text += "\n\n<color=#FFC46B>Recuerdo elegido: " + title + "</color>";
             SetVisible(upgradeGroup, 0f);
             SetActive(nextNightButton, true);
             Select(nextNightButton);
