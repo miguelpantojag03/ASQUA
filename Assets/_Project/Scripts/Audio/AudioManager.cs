@@ -233,6 +233,29 @@ namespace Ascua.Audio
 
         // ================================================================== Música adaptativa
 
+        // Secuencia del final (EndingSequence): capa de esperanza y volumen de música fijados a mano.
+        private bool endingMusic;
+        private float endingHope;
+        private float endingVolumeTarget = 1f;
+        private float endingVolume = 1f;
+
+        /// <summary>
+        /// Música del final: hope = capa de esperanza (0-1) y volume = volumen de toda la música
+        /// (0 = silencio). Las transiciones son suaves (unos 2 s) y usan tiempo sin escalar.
+        /// </summary>
+        public void SetEndingMusic(float hope, float volume)
+        {
+            endingMusic = true;
+            endingHope = Mathf.Clamp01(hope);
+            endingVolumeTarget = Mathf.Clamp01(volume);
+        }
+
+        /// <summary>Vuelve a la música adaptativa normal.</summary>
+        public void ClearEndingMusic()
+        {
+            endingMusic = false;
+        }
+
         private void UpdateLayers(float dt)
         {
             // Esperanza media de las zonas vivas (0-1).
@@ -252,14 +275,23 @@ namespace Ascua.Audio
             if (Heraldo_AI.Instance != null) heraldo = Mathf.Clamp01(1f - (Heraldo_AI.Instance.DistanceToPlayer - 4f) / 18f);
             // Tensión: Heraldo cerca, ráfaga de la Penumbra u oleada de sombras.
             float tension = Mathf.Max(heraldo, surgeActive ? 1f : waveActive ? 0.85f : 0f);
+            float hopeTarget = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.3f, 0.85f, hope));
+
+            // Secuencia del final: manda la capa de esperanza pedida y no hay tensión.
+            if (endingMusic)
+            {
+                hopeTarget = endingHope;
+                tension = 0f;
+            }
+            endingVolume = Mathf.MoveTowards(endingVolume, endingMusic ? endingVolumeTarget : 1f, dt * 0.5f);
 
             float k = 1f - Mathf.Exp(-layerSmoothing * dt);
-            hopeLayer = Mathf.Lerp(hopeLayer, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.3f, 0.85f, hope)), k);
+            hopeLayer = Mathf.Lerp(hopeLayer, hopeTarget, k);
             tensionLayer = Mathf.Lerp(tensionLayer, tension, k * 1.5f);
             momentBoost = Mathf.MoveTowards(momentBoost, 0f, dt * 0.25f);
 
             // Con Audio Mixer el volumen del jugador lo aplica el mixer (dB); sin él, se aplica aquí.
-            float music = musicLevel * (mixer != null ? 1f : musicVolume);
+            float music = musicLevel * (mixer != null ? 1f : musicVolume) * endingVolume;
             baseSource.volume = music * Mathf.Lerp(0.8f, 0.55f, tensionLayer) * (1f + momentBoost * 0.3f);
             hopeSource.volume = music * Mathf.Max(hopeLayer * (1f - tensionLayer * 0.6f), momentBoost);
             tensionSource.volume = music * tensionLayer * 0.9f;
