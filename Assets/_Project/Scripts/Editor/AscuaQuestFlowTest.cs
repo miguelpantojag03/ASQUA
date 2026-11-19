@@ -94,6 +94,9 @@ namespace Ascua.EditorTools
             // La Cacería del Heraldo movería al Heraldo en mitad de los pasos guionizados: aquí se desactiva.
             HeraldoHuntDirector hunts = HeraldoHuntDirector.Instance;
             if (hunts != null && hunts.ScheduledCount > 0) hunts.Configure(0, hunts.HuntSpeed);
+            // Igual con el evento de la noche 3-5 (la prueba llega a la Noche 3): se prueba aparte con F7.
+            NightEventDirector nightEvent = NightEventDirector.Instance;
+            if (nightEvent != null && nightEvent.enabled && !nightEvent.IsPlaying) nightEvent.enabled = false;
 
             frameTimes.Add(Time.unscaledDeltaTime * 1000f);
 

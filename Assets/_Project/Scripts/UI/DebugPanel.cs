@@ -2,6 +2,7 @@ using System.Text;
 using Ascua.Characters;
 using Ascua.Combat;
 using Ascua.Core;
+using Ascua.Narrative;
 using Ascua.World;
 using TMPro;
 using UnityEngine;
@@ -59,6 +60,8 @@ namespace Ascua.UI
             }
             // F6 (solo con el panel abierto): lanza una Cacería del Heraldo ahora (con su aviso).
             if (IsAllowed && visible && keyboard != null && keyboard.f6Key.wasPressedThisFrame) StartHuntNow();
+            // F7 (solo con el panel abierto): dispara ya el evento memorable de esta noche (3, 4 o 5).
+            if (IsAllowed && visible && keyboard != null && keyboard.f7Key.wasPressedThisFrame) StartNightEventNow();
 
             // Los FPS se miden siempre (es barato) para que el dato sea fiable al abrir el panel.
             fpsFrames++;
@@ -75,6 +78,20 @@ namespace Ascua.UI
             if (refreshTimer < refreshInterval) return;
             refreshTimer = 0f;
             Refresh();
+        }
+
+        private static void StartNightEventNow()
+        {
+            NightEventDirector director = NightEventDirector.Instance;
+            if (director == null)
+            {
+                Debug.Log("[Debug] F7: esta noche no tiene evento propio (solo las noches 3, 4 y 5).");
+                return;
+            }
+            bool started = director.TriggerNow();
+            Debug.Log(started
+                ? "[Debug] F7: evento '" + director.EventId + "' iniciado."
+                : "[Debug] F7: ahora no puede empezar (diálogo, oleada, Cacería, pausa u otro momento en curso).");
         }
 
         private static void StartHuntNow()
@@ -108,7 +125,7 @@ namespace Ascua.UI
             if (text == null) return;
             builder.Clear();
 
-            builder.Append("<b>DEBUG</b>  (F1 oculta · F5 salta de noche · F6 cacería)\n");
+            builder.Append("<b>DEBUG</b>  (F1 oculta · F5 salta de noche · F6 cacería · F7 evento)\n");
             builder.Append("FPS: ").Append(Mathf.RoundToInt(fps)).Append("  (").Append((1000f / Mathf.Max(1f, fps)).ToString("0.0")).Append(" ms)\n");
 
             NightManager night = NightManager.Instance;
@@ -133,6 +150,13 @@ namespace Ascua.UI
                 else builder.Append(zone.Hope.ToString("0.0")).Append(zone.IsIlluminated ? " (iluminada)" : "")
                             .Append(" · Penumbra ").Append(Mathf.RoundToInt(zone.PenumbraOverlap * 100f)).Append('%');
                 builder.Append('\n');
+            }
+
+            NightEventDirector nightEvent = NightEventDirector.Instance;
+            if (nightEvent != null)
+            {
+                builder.Append("Evento: ").Append(nightEvent.EventId)
+                       .Append(nightEvent.IsPlaying ? " · EN CURSO" : nightEvent.HasPlayed ? " · visto" : " · pendiente").Append('\n');
             }
 
             HeraldoHuntDirector hunts = HeraldoHuntDirector.Instance;
