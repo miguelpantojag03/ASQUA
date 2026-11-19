@@ -78,7 +78,16 @@ namespace Ascua.Combat
             }
         }
 
-        private void Show(Transform target)
+        /// <summary>
+        /// Señala la dirección de 'target' con un pulso en el borde de la pantalla, sin el aviso sonoro
+        /// (p. ej. un Apagavelas apagando una luz lejos de Ilse: su propio sonido ya avisa).
+        /// </summary>
+        public void PointAt(Transform target)
+        {
+            if (target != null) Show(target, false);
+        }
+
+        private void Show(Transform target, bool announce = true)
         {
             int slot = 0;
             float oldest = float.MaxValue;
@@ -91,7 +100,7 @@ namespace Ascua.Combat
             followTargets[slot] = target;
             timers[slot] = pulseSeconds;
             ShownCount++;
-            EventBus.RaiseThreatDetected(target.position);
+            if (announce) EventBus.RaiseThreatDetected(target.position);
         }
 
         private void AnimateMarkers(float dt)
