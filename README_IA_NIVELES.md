@@ -127,3 +127,28 @@ Cada noche diseñada tiene un momento memorable (handoff §8.6). Los de las noch
 **Probar:** `F1` y después `F7` dispara ya el evento de la noche actual (aunque ya se haya visto). Para llegar a la noche: `F5`. Pruebas: `NightEventRulesTests` y `EndingResolverTests`.
 
 **Archivos:** `Scripts/Narrative/NightEventDirector*.cs` (uno por evento), `Scripts/Narrative/RuntimeDiaryPages.cs`, `Scripts/World/BondLantern.cs`, `Scripts/AI_LevelGen/Logica/NightEventRules.cs`, `Scripts/Characters/Heraldo_AI.cs` (`StopBefore`, `TwirlLantern`, `SetGoldenLantern`).
+
+# Apagavelas
+
+Sombra voladora que **no persigue a Ilse**: va a las luces (farolas y velas de Teo) y las apaga. Cada luz apagada quita **8 de Esperanza** a su zona. Obliga a repartirse por el mapa y a decidir qué defender.
+
+1. **Ciclo:** elige la mejor luz encendida (`SnuffPlanner`: la zona con menos Esperanza y, luego, la más cercana; empate por índice) → vuela hasta ella (~1.8 m de altura, 2.2 m/s) → **inhala 1.5 s** (humo y subtítulo `[Susurro de humo]`) → la farola se apaga y se bloquea (la vela desaparece) → siguiente luz.
+2. **Defenderse:**
+   - El **Farol encendido a menos de 6 m** mientras inhala lo espanta: se interrumpe y retrocede 3 s.
+   - Tiene 3 de vida: un barrido fuerte o dos normales lo deshacen (suelta 6 de energía).
+   - No ataca a Ilse.
+3. **Deshacerlo:** una farola apagada por un Apagavelas se reenciende si el Farol la ilumina **1.2 s seguidos** (`RelightOnLantern`): se desbloquea, se enciende, la zona recupera **+4** y hay una celebración corta. Si la zona muere antes, sigue apagada. Las velas no vuelven: el `CandleSpawner` saca otras.
+4. **Avisos:** un aro que late sobre la luz que está apagando (fijo con *reducir destellos*), un pulso en el borde de la pantalla hacia ella (`ThreatIndicator.PointAt`) y, la primera vez en la partida, "Algo apaga las luces de [zona]...".
+
+**Cuántos y cuándo (`SnuffDirector`, creado por `NightManager`):**
+- Automático: noche 1 = 0, 2 = 1, 3 = 2, 4 = 3, 5+ = 4. O lo que diga el ADN (`snuffers`, -1 a 8).
+- Aparecen entre el 15 % y el 85 % de la noche (reutiliza `HuntSchedule`), a ~16 m de Ilse, del lado de la zona con más farolas encendidas.
+- Nunca durante una Cacería, un momento narrativo, un diálogo o la pausa (reintenta cada segundo hasta el 90 %).
+- Usan su propio tag (`apagavelas`): **no cuentan como oleada** de `CombatWaveDirector`.
+- Pool de 6 al empezar la noche, clonados de una Polilla de la escena (gris humo, un 30 % más grandes). Si la escena no tiene Polillas, esa noche no hay Apagavelas (aviso en consola).
+
+**IA de niveles:** `ProceduralFallback` da `2 + hardness*4` Apagavelas (redondeado) y ninguno si la noche es fácil (`SignedHardness` < -0.2). En *Ver ADN*: fila "Apagavelas". Si falta en el banco de IA vale -1 (automático).
+
+**Probar:** `F1` y después `F9` hace aparecer uno ya; el panel muestra cuántos hay activos y cuándo sale el siguiente. Pruebas: `SnuffPlannerTests` y las nuevas de `LevelGenTests`.
+
+**Archivos:** `Scripts/Combat/Apagavelas.cs`, `SnuffDirector.cs`, `SnuffTarget.cs`, `Scripts/World/RelightOnLantern.cs`, `Scripts/AI_LevelGen/Logica/SnuffPlanner.cs`.
