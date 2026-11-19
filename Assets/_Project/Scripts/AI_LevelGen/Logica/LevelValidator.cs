@@ -35,6 +35,9 @@ namespace Ascua.LevelGen
         public const int HuntCountMin = 0, HuntCountMax = 3;
         public const float HuntSpeedMin = 3.5f, HuntSpeedMax = 6f;
         public const float HuntSpeedDefault = 4.8f;
+        /// <summary>snuffers = -1: lo decide la noche (SnuffPlanner.CountForNight).</summary>
+        public const int SnuffersAuto = -1;
+        public const int SnuffersMin = -1, SnuffersMax = 8;
         public const int MaxFragments = 3;
         public const int MaxFragmentLength = 120;
     }
@@ -125,6 +128,9 @@ namespace Ascua.LevelGen
                 dna.huntSpeed = LevelDnaLimits.HuntSpeedDefault;
             }
             dna.huntSpeed = Fix(dna.huntSpeed, LevelDnaLimits.HuntSpeedMin, LevelDnaLimits.HuntSpeedMax, LevelDnaLimits.HuntSpeedDefault, "huntSpeed", log);
+
+            // Apagavelas: -1 (automático) a 8.
+            dna.snuffers = FixInt(dna.snuffers, LevelDnaLimits.SnuffersMin, LevelDnaLimits.SnuffersMax, "snuffers", log);
 
             float difficulty = Fix(dna.playerDifficulty, 0f, 1f, 0.5f, "playerDifficulty", log);
             dna.playerDifficulty = difficulty;

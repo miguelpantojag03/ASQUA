@@ -78,6 +78,10 @@ namespace Ascua.LevelGen
         /// <summary>Velocidad del Heraldo al cazar (Ilse corre a 5.2).</summary>
         public float huntSpeed = LevelDnaLimits.HuntSpeedDefault;
 
+        // ---- Apagavelas (si falta en un JSON vale -1)
+        /// <summary>Apagavelas por noche: -1 = automático (noche 1: 0, 2: 1, 3: 2, 4: 3, 5+: 4); 0-8 = fijo.</summary>
+        public int snuffers = LevelDnaLimits.SnuffersAuto;
+
         /// <summary>Textos cortos (máx. 3). El primero se usa como subtítulo de la noche.</summary>
         public string[] narrativeFragments = new string[0];
 
@@ -109,6 +113,7 @@ namespace Ascua.LevelGen
                 && heraldoEnabled == other.heraldoEnabled && heraldoAppearAt == other.heraldoAppearAt
                 && heraldoChaseSpeed == other.heraldoChaseSpeed
                 && huntCount == other.huntCount && huntSpeed == other.huntSpeed
+                && snuffers == other.snuffers
                 && SameArray(questTypeWeights, other.questTypeWeights)
                 && SameArray(narrativeFragments, other.narrativeFragments);
         }

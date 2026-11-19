@@ -347,5 +347,77 @@ namespace Ascua.LevelGen.Tests
             Assert.AreEqual("4.8 m/s", speed.BaseText);
             Assert.AreEqual("5.4 m/s", speed.CurrentText);
         }
+
+        // ------------------------------------------------------------ Apagavelas
+
+        [Test]
+        public void LosApagavelasSonAutomaticosPorDefecto()
+        {
+            Assert.AreEqual(LevelDnaLimits.SnuffersAuto, new LevelDNA().snuffers);
+            // Un JSON sin el campo (p. ej. el banco de IA actual) se queda en automático.
+            LevelDNA fromJson = UnityEngine.JsonUtility.FromJson<LevelDNA>("{\"seed\":4}");
+            Assert.AreEqual(LevelDnaLimits.SnuffersAuto, fromJson.snuffers);
+        }
+
+        [Test]
+        public void ElValidadorAcotaLosApagavelas()
+        {
+            LevelDNA dna = BaseDna();
+            dna.snuffers = 12;
+            List<string> log = LevelValidator.Repair(dna);
+            Assert.AreEqual(LevelDnaLimits.SnuffersMax, dna.snuffers);
+            Assert.IsTrue(log.Exists(l => l.StartsWith("snuffers")), "Anota la corrección");
+
+            dna = BaseDna();
+            dna.snuffers = -5;
+            LevelValidator.Repair(dna);
+            Assert.AreEqual(LevelDnaLimits.SnuffersMin, dna.snuffers);
+
+            dna = BaseDna();
+            dna.snuffers = 3;
+            Assert.AreEqual(0, LevelValidator.Validate(dna).Count);
+            dna.snuffers = LevelDnaLimits.SnuffersAuto;
+            Assert.AreEqual(0, LevelValidator.Validate(dna).Count, "-1 (automático) es válido");
+        }
+
+        [Test]
+        public void ElFallbackSubeLosApagavelasConLaDificultad()
+        {
+            LevelDNA hard = BaseDna();
+            hard.hopeDecayPerSecond = 1.2f;
+            LevelDNA dna = ProceduralFallback.Generate(BaseDna(), hard, 1f, 6, 11, null);
+            Assert.GreaterOrEqual(dna.snuffers, 5, "Noche dura: 2 + hardness*4 con hardness cerca de 1");
+
+            LevelDNA middle = ProceduralFallback.Generate(BaseDna(), null, 0.5f, 5, 3, null);
+            Assert.That(middle.snuffers, Is.InRange(2, 3), "Noche intermedia");
+        }
+
+        [Test]
+        public void ElFallbackQuitaLosApagavelasEnNochesFaciles()
+        {
+            LevelDNA easy = BaseDna();
+            easy.hopeDecayPerSecond = 0.3f;
+            LevelDNA dna = ProceduralFallback.Generate(BaseDna(), easy, 0f, 6, 11, null);
+            Assert.AreEqual(0, dna.snuffers);
+        }
+
+        [Test]
+        public void LaFormulaDeApagavelas()
+        {
+            Assert.AreEqual(0, ProceduralFallback.SnuffersFor(-0.3f, 0f));
+            Assert.AreEqual(2, ProceduralFallback.SnuffersFor(0f, 0f));
+            Assert.AreEqual(6, ProceduralFallback.SnuffersFor(1f, 1f));
+            Assert.AreEqual(4, ProceduralFallback.SnuffersFor(0.5f, 0.5f));
+        }
+
+        [Test]
+        public void LaTablaDeAdnMuestraLosApagavelas()
+        {
+            LevelDNA current = BaseDna();
+            current.snuffers = 5;
+            DnaRow row = LevelDnaRows.Compare(BaseDna(), current).Find(r => r.Label == "Apagavelas");
+            Assert.AreEqual("auto", row.BaseText);
+            Assert.AreEqual("5", row.CurrentText);
+        }
     }
 }
