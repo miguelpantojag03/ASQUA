@@ -62,6 +62,8 @@ namespace Ascua.UI
             if (IsAllowed && visible && keyboard != null && keyboard.f6Key.wasPressedThisFrame) StartHuntNow();
             // F7 (solo con el panel abierto): dispara ya el evento memorable de esta noche (3, 4 o 5).
             if (IsAllowed && visible && keyboard != null && keyboard.f7Key.wasPressedThisFrame) StartNightEventNow();
+            // F9 (solo con el panel abierto): hace aparecer un Apagavelas ya.
+            if (IsAllowed && visible && keyboard != null && keyboard.f9Key.wasPressedThisFrame) SpawnSnufferNow();
 
             // Los FPS se miden siempre (es barato) para que el dato sea fiable al abrir el panel.
             fpsFrames++;
@@ -78,6 +80,15 @@ namespace Ascua.UI
             if (refreshTimer < refreshInterval) return;
             refreshTimer = 0f;
             Refresh();
+        }
+
+        private static void SpawnSnufferNow()
+        {
+            SnuffDirector director = SnuffDirector.Instance;
+            bool spawned = director != null && director.SpawnOne();
+            Debug.Log(spawned
+                ? "[Debug] F9: aparece un Apagavelas."
+                : "[Debug] F9: no hay Apagavelas libres (o no hay Polilla que clonar en la escena).");
         }
 
         private static void StartNightEventNow()
@@ -125,7 +136,7 @@ namespace Ascua.UI
             if (text == null) return;
             builder.Clear();
 
-            builder.Append("<b>DEBUG</b>  (F1 oculta · F5 salta de noche · F6 cacería · F7 evento)\n");
+            builder.Append("<b>DEBUG</b>  (F1 oculta · F5 salta de noche · F6 cacería · F7 evento · F9 apagavelas)\n");
             builder.Append("FPS: ").Append(Mathf.RoundToInt(fps)).Append("  (").Append((1000f / Mathf.Max(1f, fps)).ToString("0.0")).Append(" ms)\n");
 
             NightManager night = NightManager.Instance;
@@ -157,6 +168,16 @@ namespace Ascua.UI
             {
                 builder.Append("Evento: ").Append(nightEvent.EventId)
                        .Append(nightEvent.IsPlaying ? " · EN CURSO" : nightEvent.HasPlayed ? " · visto" : " · pendiente").Append('\n');
+            }
+
+            SnuffDirector snuff = SnuffDirector.Instance;
+            if (snuff != null)
+            {
+                builder.Append("Apagavelas: ").Append(snuff.ActiveCount).Append(" activos · quedan ")
+                       .Append(snuff.RemainingCount).Append('/').Append(snuff.ScheduledCount);
+                if (snuff.NextMoment >= 0f) builder.Append(" · siguiente al ").Append(Mathf.RoundToInt(snuff.NextMoment * 100f)).Append('%');
+                builder.Append('
+');
             }
 
             HeraldoHuntDirector hunts = HeraldoHuntDirector.Instance;
