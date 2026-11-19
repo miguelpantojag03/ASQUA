@@ -80,3 +80,24 @@ Al pulsar *Ver el final* en la última noche, `EndingScreen` reproduce primero `
 - **Reducir destellos** (accesibilidad): luces más tenues y que se encienden más despacio, y la aceleración baja a x2.
 
 **Archivos:** `Scripts/UI/EndingSequence.cs` (la escena), `Scripts/UI/EndingScreen.cs` (la lanza), `Scripts/Audio/AudioManager.cs` y `Scripts/World/WindowLight.cs` (apoyos).
+
+# Cacería del Heraldo
+
+En momentos fijos de la noche el Heraldo deja de pasear y **corre** (4.8 m/s, casi como Ilse corriendo a 5.2) durante unos 15 s. Ilse tiene que llegar a un **refugio**. **Nunca hay Game Over.**
+
+1. **Cuándo** (`HuntSchedule`, lógica pura en `Ascua.LevelGen`): momentos entre el 30 % y el 90 % de la noche, separados al menos un 15 %, sembrados por número de noche (al reintentar caen igual). Cantidad: noches 1-2 = 0, noche 3 = 1, noche 4+ = 2, salvo que el nivel fije `huntCount`.
+2. **Solo empieza** con el Heraldo presente y sin diálogo, oleada, momento narrativo (`HeraldoOmen` / `EventBus.NarrativeMoment`) ni pausa. Si no se da, reintenta cada segundo hasta el 95 %.
+3. **Aviso (4 s):** "Escucha… se acerca", `SFX_Amenaza` con subtítulo y el farol violeta parpadeando (con *reducir destellos*, sin parpadeo). Los refugios ya se ven.
+4. **Cacería:** el Heraldo reaparece a ~18 m, del lado contrario al refugio más cercano. HUD con flecha (8 sentidos) y distancia al refugio, música en tensión máxima y subtítulo `[Pasos veloces]`. El Pulso solo lo frena 1.5 s; el dash sigue liberando de su abrazo.
+5. **Final:**
+   - **Refugio** (2 s dentro del círculo): el Heraldo se detiene al borde. +20 de energía, +1 de Vínculo con ese NPC y "Mina te cubre con su luz".
+   - **Te alcanza** (a 1.6 m): −25 de energía, −15 de Esperanza a la zona más cercana (nunca por debajo de 5), aviso corto y se retira 20 s.
+   - **15 s sin alcanzarte:** pierde interés, sin recompensa.
+
+**Refugios (`SafeHaven`):** se añaden por código a Mina, Teo y Perpetua (radio 4.5 m). Cuenta como refugio el NPC con Vínculo ≥ 1; si ninguno llega, el de mayor Vínculo (siempre hay uno). Solo se ven durante la cacería: anillo ámbar emisivo + luz cálida (malla y material creados una vez y compartidos).
+
+**IA de niveles:** el ADN trae `huntCount` (−1 = automático, 0-3) y `huntSpeed` (3.5-6.0, por defecto 4.8); si faltan en el JSON valen eso. `ProceduralFallback` pone 3 cacerías si la noche es dura (`SignedHardness` > 0.6), ninguna si es fácil (< −0.2) y escala la velocidad de 4.2 a 5.4. Salen en *Ver ADN* como "Cacerías del Heraldo" y "Velocidad de la cacería".
+
+**Probar:** `F1` y después `F6` lanza una cacería ahora (el panel muestra cuántas quedan y cuándo). Pruebas: `HuntScheduleTests` y las nuevas de `LevelGenTests`.
+
+**Archivos:** `Scripts/Combat/HeraldoHuntDirector.cs`, `Scripts/World/SafeHaven.cs`, `Scripts/AI_LevelGen/Logica/HuntSchedule.cs`, `Scripts/Characters/Heraldo_AI.cs` (estado *Cazando*), `Scripts/Audio/AudioManager.cs` (`SetHuntTension`, `PlayHuntWarning`).

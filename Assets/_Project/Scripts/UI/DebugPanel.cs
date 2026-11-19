@@ -1,5 +1,6 @@
 using System.Text;
 using Ascua.Characters;
+using Ascua.Combat;
 using Ascua.Core;
 using Ascua.World;
 using TMPro;
@@ -56,6 +57,8 @@ namespace Ascua.UI
                 NightManager.Instance.StartNextNight();
                 return;
             }
+            // F6 (solo con el panel abierto): lanza una Cacería del Heraldo ahora (con su aviso).
+            if (IsAllowed && visible && keyboard != null && keyboard.f6Key.wasPressedThisFrame) StartHuntNow();
 
             // Los FPS se miden siempre (es barato) para que el dato sea fiable al abrir el panel.
             fpsFrames++;
@@ -72,6 +75,20 @@ namespace Ascua.UI
             if (refreshTimer < refreshInterval) return;
             refreshTimer = 0f;
             Refresh();
+        }
+
+        private static void StartHuntNow()
+        {
+            if (Heraldo_AI.Instance == null)
+            {
+                Debug.Log("[Debug] F6: no hay Heraldo en esta escena.");
+                return;
+            }
+            HeraldoHuntDirector director = HeraldoHuntDirector.Ensure();
+            bool started = director.StartNow();
+            Debug.Log(started
+                ? "[Debug] F6: Cacería del Heraldo iniciada."
+                : "[Debug] F6: ahora no puede empezar (diálogo, oleada, momento narrativo, pausa o cacería en curso).");
         }
 
         public void SetVisible(bool value)
@@ -91,7 +108,7 @@ namespace Ascua.UI
             if (text == null) return;
             builder.Clear();
 
-            builder.Append("<b>DEBUG</b>  (F1 oculta · F5 salta de noche)\n");
+            builder.Append("<b>DEBUG</b>  (F1 oculta · F5 salta de noche · F6 cacería)\n");
             builder.Append("FPS: ").Append(Mathf.RoundToInt(fps)).Append("  (").Append((1000f / Mathf.Max(1f, fps)).ToString("0.0")).Append(" ms)\n");
 
             NightManager night = NightManager.Instance;
@@ -115,6 +132,16 @@ namespace Ascua.UI
                 if (zone.IsDead) builder.Append("apagada");
                 else builder.Append(zone.Hope.ToString("0.0")).Append(zone.IsIlluminated ? " (iluminada)" : "")
                             .Append(" · Penumbra ").Append(Mathf.RoundToInt(zone.PenumbraOverlap * 100f)).Append('%');
+                builder.Append('\n');
+            }
+
+            HeraldoHuntDirector hunts = HeraldoHuntDirector.Instance;
+            if (hunts != null)
+            {
+                builder.Append("Cacerías: ").Append(hunts.RemainingCount).Append('/').Append(hunts.ScheduledCount);
+                if (hunts.NextMoment >= 0f) builder.Append(" · siguiente al ").Append(Mathf.RoundToInt(hunts.NextMoment * 100f)).Append('%');
+                if (hunts.IsWarning) builder.Append(" · AVISO");
+                if (hunts.IsHunting) builder.Append(" · CAZANDO");
                 builder.Append('\n');
             }
 
