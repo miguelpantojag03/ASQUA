@@ -80,6 +80,9 @@ namespace Ascua.Narrative
             // Espera a que termine la conversación de entrega.
             if (DialogueRunner.Instance != null && DialogueRunner.Instance.IsOpen) return;
             if (NightManager.Instance != null && !NightManager.Instance.IsRunning) return;
+            // Tampoco en plena Cacería del Heraldo (ni en su aviso): espera a que termine.
+            Ascua.Combat.HeraldoHuntDirector hunts = Ascua.Combat.HeraldoHuntDirector.Instance;
+            if (hunts != null && hunts.IsBusy) return;
             pending = false;
             GameProgress.MarkMomentSeen(eventId);
             StartCoroutine(Play());

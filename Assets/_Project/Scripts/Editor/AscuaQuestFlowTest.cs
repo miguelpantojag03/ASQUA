@@ -91,6 +91,10 @@ namespace Ascua.EditorTools
             EditorApplication.QueuePlayerLoopUpdate();
             if (NightManager.Instance == null || QuestManager.Instance == null) return;
 
+            // La Cacería del Heraldo movería al Heraldo en mitad de los pasos guionizados: aquí se desactiva.
+            HeraldoHuntDirector hunts = HeraldoHuntDirector.Instance;
+            if (hunts != null && hunts.ScheduledCount > 0) hunts.Configure(0, hunts.HuntSpeed);
+
             frameTimes.Add(Time.unscaledDeltaTime * 1000f);
 
             if (stepIndex >= steps.Count)
