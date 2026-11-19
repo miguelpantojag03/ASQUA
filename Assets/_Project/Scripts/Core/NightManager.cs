@@ -118,6 +118,9 @@ namespace Ascua.Core
 
             // Momento memorable de las noches 3, 4 y 5 (creado por código; las demás noches no tienen).
             Ascua.Narrative.NightEventDirector.CreateFor(GameProgress.CurrentNight);
+
+            // Apagavelas de la noche (creado por código; cuántos depende de la noche o del ADN).
+            Ascua.Combat.SnuffDirector.Ensure();
         }
 
         private List<NightQuestSet> CollectAuthoredSets()
