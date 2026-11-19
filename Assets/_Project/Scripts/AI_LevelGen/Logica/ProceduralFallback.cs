@@ -65,6 +65,9 @@ namespace Ascua.LevelGen
             else if (signed < -0.2f) r.huntCount = 0;
             else r.huntCount = b.huntCount;
             r.huntSpeed = HuntSpeedFor(signed);
+
+            // Apagavelas: suben con la dificultad (2 + hardness*4) y desaparecen en noches fáciles.
+            r.snuffers = SnuffersFor(signed, hardness);
             r.seed = seed;
             r.origin = LevelDnaOrigin.Local;
             r.playerDifficulty = skill;
@@ -91,6 +94,13 @@ namespace Ascua.LevelGen
         {
             float t = Clamp01((signedHardness + 0.5f) / 1.5f);
             return HuntSpeedEasy + (HuntSpeedHard - HuntSpeedEasy) * t;
+        }
+
+        /// <summary>Apagavelas según la dificultad: 0 si es fácil (SignedHardness &lt; -0.2); si no, 2 + hardness*4 redondeado.</summary>
+        public static int SnuffersFor(float signedHardness, float hardness)
+        {
+            if (signedHardness < -0.2f) return 0;
+            return (int)Math.Round(2f + Clamp01(hardness) * 4f);
         }
 
         /// <summary>Qué tan difícil es r respecto a la base, de 0 (como la base o más fácil) a 1 (el extremo difícil).</summary>

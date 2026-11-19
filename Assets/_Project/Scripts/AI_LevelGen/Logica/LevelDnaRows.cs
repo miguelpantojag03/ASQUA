@@ -49,6 +49,7 @@ namespace Ascua.LevelGen
             rows.Add(Num("Velocidad del Heraldo", b.heraldoChaseSpeed, current.heraldoChaseSpeed, "", 1));
             rows.Add(Text("Cacerías del Heraldo", HuntCountText(b.huntCount), HuntCountText(current.huntCount)));
             rows.Add(Num("Velocidad de la cacería", b.huntSpeed, current.huntSpeed, " m/s", 1));
+            rows.Add(Text("Apagavelas", AutoCountText(b.snuffers), AutoCountText(current.snuffers)));
             rows.Add(Text("Tono emocional", b.tone, current.tone));
             rows.Add(Text("Tipo de misión más frecuente", TopQuestType(b), TopQuestType(current)));
             return rows;
@@ -67,9 +68,12 @@ namespace Ascua.LevelGen
         }
 
         /// <summary>"auto" si lo decide la noche (-1); si no, el número.</summary>
-        public static string HuntCountText(int huntCount)
+        public static string HuntCountText(int huntCount) => AutoCountText(huntCount);
+
+        /// <summary>"auto" para -1 (lo decide la noche); si no, el número.</summary>
+        public static string AutoCountText(int value)
         {
-            return huntCount < 0 ? "auto" : huntCount.ToString(CultureInfo.InvariantCulture);
+            return value < 0 ? "auto" : value.ToString(CultureInfo.InvariantCulture);
         }
 
         private static DnaRow Num(string label, float baseValue, float current, string unit, int decimals)

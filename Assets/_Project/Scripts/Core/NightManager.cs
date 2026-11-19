@@ -225,6 +225,9 @@ namespace Ascua.Core
             // Cacerías del Heraldo de esta noche (el director se crea por código si no existe).
             if (heraldo != null) Ascua.Combat.HeraldoHuntDirector.Ensure().Configure(set.huntCount, set.huntSpeed);
 
+            // Apagavelas de esta noche (el director se crea por código si no existe).
+            Ascua.Combat.SnuffDirector.Ensure().Configure(set.snuffers);
+
             // Oleadas de sombras de esta noche (cada noche extra suma una Polilla por oleada).
             Ascua.Combat.CombatWaveDirector waves = FindFirstObjectByType<Ascua.Combat.CombatWaveDirector>();
             if (waves != null) waves.Configure(set.waves, extraNights);

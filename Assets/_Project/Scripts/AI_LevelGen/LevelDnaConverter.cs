@@ -37,6 +37,7 @@ namespace Ascua.AILevelGen
             dna.heraldoChaseSpeed = set.heraldoChaseSpeed;
             dna.huntCount = set.huntCount;
             dna.huntSpeed = set.huntSpeed;
+            dna.snuffers = set.snuffers;
 
             // Misiones: cuántas y con qué mezcla de tipos.
             float[] weights = new float[LevelDNA.QuestTypeCount];

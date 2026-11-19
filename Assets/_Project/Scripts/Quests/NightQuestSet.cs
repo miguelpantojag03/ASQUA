@@ -77,5 +77,9 @@ namespace Ascua.Quests
         [Range(-1, 3)] public int huntCount = -1;
         [Tooltip("Velocidad del Heraldo al cazar (Ilse corre a 5.2).")]
         [Range(3.5f, 6f)] public float huntSpeed = 4.8f;
+
+        [Header("Dificultad · Apagavelas")]
+        [Tooltip("-1 = automático (noche 1: 0, 2: 1, 3: 2, 4: 3, 5+: 4); 0-8 = fijo.")]
+        [Range(-1, 8)] public int snuffers = -1;
     }
 }

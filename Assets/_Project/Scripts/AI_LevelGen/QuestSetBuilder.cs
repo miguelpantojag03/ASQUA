@@ -59,6 +59,7 @@ namespace Ascua.AILevelGen
             set.heraldoChaseSpeed = dna.heraldoChaseSpeed;
             set.huntCount = dna.huntCount;
             set.huntSpeed = dna.huntSpeed;
+            set.snuffers = dna.snuffers;
             // La dificultad ya viene escalada en el propio ADN: el set no la vuelve a subir por noche.
             set.decayIncreasePerNight = 0f;
 
