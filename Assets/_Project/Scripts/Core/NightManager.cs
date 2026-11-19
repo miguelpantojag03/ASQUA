@@ -115,6 +115,9 @@ namespace Ascua.Core
                 ApplyPacing();
                 nightNumber = Mathf.Max(nightNumber, GameProgress.CurrentNight);
             }
+
+            // Momento memorable de las noches 3, 4 y 5 (creado por código; las demás noches no tienen).
+            Ascua.Narrative.NightEventDirector.CreateFor(GameProgress.CurrentNight);
         }
 
         private List<NightQuestSet> CollectAuthoredSets()
