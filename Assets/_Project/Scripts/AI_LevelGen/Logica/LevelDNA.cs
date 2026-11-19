@@ -72,6 +72,12 @@ namespace Ascua.LevelGen
         public float heraldoAppearAt = 0.25f;
         public float heraldoChaseSpeed = 1.3f;
 
+        // ---- Cacería del Heraldo (si faltan en un JSON valen esto)
+        /// <summary>Cacerías por noche: -1 = automático (noches 1-2: 0, noche 3: 1, noche 4+: 2); 0-3 = fijo.</summary>
+        public int huntCount = LevelDnaLimits.HuntCountAuto;
+        /// <summary>Velocidad del Heraldo al cazar (Ilse corre a 5.2).</summary>
+        public float huntSpeed = LevelDnaLimits.HuntSpeedDefault;
+
         /// <summary>Textos cortos (máx. 3). El primero se usa como subtítulo de la noche.</summary>
         public string[] narrativeFragments = new string[0];
 
@@ -102,6 +108,7 @@ namespace Ascua.LevelGen
                 && hopeDrainPerCreature == other.hopeDrainPerCreature
                 && heraldoEnabled == other.heraldoEnabled && heraldoAppearAt == other.heraldoAppearAt
                 && heraldoChaseSpeed == other.heraldoChaseSpeed
+                && huntCount == other.huntCount && huntSpeed == other.huntSpeed
                 && SameArray(questTypeWeights, other.questTypeWeights)
                 && SameArray(narrativeFragments, other.narrativeFragments);
         }

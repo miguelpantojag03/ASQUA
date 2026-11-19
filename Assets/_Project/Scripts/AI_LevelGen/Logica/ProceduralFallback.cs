@@ -58,6 +58,13 @@ namespace Ascua.LevelGen
             r.creaturesPerWave = (int)Math.Round(b.creaturesPerWave + signed * 1.2f);
             r.fireflyMaxActive = (int)Math.Round(b.fireflyMaxActive * (1f - 0.3f * signed));
             r.questCount = 3 + (int)Math.Round(hardness * 2f) + rng.Next(0, 2);
+
+            // Cacería del Heraldo: noches duras, 3 cacerías; fáciles, ninguna; en medio, lo de la base
+            // (normalmente automático). La velocidad escala de 4.2 (fácil) a 5.4 (difícil).
+            if (signed > 0.6f) r.huntCount = 3;
+            else if (signed < -0.2f) r.huntCount = 0;
+            else r.huntCount = b.huntCount;
+            r.huntSpeed = HuntSpeedFor(signed);
             r.seed = seed;
             r.origin = LevelDnaOrigin.Local;
             r.playerDifficulty = skill;
@@ -75,6 +82,15 @@ namespace Ascua.LevelGen
             if (b.hopeDecayPerSecond <= 0f) return 0f;
             float v = (r.hopeDecayPerSecond - b.hopeDecayPerSecond) / (b.hopeDecayPerSecond * 0.9f);
             return v < -0.5f ? -0.5f : (v > 1f ? 1f : v);
+        }
+
+        public const float HuntSpeedEasy = 4.2f, HuntSpeedHard = 5.4f;
+
+        /// <summary>Velocidad de la cacería según la dificultad con signo (-0.5 = 4.2, 1 = 5.4).</summary>
+        public static float HuntSpeedFor(float signedHardness)
+        {
+            float t = Clamp01((signedHardness + 0.5f) / 1.5f);
+            return HuntSpeedEasy + (HuntSpeedHard - HuntSpeedEasy) * t;
         }
 
         /// <summary>Qué tan difícil es r respecto a la base, de 0 (como la base o más fácil) a 1 (el extremo difícil).</summary>
