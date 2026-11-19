@@ -407,6 +407,8 @@ namespace Ascua.Audio
                 // Noche 3: silbido grave del tren fantasma (el barrido del Farol, muy lento y grave).
                 case "tren_silbido": PlaySfx(sfxLanternResize, 0.7f, 0.42f, "[Un tren lejano]"); break;
                 case "tren_silbido_eco": PlaySfx(sfxLanternResize, 0.45f, 0.38f); break;
+                // Apagavelas inhalando una luz: el susurro, más grave.
+                case "apagavelas_humo": PlaySfx(sfxWhisper, 0.6f, 0.7f, "[Susurro de humo]"); break;
             }
         }
 
