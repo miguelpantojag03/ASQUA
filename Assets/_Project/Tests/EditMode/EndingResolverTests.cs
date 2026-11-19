@@ -8,7 +8,11 @@ namespace Ascua.Endings.Tests
     /// </summary>
     public class EndingResolverTests
     {
-        /// <summary>Partida "neutra": zonas indicadas, Vínculos medios, sin Tratos y Diario a medias.</summary>
+        /// <summary>
+        /// Partida "neutra": zonas indicadas, Vínculos medios, sin Tratos y Diario a medias.
+        /// Ilse SÍ nombró a Corvin (así los casos de Constelación solo dependen de zonas y Vínculos);
+        /// los casos sin nombrarlo lo dicen explícitamente.
+        /// </summary>
         private static EndingInput Input(int saved, int total)
         {
             return new EndingInput
@@ -20,7 +24,7 @@ namespace Ascua.Endings.Tests
                 BondPerpetua = 2,
                 TratosAccepted = 0,
                 DiaryPages = 3,
-                NamedCorvin = false
+                NamedCorvin = true
             };
         }
 
@@ -71,7 +75,7 @@ namespace Ascua.Endings.Tests
         public void FarolApagado_VinculosAlMaximoDiarioCompletoYSinTratos()
         {
             EndingInput input = WithBonds(Input(2, 2), 5, 5, 5);
-            input.DiaryPages = 6;
+            input.DiaryPages = EndingResolver.TotalDiaryPages;
             Assert.AreEqual(EndingId.FarolApagado, EndingResolver.Resolve(input));
         }
 
@@ -81,7 +85,7 @@ namespace Ascua.Endings.Tests
         public void Prioridad_FarolApagadoGanaAConstelacion()
         {
             EndingInput input = WithBonds(Input(2, 2), 5, 5, 5);
-            input.DiaryPages = 6;
+            input.DiaryPages = EndingResolver.TotalDiaryPages;
             Assert.IsTrue(EndingResolver.IsConstelacion(input));
             Assert.AreEqual(EndingId.FarolApagado, EndingResolver.Resolve(input));
         }
@@ -90,7 +94,7 @@ namespace Ascua.Endings.Tests
         public void Prioridad_UnTratoImpideFarolApagado()
         {
             EndingInput input = WithBonds(Input(2, 2), 5, 5, 5);
-            input.DiaryPages = 6;
+            input.DiaryPages = EndingResolver.TotalDiaryPages;
             input.TratosAccepted = 1;
             Assert.AreEqual(EndingId.ElTrato, EndingResolver.Resolve(input));
         }
@@ -115,7 +119,7 @@ namespace Ascua.Endings.Tests
         public void Prioridad_FarolApagadoNoMiraLasZonas()
         {
             EndingInput input = WithBonds(Input(0, 2), 5, 5, 5);
-            input.DiaryPages = 6;
+            input.DiaryPages = EndingResolver.TotalDiaryPages;
             Assert.AreEqual(EndingId.FarolApagado, EndingResolver.Resolve(input));
         }
 
@@ -165,7 +169,7 @@ namespace Ascua.Endings.Tests
         public void Borde_FarolApagadoNecesitaElDiarioCompleto()
         {
             EndingInput input = WithBonds(Input(2, 2), 5, 5, 5);
-            input.DiaryPages = 5;
+            input.DiaryPages = EndingResolver.TotalDiaryPages - 1;
             Assert.AreEqual(EndingId.Constelacion, EndingResolver.Resolve(input));
         }
 
@@ -173,7 +177,7 @@ namespace Ascua.Endings.Tests
         public void Borde_FarolApagadoNecesitaLosTresVinculosAlMaximo()
         {
             EndingInput input = WithBonds(Input(2, 2), 5, 5, 4);
-            input.DiaryPages = 6;
+            input.DiaryPages = EndingResolver.TotalDiaryPages;
             Assert.AreEqual(EndingId.Constelacion, EndingResolver.Resolve(input));
         }
 
@@ -185,12 +189,42 @@ namespace Ascua.Endings.Tests
         }
 
         [Test]
-        public void Borde_NombrarACorvinNoSeExigeTodavia()
+        public void Corvin_ConstelacionExigeNombrarlo()
         {
-            Assert.IsFalse(EndingResolver.RequireCorvinName);
+            Assert.IsTrue(EndingResolver.RequireCorvinName);
             EndingInput input = WithBonds(Input(2, 2), 4, 4, 4);
             input.NamedCorvin = false;
-            Assert.AreEqual(EndingId.Constelacion, EndingResolver.Resolve(input));
+            Assert.IsFalse(EndingResolver.IsConstelacion(input));
+            input.NamedCorvin = true;
+            Assert.IsTrue(EndingResolver.IsConstelacion(input));
+        }
+
+        [Test]
+        public void Corvin_TodoPerfectoSinNombrarloEsAlba()
+        {
+            // Todas las zonas, Vínculos al máximo, sin Tratos y Diario casi completo, pero sin decir su nombre.
+            EndingInput input = WithBonds(Input(7, 7), 5, 5, 5);
+            input.DiaryPages = EndingResolver.TotalDiaryPages - 1;
+            input.NamedCorvin = false;
+            Assert.AreEqual(EndingId.Alba, EndingResolver.Resolve(input));
+        }
+
+        [Test]
+        public void Corvin_ElFinalSecretoNoDependeDeNombrarlo()
+        {
+            EndingInput input = WithBonds(Input(2, 2), 5, 5, 5);
+            input.DiaryPages = EndingResolver.TotalDiaryPages;
+            input.NamedCorvin = false;
+            Assert.AreEqual(EndingId.FarolApagado, EndingResolver.Resolve(input));
+        }
+
+        [Test]
+        public void Diario_SieteSonElDiarioCompleto()
+        {
+            Assert.AreEqual(7, EndingResolver.TotalDiaryPages);
+            EndingInput input = WithBonds(Input(2, 2), 5, 5, 5);
+            input.DiaryPages = 6;
+            Assert.AreEqual(EndingId.Constelacion, EndingResolver.Resolve(input), "Con 6 de 7 páginas aún no hay final secreto");
         }
 
         // ------------------------------------------------------------ Textos

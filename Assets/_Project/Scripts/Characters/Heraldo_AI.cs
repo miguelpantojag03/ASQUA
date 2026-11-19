@@ -25,7 +25,11 @@ namespace Ascua.Characters
         private static readonly int SpeedHash = Animator.StringToHash("Speed");
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
-        private enum State { Dormido, Acechando, Persiguiendo, Repelido, Retirado, Cazando }
+        // Los valores nuevos van al final: AscuaQuestFlowTest fija el estado por su índice.
+        private enum State { Dormido, Acechando, Persiguiendo, Repelido, Retirado, Cazando, Detenido }
+
+        /// <summary>Color del farol cuando Ilse ha dicho su nombre (Noche 4).</summary>
+        public static readonly Color GoldenLanternColor = new Color(1f, 0.76f, 0.32f);
 
         /// <summary>Cómo terminó una cacería.</summary>
         public enum HuntOutcome { Refugio, Alcanzada, PerdioInteres }
@@ -117,6 +121,80 @@ namespace Ascua.Characters
 
         /// <summary>Puede empezar una cacería: presente y merodeando o persiguiendo (no repelido ni retirado).</summary>
         public bool IsAvailableForHunt => state == State.Acechando || state == State.Persiguiendo;
+
+        /// <summary>True si su farol ya es dorado (Ilse dijo su nombre).</summary>
+        public bool HasGoldenLantern { get; private set; }
+
+        /// <summary>
+        /// Deja de perseguir y se queda quieto a 'distance' m de Ilse, mirándola, durante 'seconds'
+        /// (o hasta que otra orden lo mueva). Devuelve false si no está presente.
+        /// </summary>
+        public bool StopBefore(float distance, float seconds)
+        {
+            if (!IsPresent || !agent.enabled || player == null) return false;
+            if (IsHunting) StopHunt(HuntOutcome.PerdioInteres);
+
+            Vector3 dir = transform.position - player.position;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.01f) dir = player.forward;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward;
+            dir.Normalize();
+
+            // Del lado en que ya estaba; si ahí no hay NavMesh, se prueban otros ángulos.
+            float[] angles = { 0f, 40f, -40f, 90f, -90f, 180f };
+            foreach (float a in angles)
+            {
+                Vector3 p = player.position + Quaternion.Euler(0f, a, 0f) * dir * distance;
+                if (!NavMesh.SamplePosition(p, out NavMeshHit hit, 2f, NavMesh.AllAreas)) continue;
+                agent.Warp(hit.position);
+                break;
+            }
+
+            agent.ResetPath();
+            state = State.Detenido;
+            stateTimer = seconds;
+            FacePlayer();
+            return true;
+        }
+
+        /// <summary>Gira su farolillo dos veces, como hacía Corvin cuando estaba nervioso (handoff §3.4).</summary>
+        public void TwirlLantern()
+        {
+            if (lanternRenderer == null || !isActiveAndEnabled) return;
+            StartCoroutine(TwirlRoutine(lanternRenderer.transform));
+        }
+
+        private System.Collections.IEnumerator TwirlRoutine(Transform lantern)
+        {
+            Quaternion start = lantern.localRotation;
+            const float seconds = 1.6f;
+            float t = 0f;
+            while (t < seconds)
+            {
+                t += Time.deltaTime;   // la pausa lo congela
+                float eased = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / seconds));
+                lantern.localRotation = start * Quaternion.Euler(0f, 720f * eased, 0f);
+                yield return null;
+            }
+            lantern.localRotation = start;
+        }
+
+        /// <summary>El farol violeta se vuelve dorado desde ahora (Ilse dijo "Corvin.").</summary>
+        public void SetGoldenLantern()
+        {
+            HasGoldenLantern = true;
+            lanternColor = GoldenLanternColor;
+            if (violetLight != null) violetLight.color = GoldenLanternColor;
+        }
+
+        private void FacePlayer()
+        {
+            if (player == null) return;
+            Vector3 look = player.position - transform.position;
+            look.y = 0f;
+            if (look.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(look.normalized, Vector3.up);
+        }
 
         /// <summary>Segundos que lleva la cacería actual.</summary>
         public float HuntElapsed => huntElapsed;
@@ -216,6 +294,9 @@ namespace Ascua.Characters
             SetVisible(false);
             agent.enabled = false;
             if (interactable != null) interactable.SetInteractable(false);
+
+            // Si Ilse ya dijo su nombre, su farol es dorado para siempre.
+            if (GameProgress.HasFlag(EndingContext.NamedCorvinFlag)) SetGoldenLantern();
         }
 
         private void Update()
@@ -260,6 +341,12 @@ namespace Ascua.Characters
 
                 case State.Cazando:
                     UpdateHunt(distance, dt);
+                    break;
+
+                case State.Detenido:
+                    // Quieto, mirando a Ilse (Noche 4: "El nombre").
+                    FacePlayer();
+                    if (stateTimer <= 0f) EnterLurk();
                     break;
             }
 

@@ -9,14 +9,14 @@ namespace Ascua.Endings
     /// </summary>
     public static class EndingResolver
     {
-        /// <summary>Si es true, Constelación exige además que Ilse haya nombrado a Corvin (esa marca aún no existe).</summary>
-        public const bool RequireCorvinName = false;
+        /// <summary>Constelación exige además que Ilse haya nombrado a Corvin (Noche 4, marca "nombro_corvin").</summary>
+        public const bool RequireCorvinName = true;
 
         /// <summary>Tratos aceptados para El Trato (hoy solo existe un Trato en el juego).</summary>
         public const int TratosForTratoEnding = 1;
 
-        /// <summary>Páginas del Diario de Ilse en total.</summary>
-        public const int TotalDiaryPages = 6;
+        /// <summary>Páginas del Diario de Ilse en total (6 en la escena + la 7 del tren fantasma, creada por código).</summary>
+        public const int TotalDiaryPages = 7;
 
         /// <summary>Vínculo máximo con un personaje.</summary>
         public const int MaxBond = 5;
