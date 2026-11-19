@@ -237,5 +237,115 @@ namespace Ascua.LevelGen.Tests
             DnaRow duration = rows.Find(r => r.Label.StartsWith("Duración"));
             Assert.AreEqual("=", duration.DeltaText);
         }
+
+        // ------------------------------------------------------------ Cacería del Heraldo
+
+        [Test]
+        public void LaCaceriaTieneValoresPorDefecto()
+        {
+            LevelDNA dna = new LevelDNA();
+            Assert.AreEqual(LevelDnaLimits.HuntCountAuto, dna.huntCount);
+            Assert.AreEqual(LevelDnaLimits.HuntSpeedDefault, dna.huntSpeed);
+
+            // Un JSON sin los campos nuevos (p. ej. el banco antiguo) se queda con esos valores.
+            LevelDNA fromJson = UnityEngine.JsonUtility.FromJson<LevelDNA>("{\"seed\":3,\"tone\":\"tenso\"}");
+            Assert.AreEqual(LevelDnaLimits.HuntCountAuto, fromJson.huntCount);
+            Assert.AreEqual(LevelDnaLimits.HuntSpeedDefault, fromJson.huntSpeed);
+        }
+
+        [Test]
+        public void ElValidadorAcotaLaCaceria()
+        {
+            LevelDNA dna = BaseDna();
+            dna.huntCount = 7;
+            dna.huntSpeed = 9f;
+            List<string> log = LevelValidator.Repair(dna);
+            Assert.AreEqual(LevelDnaLimits.HuntCountMax, dna.huntCount);
+            Assert.AreEqual(LevelDnaLimits.HuntSpeedMax, dna.huntSpeed);
+            Assert.IsTrue(log.Exists(l => l.StartsWith("huntCount")), "Anota la corrección de huntCount");
+            Assert.IsTrue(log.Exists(l => l.StartsWith("huntSpeed")), "Anota la corrección de huntSpeed");
+
+            dna = BaseDna();
+            dna.huntCount = -4;
+            dna.huntSpeed = 1f;
+            LevelValidator.Repair(dna);
+            Assert.AreEqual(LevelDnaLimits.HuntCountMin, dna.huntCount);
+            Assert.AreEqual(LevelDnaLimits.HuntSpeedMin, dna.huntSpeed);
+
+            dna = BaseDna();
+            dna.huntSpeed = float.NaN;
+            LevelValidator.Repair(dna);
+            Assert.AreEqual(LevelDnaLimits.HuntSpeedDefault, dna.huntSpeed);
+        }
+
+        [Test]
+        public void ElModoAutomaticoDeCaceriaEsValido()
+        {
+            LevelDNA dna = BaseDna();
+            dna.huntCount = LevelDnaLimits.HuntCountAuto;
+            Assert.AreEqual(0, LevelValidator.Validate(dna).Count);
+            dna.huntCount = 2;
+            Assert.AreEqual(0, LevelValidator.Validate(dna).Count);
+        }
+
+        [Test]
+        public void ElFallbackSubeLasCaceriasEnNochesDuras()
+        {
+            LevelDNA hard = BaseDna();
+            hard.hopeDecayPerSecond = 1.2f;
+            LevelDNA dna = ProceduralFallback.Generate(BaseDna(), hard, 1f, 6, 11, null);
+            Assert.Greater(ProceduralFallback.SignedHardness(dna, BaseDna()), 0.6f);
+            Assert.AreEqual(3, dna.huntCount);
+            Assert.Greater(dna.huntSpeed, 5f);
+            Assert.LessOrEqual(dna.huntSpeed, ProceduralFallback.HuntSpeedHard + 0.0001f);
+        }
+
+        [Test]
+        public void ElFallbackQuitaLasCaceriasEnNochesFaciles()
+        {
+            LevelDNA easy = BaseDna();
+            easy.hopeDecayPerSecond = 0.3f;
+            LevelDNA dna = ProceduralFallback.Generate(BaseDna(), easy, 0f, 6, 11, null);
+            Assert.Less(ProceduralFallback.SignedHardness(dna, BaseDna()), -0.2f);
+            Assert.AreEqual(0, dna.huntCount);
+            Assert.AreEqual(ProceduralFallback.HuntSpeedEasy, dna.huntSpeed, 0.01f);
+        }
+
+        [Test]
+        public void ElFallbackMantieneLaCaceriaDeLaBaseEnNochesIntermedias()
+        {
+            LevelDNA dna = ProceduralFallback.Generate(BaseDna(), null, 0.5f, 5, 3, null);
+            float signed = ProceduralFallback.SignedHardness(dna, BaseDna());
+            Assert.IsTrue(signed >= -0.2f && signed <= 0.6f, "Dificultad intermedia: " + signed);
+            Assert.AreEqual(LevelDnaLimits.HuntCountAuto, dna.huntCount);
+            Assert.IsTrue(dna.huntSpeed > ProceduralFallback.HuntSpeedEasy && dna.huntSpeed < ProceduralFallback.HuntSpeedHard);
+        }
+
+        [Test]
+        public void LaVelocidadDeCaceriaCreceConLaDificultad()
+        {
+            Assert.AreEqual(ProceduralFallback.HuntSpeedEasy, ProceduralFallback.HuntSpeedFor(-0.5f), 0.0001f);
+            Assert.AreEqual(ProceduralFallback.HuntSpeedHard, ProceduralFallback.HuntSpeedFor(1f), 0.0001f);
+            Assert.Less(ProceduralFallback.HuntSpeedFor(0f), ProceduralFallback.HuntSpeedFor(0.5f));
+        }
+
+        [Test]
+        public void LaTablaDeAdnMuestraLaCaceria()
+        {
+            LevelDNA baseDna = BaseDna();
+            LevelDNA current = BaseDna();
+            current.huntCount = 3;
+            current.huntSpeed = 5.4f;
+
+            List<DnaRow> rows = LevelDnaRows.Compare(baseDna, current);
+
+            DnaRow count = rows.Find(r => r.Label == "Cacerías del Heraldo");
+            Assert.AreEqual("auto", count.BaseText);
+            Assert.AreEqual("3", count.CurrentText);
+            Assert.AreEqual("cambia", count.DeltaText);
+            DnaRow speed = rows.Find(r => r.Label == "Velocidad de la cacería");
+            Assert.AreEqual("4.8 m/s", speed.BaseText);
+            Assert.AreEqual("5.4 m/s", speed.CurrentText);
+        }
     }
 }

@@ -30,6 +30,11 @@ namespace Ascua.LevelGen
         public const float DrainMin = 0.6f, DrainMax = 2.2f;
         public const float HeraldoAtMin = 0.1f, HeraldoAtMax = 0.8f;
         public const float HeraldoSpeedMin = 0.8f, HeraldoSpeedMax = 2f;
+        /// <summary>huntCount = -1: lo decide la noche (HuntSchedule.CountForNight).</summary>
+        public const int HuntCountAuto = -1;
+        public const int HuntCountMin = 0, HuntCountMax = 3;
+        public const float HuntSpeedMin = 3.5f, HuntSpeedMax = 6f;
+        public const float HuntSpeedDefault = 4.8f;
         public const int MaxFragments = 3;
         public const int MaxFragmentLength = 120;
     }
@@ -107,6 +112,19 @@ namespace Ascua.LevelGen
 
             dna.heraldoAppearAt = Fix(dna.heraldoAppearAt, LevelDnaLimits.HeraldoAtMin, LevelDnaLimits.HeraldoAtMax, 0.25f, "heraldoAppearAt", log);
             dna.heraldoChaseSpeed = Fix(dna.heraldoChaseSpeed, LevelDnaLimits.HeraldoSpeedMin, LevelDnaLimits.HeraldoSpeedMax, 1.3f, "heraldoChaseSpeed", log);
+
+            // Cacería del Heraldo: -1 (automático) se respeta; el resto va de 0 a 3.
+            if (dna.huntCount != LevelDnaLimits.HuntCountAuto)
+            {
+                dna.huntCount = FixInt(dna.huntCount, LevelDnaLimits.HuntCountMin, LevelDnaLimits.HuntCountMax, "huntCount", log);
+            }
+            if (dna.huntSpeed == 0f)
+            {
+                // 0 = el JSON no lo traía: vale el valor por defecto (no es un error de la IA, pero se anota).
+                log.Add("huntSpeed ausente -> " + Fmt(LevelDnaLimits.HuntSpeedDefault));
+                dna.huntSpeed = LevelDnaLimits.HuntSpeedDefault;
+            }
+            dna.huntSpeed = Fix(dna.huntSpeed, LevelDnaLimits.HuntSpeedMin, LevelDnaLimits.HuntSpeedMax, LevelDnaLimits.HuntSpeedDefault, "huntSpeed", log);
 
             float difficulty = Fix(dna.playerDifficulty, 0f, 1f, 0.5f, "playerDifficulty", log);
             dna.playerDifficulty = difficulty;

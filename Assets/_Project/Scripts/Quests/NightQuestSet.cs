@@ -71,5 +71,11 @@ namespace Ascua.Quests
         [Tooltip("Momento de la noche (0-1) en que aparece.")]
         [Range(0f, 1f)] public float heraldoAppearAt = 0.25f;
         public float heraldoChaseSpeed = 1.3f;
+
+        [Header("Dificultad · Cacería del Heraldo")]
+        [Tooltip("-1 = automático (noches 1-2: 0, noche 3: 1, noche 4+: 2); 0-3 = cacerías fijas.")]
+        [Range(-1, 3)] public int huntCount = -1;
+        [Tooltip("Velocidad del Heraldo al cazar (Ilse corre a 5.2).")]
+        [Range(3.5f, 6f)] public float huntSpeed = 4.8f;
     }
 }
