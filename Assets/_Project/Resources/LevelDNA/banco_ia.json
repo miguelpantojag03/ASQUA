@@ -27,7 +27,7 @@
       "heraldoEnabled": true,
       "heraldoAppearAt": 0.3,
       "heraldoChaseSpeed": 1.1,
-      "huntCount": -1,
+      "huntCount": 1,
       "huntSpeed": 4.5,
       "narrativeFragments": ["Hoy las ventanas se acuerdan solas", "Alguien dijo un nombre en voz alta", "El mar trae buenas noticias"]
     },
