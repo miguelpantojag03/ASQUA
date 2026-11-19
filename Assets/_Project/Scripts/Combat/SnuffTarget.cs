@@ -85,13 +85,15 @@ namespace Ascua.Combat
             }
         }
 
-        /// <summary>Apaga la luz: la farola se apaga y se bloquea; la vela desaparece.</summary>
+        /// <summary>Apaga la luz: la farola se apaga y se bloquea (reencendible con el Farol); la vela desaparece.</summary>
         public void Snuff()
         {
             if (Lamp != null)
             {
                 Lamp.TurnOff();
                 Lamp.SetLocked(true);
+                // Se puede deshacer: el Farol de Ilse la reenciende si la ilumina 1.2 s.
+                RelightOnLantern.Attach(Lamp);
             }
             else if (Candle != null)
             {
