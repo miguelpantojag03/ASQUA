@@ -262,7 +262,9 @@ namespace Ascua.Characters
 
             // Junto al Heraldo, el Farol se vacía y los pasos pesan. Esquivar (dash) rompe su abrazo un momento.
             bool hunting = state == State.Persiguiendo || state == State.Acechando || state == State.Cazando;
-            bool released = Time.time - lastDashTime < dashReleaseSeconds;
+            // Dentro de un refugio, durante la cacería, su abrazo no llega.
+            bool released = Time.time - lastDashTime < dashReleaseSeconds
+                            || (IsHunting && SafeHaven.RefugeContaining(player.position) != null);
             if (hunting && !released && distance <= drainRadius * 1.5f && playerController != null)
             {
                 playerController.ApplySlow(slowFactor);
@@ -406,16 +408,19 @@ namespace Ascua.Characters
             if (huntElapsed >= huntMaxSeconds) EndHunt(false);
         }
 
-        /// <summary>Hacia dónde corre al cazar.</summary>
+        /// <summary>Hacia dónde corre al cazar: a Ilse, o al borde del refugio si ella está dentro (no puede entrar).</summary>
         private Vector3 HuntDestination()
         {
-            return player.position;
+            SafeHaven haven = SafeHaven.RefugeContaining(player.position);
+            if (haven == null) return player.position;
+            Vector3 edge = haven.EdgePointToward(transform.position, 0.4f);
+            return NavMesh.SamplePosition(edge, out NavMeshHit hit, 2f, NavMesh.AllAreas) ? hit.position : transform.position;
         }
 
-        /// <summary>True si ahora mismo puede alcanzar a Ilse.</summary>
+        /// <summary>True si ahora mismo puede alcanzar a Ilse (no frenado y ella fuera de un refugio).</summary>
         private bool CanCatchPlayer()
         {
-            return huntStunTimer <= 0f;
+            return huntStunTimer <= 0f && SafeHaven.RefugeContaining(player.position) == null;
         }
 
         /// <summary>Te alcanzó: penalización breve (energía y algo de Esperanza), un aviso y se retira.</summary>
