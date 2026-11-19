@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Ascua.LevelGen;
 using Ascua.World;
 using UnityEngine;
 
@@ -120,25 +121,32 @@ namespace Ascua.Combat
             }
         }
 
-        /// <summary>La luz que este Apagavelas debería ir a apagar (o null si no queda ninguna).</summary>
+        private static readonly List<SnuffCandidate> candidates = new List<SnuffCandidate>();
+        private static readonly List<SnuffTarget> candidateTargets = new List<SnuffTarget>();
+
+        /// <summary>
+        /// La luz que este Apagavelas debería ir a apagar (o null si no queda ninguna encendida y libre).
+        /// La elección es SnuffPlanner.PickBest: zona con menos Esperanza, luego la más cercana; empate por índice.
+        /// </summary>
         public static SnuffTarget PickBest(Vector3 from, Apagavelas who)
         {
             if (all.Count == 0) Collect();
-            SnuffTarget best = null;
-            float bestDistance = float.MaxValue;
+            candidates.Clear();
+            candidateTargets.Clear();
             for (int i = 0; i < all.Count; i++)
             {
                 SnuffTarget t = all[i];
+                // Solo luces encendidas (apagar una ya apagada no tiene sentido) y que no tenga otro Apagavelas.
                 if (!t.Exists || !t.IsLit) continue;
                 if (t.ClaimedBy != null && t.ClaimedBy != who && t.ClaimedBy.IsAlive) continue;
-                float d = (t.BasePosition - from).sqrMagnitude;
-                if (d < bestDistance)
-                {
-                    bestDistance = d;
-                    best = t;
-                }
+                ZoneHope zone = t.Zone;
+                if (zone != null && zone.IsDead) continue;
+                Vector3 p = t.BasePosition;
+                candidates.Add(new SnuffCandidate(t.Index, true, zone != null ? zone.Normalized : 1f, p.x, p.z));
+                candidateTargets.Add(t);
             }
-            return best;
+            int best = SnuffPlanner.PickBest(candidates, from.x, from.z);
+            return best >= 0 ? candidateTargets[best] : null;
         }
 
         private static ZoneHope NearestZone(Vector3 position)

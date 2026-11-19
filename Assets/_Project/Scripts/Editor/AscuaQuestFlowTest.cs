@@ -97,6 +97,9 @@ namespace Ascua.EditorTools
             // Igual con el evento de la noche 3-5 (la prueba llega a la Noche 3): se prueba aparte con F7.
             NightEventDirector nightEvent = NightEventDirector.Instance;
             if (nightEvent != null && nightEvent.enabled && !nightEvent.IsPlaying) nightEvent.enabled = false;
+            // Y con los Apagavelas (desde la Noche 2): apagarían farolas que la prueba comprueba.
+            SnuffDirector snuff = SnuffDirector.Instance;
+            if (snuff != null && snuff.ScheduledCount > 0) snuff.Configure(0);
 
             frameTimes.Add(Time.unscaledDeltaTime * 1000f);
 
