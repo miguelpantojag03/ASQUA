@@ -267,7 +267,8 @@ namespace Ascua.Characters
             bool hunting = state == State.Persiguiendo || state == State.Acechando || state == State.Cazando;
             // Dentro de un refugio, durante la cacería, su abrazo no llega.
             bool released = Time.time - lastDashTime < dashReleaseSeconds
-                            || (IsHunting && SafeHaven.RefugeContaining(player.position) != null);
+                            || (IsHunting && SafeHaven.RefugeContaining(player.position) != null)
+                            || HuntFrozen;
             if (hunting && !released && distance <= drainRadius * 1.5f && playerController != null)
             {
                 playerController.ApplySlow(slowFactor);
@@ -382,8 +383,18 @@ namespace Ascua.Characters
             warningFlicker = active;
         }
 
+        /// <summary>Con un diálogo abierto Ilse no puede moverse: la cacería se congela (ni avanza ni alcanza).</summary>
+        private bool HuntFrozen => IsHunting && DialogueRunner.Instance != null && DialogueRunner.Instance.IsOpen;
+
         private void UpdateHunt(float distance, float dt)
         {
+            if (HuntFrozen)
+            {
+                if (!agent.isStopped) agent.isStopped = true;
+                return;
+            }
+            if (agent.isStopped) agent.isStopped = false;
+
             huntElapsed += dt;
 
             if (huntStunTimer > 0f)
@@ -459,6 +470,7 @@ namespace Ascua.Characters
             huntStunTimer = 0f;
             warningFlicker = false;
             agent.acceleration = normalAcceleration;
+            if (agent.enabled) agent.isStopped = false;
             HuntEnded?.Invoke(outcome);
         }
 

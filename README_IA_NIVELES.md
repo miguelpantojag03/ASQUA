@@ -89,6 +89,7 @@ En momentos fijos de la noche el Heraldo deja de pasear y **corre** (4.8 m/s, ca
 2. **Solo empieza** con el Heraldo presente y sin diálogo, oleada, momento narrativo (`HeraldoOmen` / `EventBus.NarrativeMoment`) ni pausa. Si no se da, reintenta cada segundo hasta el 95 %.
 3. **Aviso (4 s):** "Escucha… se acerca", `SFX_Amenaza` con subtítulo y el farol violeta parpadeando (con *reducir destellos*, sin parpadeo). Los refugios ya se ven.
 4. **Cacería:** el Heraldo reaparece a ~18 m, del lado contrario al refugio más cercano. HUD con flecha (8 sentidos) y distancia al refugio, música en tensión máxima y subtítulo `[Pasos veloces]`. El Pulso solo lo frena 1.5 s; el dash sigue liberando de su abrazo.
+   Con un diálogo abierto la cacería se congela (el Heraldo no avanza ni alcanza, el tiempo no corre), y los momentos narrativos (`NightEvent`, `HeraldoOmen`) esperan a que termine.
 5. **Final:**
    - **Refugio** (2 s dentro del círculo): el Heraldo se detiene al borde. +20 de energía, +1 de Vínculo con ese NPC y "Mina te cubre con su luz".
    - **Te alcanza** (a 1.6 m): −25 de energía, −15 de Esperanza a la zona más cercana (nunca por debajo de 5), aviso corto y se retira 20 s.

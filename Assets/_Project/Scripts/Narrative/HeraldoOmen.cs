@@ -125,7 +125,9 @@ namespace Ascua.Narrative
             CombatWaveDirector director = CombatWaveDirector.Instance;
             if (director != null && director.Alive.Count > 0) return false;
             Heraldo_AI heraldo = FindFirstObjectByType<Heraldo_AI>();
-            if (heraldo != null && heraldo.IsChasing) return false;
+            if (heraldo != null && (heraldo.IsChasing || heraldo.IsHunting)) return false;
+            // Ni durante el aviso de una Cacería del Heraldo.
+            if (HeraldoHuntDirector.Instance != null && HeraldoHuntDirector.Instance.IsBusy) return false;
             return true;
         }
 
