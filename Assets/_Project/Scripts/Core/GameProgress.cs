@@ -21,6 +21,8 @@ namespace Ascua.Core
         // Decisiones con consecuencia tardía (p. ej. a quién dio Ilse las velas de reserva en la Noche 2).
         private static readonly HashSet<string> flags = new HashSet<string>();
         private static readonly List<string> flagsThisNight = new List<string>();
+        // Momentos que se deshacen al reintentar la noche (eventos de las noches 3-5).
+        private static readonly List<string> momentsThisNight = new List<string>();
 
         /// <summary>Noche actual (1, 2, 3...).</summary>
         public static int CurrentNight { get; private set; } = 1;
@@ -55,6 +57,7 @@ namespace Ascua.Core
             pagesThisNight.Clear();
             flags.Clear();
             flagsThisNight.Clear();
+            momentsThisNight.Clear();
             WavesDefended = 0;
             // Partida nueva: se olvidan los niveles generados y el perfil del jugador (IA de niveles).
             Ascua.AILevelGen.AIDirector.ResetAll();
@@ -65,6 +68,7 @@ namespace Ascua.Core
             CurrentNight++;
             pagesThisNight.Clear();
             flagsThisNight.Clear();
+            momentsThisNight.Clear();
         }
 
         public static void MarkQuestCompleted(string questId) => completedQuests.Add(questId);
@@ -119,6 +123,8 @@ namespace Ascua.Core
         {
             foreach (string flag in flagsThisNight) flags.Remove(flag);
             flagsThisNight.Clear();
+            foreach (string moment in momentsThisNight) seenMoments.Remove(moment);
+            momentsThisNight.Clear();
         }
 
         /// <summary>Solo para pruebas: salta directamente a una noche concreta.</summary>
@@ -131,6 +137,17 @@ namespace Ascua.Core
 
         /// <summary>Los momentos memorables solo se ven una vez por partida.</summary>
         public static bool MarkMomentSeen(string id) => seenMoments.Add(id);
+
+        /// <summary>
+        /// Como MarkMomentSeen, pero si se reintenta la noche el momento vuelve a ocurrir
+        /// (igual que se deshacen las decisiones de esa noche: p. ej. nombrar a Corvin).
+        /// </summary>
+        public static bool MarkMomentSeenThisNight(string id)
+        {
+            if (string.IsNullOrEmpty(id) || !seenMoments.Add(id)) return false;
+            momentsThisNight.Add(id);
+            return true;
+        }
 
         /// <summary>True si el momento ya se vio (sin marcarlo).</summary>
         public static bool HasSeenMoment(string id) => seenMoments.Contains(id);
