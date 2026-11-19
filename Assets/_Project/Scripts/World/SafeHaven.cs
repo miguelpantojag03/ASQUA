@@ -262,6 +262,15 @@ namespace Ascua.World
             visual.SetActive(false);
         }
 
+        /// <summary>Color cálido por defecto de los anillos.</summary>
+        public static readonly Color WarmColor = new Color(1f, 0.62f, 0.22f);
+
+        /// <summary>Malla del anillo (radio 1) para otros círculos de luz (p. ej. los farolillos de la Noche 5).</summary>
+        public static Mesh SharedRingMesh() => RingMesh();
+
+        /// <summary>Material ámbar emisivo compartido (el mismo de los refugios).</summary>
+        public static Material SharedWarmMaterial() => RingMaterial(WarmColor);
+
         /// <summary>Material ámbar emisivo creado una sola vez y compartido por todos los refugios.</summary>
         private static Material RingMaterial(Color color)
         {
