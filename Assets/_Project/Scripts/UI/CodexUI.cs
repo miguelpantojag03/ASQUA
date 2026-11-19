@@ -120,9 +120,18 @@ namespace Ascua.UI
 
         private DiaryPage FindFound(int number)
         {
-            if (pages == null) return null;
-            foreach (DiaryPage page in pages)
+            if (pages != null)
             {
+                foreach (DiaryPage page in pages)
+                {
+                    if (page != null && page.number == number && GameProgress.HasPage(page.pageId)) return page;
+                }
+            }
+            // Páginas creadas por código (p. ej. la 7, del tren fantasma).
+            var runtimePages = RuntimeDiaryPages.All;
+            for (int i = 0; i < runtimePages.Count; i++)
+            {
+                DiaryPage page = runtimePages[i];
                 if (page != null && page.number == number && GameProgress.HasPage(page.pageId)) return page;
             }
             return null;

@@ -404,6 +404,9 @@ namespace Ascua.Audio
                 case "vara_luz": PlaySfx(sfxMoment, 0.9f, 1.2f, "[El Farol se transforma]"); break;
                 case "fijar_objetivo": PlaySfx(sfxLockOn, 0.45f, UnityEngine.Random.Range(0.97f, 1.03f)); break;
                 case "presagio_susurro": PlaySfx(sfxWhisper, 0.85f, 1f, "[Un susurro lejano, sin palabras]"); break;
+                // Noche 3: silbido grave del tren fantasma (el barrido del Farol, muy lento y grave).
+                case "tren_silbido": PlaySfx(sfxLanternResize, 0.7f, 0.42f, "[Un tren lejano]"); break;
+                case "tren_silbido_eco": PlaySfx(sfxLanternResize, 0.45f, 0.38f); break;
             }
         }
 
