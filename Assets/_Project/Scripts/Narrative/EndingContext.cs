@@ -18,6 +18,9 @@ namespace Ascua.Narrative
         public const string TeoId = "teo";
         public const string PerpetuaId = "perpetua";
 
+        /// <summary>Marca que deja Ilse al decir "Corvin." en la Noche 4 (se guarda con el resto de marcas).</summary>
+        public const string NamedCorvinFlag = "nombro_corvin";
+
         /// <summary>Datos de la partida al terminar la última noche.</summary>
         /// <param name="summary">NightManager.LastSummary (puede ser null).</param>
         /// <param name="fallback">Resultado de la noche, por si no hay resumen.</param>
@@ -29,7 +32,7 @@ namespace Ascua.Narrative
                 TotalZones = summary != null ? summary.SavedZones.Count + summary.LostZones.Count : fallback.ZonesTotal,
                 TratosAccepted = GameProgress.IsQuestCompleted(TratoQuestId) ? 1 : 0,
                 DiaryPages = GameProgress.FoundPages.Count,
-                NamedCorvin = false   // la marca aún no existe en el juego
+                NamedCorvin = GameProgress.HasFlag(NamedCorvinFlag)
             };
 
             QuestManager quests = QuestManager.Instance;

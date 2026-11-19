@@ -22,7 +22,7 @@ namespace Ascua.Endings
         /// <summary>Páginas del Diario de Ilse encontradas (de 6).</summary>
         public int DiaryPages;
 
-        /// <summary>True si Ilse pronunció el nombre de Corvin (marca que aún no existe en el juego).</summary>
+        /// <summary>True si Ilse pronunció el nombre de Corvin en la Noche 4 (marca "nombro_corvin").</summary>
         public bool NamedCorvin;
     }
 }
