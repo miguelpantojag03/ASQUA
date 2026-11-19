@@ -102,3 +102,28 @@ En momentos fijos de la noche el Heraldo deja de pasear y **corre** (4.8 m/s, ca
 **Probar:** `F1` y después `F6` lanza una cacería ahora (el panel muestra cuántas quedan y cuándo). Pruebas: `HuntScheduleTests` y las nuevas de `LevelGenTests`.
 
 **Archivos:** `Scripts/Combat/HeraldoHuntDirector.cs`, `Scripts/World/SafeHaven.cs`, `Scripts/AI_LevelGen/Logica/HuntSchedule.cs`, `Scripts/Characters/Heraldo_AI.cs` (estado *Cazando*), `Scripts/Audio/AudioManager.cs` (`SetHuntTension`, `PlayHuntWarning`).
+
+# Eventos por noche y Corvin
+
+Cada noche diseñada tiene un momento memorable (handoff §8.6). Los de las noches 1 y 2 están en la escena (`NightEvent` de Brasa, `HeraldoOmen`). Los de las noches **3, 4 y 5** los crea por código `NightEventDirector`: `NightManager` lo crea en `Awake` según `GameProgress.CurrentNight`, sin tocar la escena.
+
+- **Cuándo:** `NightEventRules` (lógica pura, `Ascua.LevelGen`) decide: solo en su noche, una vez por partida, cuando el progreso pasa su umbral y no hay diálogo, oleada, Cacería, pausa ni otro momento narrativo. Desde el **90 %** ya no ocurre. Las noches generadas posteriores (6+) no lo repiten.
+- **Al reintentar la noche** el evento vuelve a ocurrir, igual que se deshacen sus decisiones (`GameProgress.MarkMomentSeenThisNight`).
+- Al empezar y terminar publica `EventBus.RaiseNarrativeMoment`: la música lo marca y la Cacería del Heraldo espera.
+
+| Noche | Evento | Qué pasa |
+|---|---|---|
+| 3 (55 %) | **El tren fantasma** | Por el borde norte pasa en 14 s un tren de 8 ventanas de luz azul pálido. Silbido grave con subtítulo `[Un tren lejano]`. Aparecen 4 luciérnagas doradas en fila: recogerlas todas da la **página 7** del Diario ("Tuve un hijo… Y no puedo decir su nombre.") y energía. Ilse piensa: "Nadie bajó. Nadie subió. Aun así, el tren pasó." |
+| 4 (70 %) | **El nombre** | El Heraldo se detiene a ~6 m, gira su farol dos veces y habla. Opciones: **"Corvin."** (marca `nombro_corvin`, +10 de energía, +1 de Vínculo con quien esté más cerca y su farol se vuelve **dorado** desde entonces), "No sé quién eres." o "Aléjate." |
+| 5 (5 %) | **Los farolillos** | Cada personaje con **Vínculo ≥ 3** enciende su farolillo (luz cálida de 6 m y anillo ámbar). Dentro, la Esperanza de la zona más cercana sube +1.5/s. Los de Vínculo bajo no lo encienden. |
+
+**Corvin y los finales**
+- `EndingContext.NamedCorvin` lee la marca `nombro_corvin` (se guarda con las demás en `GameProgressData.flags`).
+- `EndingResolver.RequireCorvinName = true`: **Constelación exige haber nombrado a Corvin**. Todo perfecto sin nombrarlo = **Alba**.
+- `EndingResolver.TotalDiaryPages = 7`: el final secreto pide también la página del tren.
+
+**Accesibilidad:** sin mover la cámara; todo con `Time.deltaTime` (la pausa lo congela); con *reducir destellos* las luces no titilan; el silbido tiene subtítulo.
+
+**Probar:** `F1` y después `F7` dispara ya el evento de la noche actual (aunque ya se haya visto). Para llegar a la noche: `F5`. Pruebas: `NightEventRulesTests` y `EndingResolverTests`.
+
+**Archivos:** `Scripts/Narrative/NightEventDirector*.cs` (uno por evento), `Scripts/Narrative/RuntimeDiaryPages.cs`, `Scripts/World/BondLantern.cs`, `Scripts/AI_LevelGen/Logica/NightEventRules.cs`, `Scripts/Characters/Heraldo_AI.cs` (`StopBefore`, `TwirlLantern`, `SetGoldenLantern`).
