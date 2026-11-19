@@ -115,6 +115,9 @@ namespace Ascua.Characters
         /// <summary>Cacería en curso (corre rápido hacia Ilse).</summary>
         public bool IsHunting => state == State.Cazando;
 
+        /// <summary>Puede empezar una cacería: presente y merodeando o persiguiendo (no repelido ni retirado).</summary>
+        public bool IsAvailableForHunt => state == State.Acechando || state == State.Persiguiendo;
+
         /// <summary>Segundos que lleva la cacería actual.</summary>
         public float HuntElapsed => huntElapsed;
         public float HuntMaxSeconds => huntMaxSeconds;

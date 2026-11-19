@@ -256,6 +256,21 @@ namespace Ascua.Audio
             endingMusic = false;
         }
 
+        // Cacería del Heraldo: la capa de tensión se fija al máximo mientras dure.
+        private bool huntTension;
+
+        /// <summary>Fija (true) o suelta (false) la tensión de la música al máximo (Cacería del Heraldo).</summary>
+        public void SetHuntTension(bool active)
+        {
+            huntTension = active;
+        }
+
+        /// <summary>Aviso de cacería: el sonido de amenaza que ya existe (SFX_Amenaza), con subtítulo.</summary>
+        public void PlayHuntWarning()
+        {
+            PlaySfx(sfxThreat, 0.85f, 0.85f, "[Un rumor grave: algo corre hacia ti]");
+        }
+
         private void UpdateLayers(float dt)
         {
             // Esperanza media de las zonas vivas (0-1).
@@ -275,6 +290,7 @@ namespace Ascua.Audio
             if (Heraldo_AI.Instance != null) heraldo = Mathf.Clamp01(1f - (Heraldo_AI.Instance.DistanceToPlayer - 4f) / 18f);
             // Tensión: Heraldo cerca, ráfaga de la Penumbra u oleada de sombras.
             float tension = Mathf.Max(heraldo, surgeActive ? 1f : waveActive ? 0.85f : 0f);
+            if (huntTension) tension = 1f;
             float hopeTarget = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.3f, 0.85f, hope));
 
             // Secuencia del final: manda la capa de esperanza pedida y no hay tensión.
