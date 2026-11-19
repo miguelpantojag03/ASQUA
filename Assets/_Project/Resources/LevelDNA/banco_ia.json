@@ -27,6 +27,8 @@
       "heraldoEnabled": true,
       "heraldoAppearAt": 0.3,
       "heraldoChaseSpeed": 1.1,
+      "huntCount": -1,
+      "huntSpeed": 4.5,
       "narrativeFragments": ["Hoy las ventanas se acuerdan solas", "Alguien dijo un nombre en voz alta", "El mar trae buenas noticias"]
     },
     {
@@ -56,6 +58,8 @@
       "heraldoEnabled": true,
       "heraldoAppearAt": 0.28,
       "heraldoChaseSpeed": 1.3,
+      "huntCount": -1,
+      "huntSpeed": 4.8,
       "narrativeFragments": ["Lo que aún respira", "La ciudad guarda silencio", "Una luz por cada nombre"]
     },
     {
@@ -85,6 +89,8 @@
       "heraldoEnabled": true,
       "heraldoAppearAt": 0.22,
       "heraldoChaseSpeed": 1.55,
+      "huntCount": 3,
+      "huntSpeed": 5.2,
       "narrativeFragments": ["La niebla llega antes de lo previsto", "Nadie duerme en Vesper", "El viento trae un susurro"]
     },
     {
@@ -114,6 +120,8 @@
       "heraldoEnabled": true,
       "heraldoAppearAt": 0.15,
       "heraldoChaseSpeed": 1.8,
+      "huntCount": 3,
+      "huntSpeed": 5.4,
       "narrativeFragments": ["La última noche larga", "Todo lo que se recuerda arde", "Hoy no se apaga nadie"]
     }
   ]
