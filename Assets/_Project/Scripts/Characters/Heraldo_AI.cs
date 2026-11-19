@@ -3,6 +3,7 @@ using Ascua.Lighting;
 using Ascua.Narrative;
 using Ascua.Quests;
 using Ascua.UI;
+using Ascua.World;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -15,6 +16,8 @@ namespace Ascua.Characters
     /// misión de tipo TratoHeraldo (la misma arquitectura de misiones, no un sistema aparte).
     /// En Persecución Activa se le puede "enfrentar" con luz (HeraldoConfrontation): nunca se le
     /// derrota, solo retrocede, se desvanece y reaparece, y al final se aleja revelando una pista.
+    /// Cacería (HeraldoHuntDirector): en momentos fijos de la noche corre casi tan rápido como Ilse
+    /// durante unos segundos. Si la alcanza hay una penalización breve; nunca hay Game Over.
     /// </summary>
     [RequireComponent(typeof(NavMeshAgent))]
     public class Heraldo_AI : MonoBehaviour
@@ -22,7 +25,10 @@ namespace Ascua.Characters
         private static readonly int SpeedHash = Animator.StringToHash("Speed");
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
-        private enum State { Dormido, Acechando, Persiguiendo, Repelido, Retirado }
+        private enum State { Dormido, Acechando, Persiguiendo, Repelido, Retirado, Cazando }
+
+        /// <summary>Cómo terminó una cacería.</summary>
+        public enum HuntOutcome { Refugio, Alcanzada, PerdioInteres }
 
         public static Heraldo_AI Instance { get; private set; }
 
@@ -55,6 +61,24 @@ namespace Ascua.Characters
         [Tooltip("Distancia a la que ofrece su Trato la primera vez.")]
         [SerializeField] private float offerDistance = 3f;
 
+        [Header("Cacería")]
+        [Tooltip("Velocidad al cazar (Ilse corre a 5.2: solo escapa corriendo o con el dash).")]
+        [SerializeField] private float huntSpeed = 4.8f;
+        [SerializeField] private float huntAcceleration = 14f;
+        [Tooltip("Segundos que el Pulso lo frena mientras caza (fuera de la cacería son repelDuration).")]
+        [SerializeField] private float huntRepelSeconds = 1.5f;
+        [SerializeField] private float huntCatchDistance = 1.6f;
+        [Tooltip("Distancia a Ilse a la que aparece al empezar (del lado contrario al refugio).")]
+        [SerializeField] private float huntSpawnDistance = 18f;
+        [Tooltip("Si en este tiempo no la alcanza, pierde interés.")]
+        [SerializeField] private float huntMaxSeconds = 15f;
+        [SerializeField] private float caughtEnergyLoss = 25f;
+        [SerializeField] private float caughtHopeLoss = 15f;
+        [Tooltip("La cacería nunca deja una zona por debajo de esto.")]
+        [SerializeField] private float caughtHopeFloor = 5f;
+        [SerializeField] private float retreatAfterCatchSeconds = 20f;
+        [SerializeField] private float retreatAfterHuntSeconds = 10f;
+
         [Header("Visual")]
         [SerializeField] private Animator animator;
         [SerializeField] private Renderer[] bodyRenderers;
@@ -72,6 +96,15 @@ namespace Ascua.Characters
         private float repathTimer;
         private bool offered;
         private MaterialPropertyBlock propertyBlock;
+        private float huntElapsed;
+        private float huntStunTimer;
+        private float normalAcceleration = 8f;
+        private bool warningFlicker;
+
+        /// <summary>Se lanza al empezar una cacería.</summary>
+        public event System.Action HuntStarted;
+        /// <summary>Se lanza al terminar una cacería (refugio, alcanzada o sin interés).</summary>
+        public event System.Action<HuntOutcome> HuntEnded;
 
         /// <summary>True si está en la escena (visible y activo).</summary>
         public bool IsPresent => state != State.Dormido;
@@ -79,13 +112,20 @@ namespace Ascua.Characters
         /// <summary>Persecución Activa: el único momento en que se le puede enfrentar.</summary>
         public bool IsChasing => state == State.Persiguiendo;
 
+        /// <summary>Cacería en curso (corre rápido hacia Ilse).</summary>
+        public bool IsHunting => state == State.Cazando;
+
+        /// <summary>Segundos que lleva la cacería actual.</summary>
+        public float HuntElapsed => huntElapsed;
+        public float HuntMaxSeconds => huntMaxSeconds;
+
         /// <summary>
         /// Se desvanece y reaparece a 'minRadius'-'maxRadius' m de 'center' (enfrentamiento).
         /// Devuelve false si no encontró sitio en el NavMesh.
         /// </summary>
         public bool TeleportAround(Vector3 center, float minRadius, float maxRadius)
         {
-            if (!IsPresent || !agent.enabled) return false;
+            if (!IsPresent || !agent.enabled || IsHunting) return false;
             for (int attempt = 0; attempt < 10; attempt++)
             {
                 float angle = Random.value * Mathf.PI * 2f;
@@ -112,6 +152,7 @@ namespace Ascua.Characters
         public void RetreatFor(float seconds)
         {
             if (!IsPresent) return;
+            if (IsHunting) StopHunt(HuntOutcome.PerdioInteres);
             state = State.Retirado;
             stateTimer = seconds;
             Transform far = FarthestLurkPoint();
@@ -124,6 +165,7 @@ namespace Ascua.Characters
             agent = GetComponent<NavMeshAgent>();
             interactable = GetComponent<NpcInteractable>();
             propertyBlock = new MaterialPropertyBlock();
+            normalAcceleration = agent.acceleration;
         }
 
         private void OnDestroy()
@@ -212,10 +254,14 @@ namespace Ascua.Characters
                 case State.Retirado:
                     if (stateTimer <= 0f) EnterLurk();
                     break;
+
+                case State.Cazando:
+                    UpdateHunt(distance, dt);
+                    break;
             }
 
             // Junto al Heraldo, el Farol se vacía y los pasos pesan. Esquivar (dash) rompe su abrazo un momento.
-            bool hunting = state == State.Persiguiendo || state == State.Acechando;
+            bool hunting = state == State.Persiguiendo || state == State.Acechando || state == State.Cazando;
             bool released = Time.time - lastDashTime < dashReleaseSeconds;
             if (hunting && !released && distance <= drainRadius * 1.5f && playerController != null)
             {
@@ -228,7 +274,10 @@ namespace Ascua.Characters
 
             if (animator != null)
             {
-                animator.SetFloat(SpeedHash, Mathf.Clamp01(agent.velocity.magnitude / Mathf.Max(0.1f, chaseSpeed)) * 0.5f, 0.2f, dt);
+                // Al cazar corre (hasta 1); el resto del tiempo camina (hasta 0.5).
+                float topSpeed = IsHunting ? huntSpeed : chaseSpeed;
+                float gait = IsHunting ? 1f : 0.5f;
+                animator.SetFloat(SpeedHash, Mathf.Clamp01(agent.velocity.magnitude / Mathf.Max(0.1f, topSpeed)) * gait, 0.2f, dt);
             }
             UpdateLantern();
         }
@@ -262,14 +311,194 @@ namespace Ascua.Characters
         public void Repel(Vector3 from)
         {
             if (!IsPresent || !agent.enabled) return;
+            agent.speed = repelSpeed;
+            MoveAwayFrom(from);
+
+            // Cazando, el Pulso solo lo frena un momento: la cacería sigue.
+            if (IsHunting)
+            {
+                huntStunTimer = huntRepelSeconds;
+                return;
+            }
             state = State.Repelido;
             stateTimer = repelDuration;
-            agent.speed = repelSpeed;
+        }
 
+        private void MoveAwayFrom(Vector3 from)
+        {
             Vector3 away = transform.position - from;
             away.y = 0f;
             Vector3 target = transform.position + away.normalized * 10f;
             if (NavMesh.SamplePosition(target, out NavMeshHit hit, 6f, NavMesh.AllAreas)) agent.SetDestination(hit.position);
+        }
+
+        // ================================================================== Cacería
+
+        /// <summary>
+        /// Empieza una cacería: reaparece a ~huntSpawnDistance m de Ilse, del lado contrario a 'awayFrom'
+        /// (el refugio más cercano) y corre hacia ella a 'speed'. Devuelve false si no está presente.
+        /// </summary>
+        public bool StartHunt(float speed, Vector3 awayFrom)
+        {
+            if (!IsPresent || !agent.enabled || player == null || IsHunting) return false;
+
+            huntSpeed = Mathf.Max(0.5f, speed);
+            WarpBehindPlayer(awayFrom);
+
+            state = State.Cazando;
+            huntElapsed = 0f;
+            huntStunTimer = 0f;
+            repathTimer = 0f;
+            warningFlicker = false;
+            agent.isStopped = false;
+            agent.acceleration = huntAcceleration;
+            agent.ResetPath();
+            HuntStarted?.Invoke();
+            return true;
+        }
+
+        /// <summary>
+        /// Termina la cacería. success = Ilse llegó a un refugio; si no, pierde interés.
+        /// En ambos casos se retira un rato. Las recompensas las da quien llama (SafeHaven).
+        /// </summary>
+        public void EndHunt(bool success)
+        {
+            if (!IsHunting) return;
+            StopHunt(success ? HuntOutcome.Refugio : HuntOutcome.PerdioInteres);
+            state = State.Retirado;
+            stateTimer = retreatAfterHuntSeconds;
+            Transform far = FarthestLurkPoint();
+            if (far != null && agent.enabled) agent.SetDestination(far.position);
+        }
+
+        /// <summary>Aviso de cacería: el farol violeta parpadea (con "reducir destellos" solo brilla más).</summary>
+        public void SetWarningFlicker(bool active)
+        {
+            warningFlicker = active;
+        }
+
+        private void UpdateHunt(float distance, float dt)
+        {
+            huntElapsed += dt;
+
+            if (huntStunTimer > 0f)
+            {
+                // Frenado por el Pulso: retrocede un instante.
+                huntStunTimer -= dt;
+                agent.speed = repelSpeed;
+                if (huntStunTimer <= 0f) repathTimer = 0f;
+            }
+            else
+            {
+                agent.speed = huntSpeed;
+                if (repathTimer <= 0f)
+                {
+                    repathTimer = 0.2f;
+                    agent.SetDestination(HuntDestination());
+                }
+            }
+
+            if (distance <= huntCatchDistance && CanCatchPlayer())
+            {
+                Caught();
+                return;
+            }
+            if (huntElapsed >= huntMaxSeconds) EndHunt(false);
+        }
+
+        /// <summary>Hacia dónde corre al cazar.</summary>
+        private Vector3 HuntDestination()
+        {
+            return player.position;
+        }
+
+        /// <summary>True si ahora mismo puede alcanzar a Ilse.</summary>
+        private bool CanCatchPlayer()
+        {
+            return huntStunTimer <= 0f;
+        }
+
+        /// <summary>Te alcanzó: penalización breve (energía y algo de Esperanza), un aviso y se retira.</summary>
+        private void Caught()
+        {
+            if (playerEnergy != null) playerEnergy.ApplyDamage(caughtEnergyLoss);
+
+            // La zona más cercana pierde algo de Esperanza, pero la cacería nunca la apaga.
+            ZoneHope zone = NearestLiveZone(player.position);
+            if (zone != null)
+            {
+                float loss = Mathf.Min(caughtHopeLoss, zone.Hope - caughtHopeFloor);
+                if (loss > 0f) zone.AddHope(-loss);
+            }
+
+            if (ZoneLostNotification.Instance != null)
+            {
+                ZoneLostNotification.Instance.Show("El Heraldo te alcanza… por un instante olvidas por qué brillabas", 2.8f);
+            }
+
+            StopHunt(HuntOutcome.Alcanzada);
+            state = State.Retirado;
+            stateTimer = retreatAfterCatchSeconds;
+            Transform far = FarthestLurkPoint();
+            if (far != null && agent.enabled) agent.SetDestination(far.position);
+        }
+
+        /// <summary>Sale del estado de cacería y avisa. Quien llama fija el estado siguiente.</summary>
+        private void StopHunt(HuntOutcome outcome)
+        {
+            if (!IsHunting) return;
+            state = State.Acechando;
+            huntStunTimer = 0f;
+            warningFlicker = false;
+            agent.acceleration = normalAcceleration;
+            HuntEnded?.Invoke(outcome);
+        }
+
+        /// <summary>Reaparece a ~huntSpawnDistance m de Ilse, en dirección contraria a 'awayFrom'.</summary>
+        private void WarpBehindPlayer(Vector3 awayFrom)
+        {
+            Vector3 back = player.position - awayFrom;
+            back.y = 0f;
+            if (back.sqrMagnitude < 0.01f) back = -player.forward;
+            back.y = 0f;
+            if (back.sqrMagnitude < 0.01f) back = Vector3.back;
+            back.Normalize();
+
+            // Primero justo detrás; si no hay NavMesh allí, se abre el ángulo y se cambia la distancia.
+            float[] angles = { 0f, 25f, -25f, 50f, -50f, 80f, -80f };
+            float[] distances = { huntSpawnDistance, huntSpawnDistance * 0.8f, huntSpawnDistance * 1.2f, huntSpawnDistance * 0.6f };
+            foreach (float d in distances)
+            {
+                foreach (float a in angles)
+                {
+                    Vector3 p = player.position + Quaternion.Euler(0f, a, 0f) * back * d;
+                    if (!NavMesh.SamplePosition(p, out NavMeshHit hit, 3f, NavMesh.AllAreas)) continue;
+                    agent.Warp(hit.position);
+                    Vector3 look = player.position - hit.position;
+                    look.y = 0f;
+                    if (look.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(look.normalized, Vector3.up);
+                    return;
+                }
+            }
+            // Sin sitio en el NavMesh: caza desde donde está.
+        }
+
+        private static ZoneHope NearestLiveZone(Vector3 position)
+        {
+            ZoneHope best = null;
+            float bestDistance = float.MaxValue;
+            var zones = ZoneHope.All;
+            for (int i = 0; i < zones.Count; i++)
+            {
+                if (zones[i] == null || zones[i].IsDead) continue;
+                float d = (zones[i].Center - position).sqrMagnitude;
+                if (d < bestDistance)
+                {
+                    bestDistance = d;
+                    best = zones[i];
+                }
+            }
+            return best;
         }
 
         private void TryOfferDeal(float distance)
@@ -293,6 +522,8 @@ namespace Ascua.Characters
             if (interactable == null || QuestManager.Instance == null) return;
             QuestRuntime q = QuestManager.Instance.FindById(questId);
             if (q == null || q.Data.giverNpcId != interactable.NpcId) return;
+
+            if (IsHunting) return;   // la cacería manda: el Trato no la interrumpe
 
             if (q.State == QuestState.Completada)
             {
@@ -344,9 +575,18 @@ namespace Ascua.Characters
 
         private void UpdateLantern()
         {
-            // El farol violeta late; repelido, casi se apaga.
+            // El farol violeta late; repelido, casi se apaga. Antes de una cacería parpadea
+            // (con "reducir destellos" solo brilla un poco más, sin parpadeo). Cazando, brilla fijo.
             float pulse = 0.75f + 0.25f * Mathf.Sin(Time.time * 2.3f);
             float factor = state == State.Repelido ? 0.25f : pulse;
+            if (warningFlicker)
+            {
+                factor = AccessibilitySettings.ReduceFlashes ? 1.15f : (Mathf.Repeat(Time.time * 4f, 1f) < 0.5f ? 1.5f : 0.2f);
+            }
+            else if (IsHunting)
+            {
+                factor = 1.2f;
+            }
             if (violetLight != null) violetLight.intensity = 1.6f * factor;
             if (lanternRenderer != null)
             {
