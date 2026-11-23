@@ -40,7 +40,8 @@ namespace Ascua.LevelGen
 
             // Se reserva el hueco mínimo entre cacerías y el sobrante se reparte al azar:
             // así la separación y el rango se cumplen siempre, sin reintentos.
-            float slack = (Latest - Earliest) - MinGap * (count - 1);
+            // Math.Max: con 5 cacerías el sobrante es 0 y el redondeo de float lo dejaba en -0.00000005.
+            float slack = Math.Max(0f, (Latest - Earliest) - MinGap * (count - 1));
             Random rng = new Random(seed);
             List<float> offsets = new List<float>(count);
             for (int i = 0; i < count; i++) offsets.Add((float)rng.NextDouble() * slack);
