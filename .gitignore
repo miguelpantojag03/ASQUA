@@ -46,3 +46,7 @@ sysinfo.txt
 
 # Capturas de la prueba automática (Ascua > Prueba automática)
 /[Cc]apturas/
+
+# Proyectos .NET para compilar y probar la lógica pura fuera de Unity
+!/LogicTests/**/*.csproj
+!/LogicTests/*.sln
