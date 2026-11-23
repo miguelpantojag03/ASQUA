@@ -72,5 +72,38 @@ namespace Ascua.LevelGen.Tests
             Assert.AreEqual(3, HuntSchedule.CountForNight(1, 3));
             Assert.AreEqual(0, HuntSchedule.CountForNight(6, 0));
         }
+
+        [Test]
+        public void LosMomentosNuncaSalenDelRango_SinTolerancia()
+        {
+            // Sin margen: SnuffPlanner y el director comparan contra Earliest/Latest tal cual.
+            for (int count = 1; count <= HuntSchedule.MaxHunts; count++)
+            {
+                for (int seed = 0; seed < 500; seed++)
+                {
+                    foreach (float moment in HuntSchedule.Compute(count, seed))
+                    {
+                        Assert.GreaterOrEqual(moment, HuntSchedule.Earliest, "count " + count + ", semilla " + seed);
+                        Assert.LessOrEqual(moment, HuntSchedule.Latest, "count " + count + ", semilla " + seed);
+                    }
+                }
+            }
+        }
+
+        [Test]
+        public void ConElMaximoDeCaceriasQuedanRepartidasDeIgualModo()
+        {
+            List<float> moments = HuntSchedule.Compute(HuntSchedule.MaxHunts, 42);
+            float[] expected = { 0.30f, 0.45f, 0.60f, 0.75f, 0.90f };
+            Assert.AreEqual(expected.Length, moments.Count);
+            for (int i = 0; i < expected.Length; i++) Assert.AreEqual(expected[i], moments[i], Tolerance);
+        }
+
+        [Test]
+        public void NuncaMasDelMaximoQueCabe()
+        {
+            Assert.AreEqual(HuntSchedule.MaxHunts, HuntSchedule.Compute(50, 1).Count);
+            Assert.AreEqual(HuntSchedule.MaxHunts, HuntSchedule.CountForNight(3, 9));
+        }
     }
 }
