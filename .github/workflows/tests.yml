@@ -1,0 +1,22 @@
+name: Pruebas de lógica
+
+# Compila con analizadores y corre las pruebas EditMode de la lógica pura
+# (ensamblados Ascua.LevelGen, Ascua.Endings y Ascua.Recuerdos) sin abrir Unity.
+# No compila el proyecto Unity completo ni corre pruebas PlayMode.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  logica:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Lint (analizadores como errores)
+        run: dotnet build LogicTests/Ascua.Logic.Tests --nologo
+      - name: Pruebas
+        run: dotnet test LogicTests/Ascua.Logic.Tests --nologo --no-build
