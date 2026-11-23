@@ -227,6 +227,41 @@ namespace Ascua.Endings.Tests
             Assert.AreEqual(EndingId.Constelacion, EndingResolver.Resolve(input), "Con 6 de 7 páginas aún no hay final secreto");
         }
 
+        // ------------------------------------------------------------ Proporciones y datos raros
+
+        [Test]
+        public void Proporcion_SeAcotaEntreCeroYUno()
+        {
+            Assert.AreEqual(1f, EndingResolver.SavedRatio(Input(5, 2)), "Más salvadas que totales no pasa de 1");
+            Assert.AreEqual(0f, EndingResolver.SavedRatio(Input(-1, 2)));
+            Assert.AreEqual(0f, EndingResolver.SavedRatio(Input(1, -2)));
+        }
+
+        [Test]
+        public void Proporcion_FuncionaConMasZonas()
+        {
+            // Si se añaden zonas, los umbrales siguen siendo proporciones: 6 de 10 ya es Alba.
+            Assert.AreEqual(EndingId.Ceniza, EndingResolver.Resolve(Input(1, 10)));
+            Assert.AreEqual(EndingId.Vigilia, EndingResolver.Resolve(Input(2, 10)));
+            Assert.AreEqual(EndingId.Vigilia, EndingResolver.Resolve(Input(5, 10)));
+            Assert.AreEqual(EndingId.Alba, EndingResolver.Resolve(Input(6, 10)));
+        }
+
+        [Test]
+        public void VinculoPromedio_EsLaMediaDeLosTres()
+        {
+            Assert.AreEqual(3f, EndingResolver.AverageBond(WithBonds(Input(1, 1), 1, 3, 5)), 0.0001f);
+            Assert.AreEqual(0f, EndingResolver.AverageBond(WithBonds(Input(1, 1), 0, 0, 0)));
+        }
+
+        [Test]
+        public void Trato_VariosTratosSiguenSiendoElTrato()
+        {
+            EndingInput input = Input(2, 2);
+            input.TratosAccepted = 3;
+            Assert.AreEqual(EndingId.ElTrato, EndingResolver.Resolve(input));
+        }
+
         // ------------------------------------------------------------ Textos
 
         [Test]
