@@ -83,7 +83,7 @@ namespace Ascua.LevelGen
         public int snuffers = LevelDnaLimits.SnuffersAuto;
 
         /// <summary>Textos cortos (máx. 3). El primero se usa como subtítulo de la noche.</summary>
-        public string[] narrativeFragments = new string[0];
+        public string[] narrativeFragments = Array.Empty<string>();
 
         /// <summary>Copia profunda: modificar la copia nunca toca al original (así BASE_DNA es inmutable).</summary>
         public LevelDNA Clone()
