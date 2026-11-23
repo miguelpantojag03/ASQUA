@@ -271,7 +271,13 @@ namespace Ascua.LevelGen
                 sb.Append(c);
             }
             clean = Regex.Replace(sb.ToString(), "\\s+", " ").Trim();
-            if (clean.Length > LevelDnaLimits.MaxFragmentLength) clean = clean.Substring(0, LevelDnaLimits.MaxFragmentLength).TrimEnd();
+            if (clean.Length > LevelDnaLimits.MaxFragmentLength)
+            {
+                // No cortar un emoji (par sustituto) por la mitad: TextMeshPro mostraría un glifo roto.
+                int cut = LevelDnaLimits.MaxFragmentLength;
+                if (char.IsHighSurrogate(clean[cut - 1])) cut--;
+                clean = clean.Substring(0, cut).TrimEnd();
+            }
             return clean;
         }
 
