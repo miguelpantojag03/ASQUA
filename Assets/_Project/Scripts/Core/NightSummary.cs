@@ -41,6 +41,7 @@ namespace Ascua.Core
                 }
                 summary.Bonds.Add("Mina " + manager.GetBond("mina") + "/" + QuestManager.MaxBond);
                 summary.Bonds.Add("Teo " + manager.GetBond("teo") + "/" + QuestManager.MaxBond);
+                summary.Bonds.Add("Perpetua " + manager.GetBond("perpetua") + "/" + QuestManager.MaxBond);
             }
             return summary;
         }
