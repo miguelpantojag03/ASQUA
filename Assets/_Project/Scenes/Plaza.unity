@@ -12852,6 +12852,7 @@ MonoBehaviour:
   bondNpcIds:
   - mina
   - teo
+  - perpetua
 --- !u!225 &42461204
 CanvasGroup:
   m_ObjectHideFlags: 0
