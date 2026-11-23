@@ -1,0 +1,9 @@
+{
+  "name": "ascua",
+  "private": true,
+  "description": "Atajos para compilar y probar la lógica pura de Ascua sin abrir Unity (requiere el SDK de .NET 8).",
+  "scripts": {
+    "lint": "dotnet build LogicTests/Ascua.Logic.Tests --nologo",
+    "test": "dotnet test LogicTests/Ascua.Logic.Tests --nologo"
+  }
+}
