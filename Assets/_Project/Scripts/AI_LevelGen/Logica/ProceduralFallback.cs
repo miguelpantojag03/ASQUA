@@ -19,7 +19,7 @@ namespace Ascua.LevelGen
         /// </summary>
         public static LevelDNA Generate(LevelDNA baseDna, LevelDNA previous, float playerSkill, int nightNumber, int seed, List<string> log)
         {
-            if (baseDna == null) throw new ArgumentNullException("baseDna");
+            if (baseDna == null) throw new ArgumentNullException(nameof(baseDna));
             if (log == null) log = new List<string>();
 
             LevelDNA b = baseDna.Clone();
