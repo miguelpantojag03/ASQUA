@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Corre con `dotnet test` las mismas pruebas EditMode que ve el Test Runner de Unity
+    (Assets/_Project/Tests/EditMode). NUnit 3, como el com.unity.test-framework.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- CA1707: los nombres de prueba usan Contexto_Caso_Resultado, como en el resto del repo. -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(AscuaTests)EditMode/**/*.cs" Link="EditMode/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="UnityShims/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Ascua.LevelGen/Ascua.LevelGen.csproj" />
+    <ProjectReference Include="../Ascua.Endings/Ascua.Endings.csproj" />
+    <ProjectReference Include="../Ascua.Recuerdos/Ascua.Recuerdos.csproj" />
+  </ItemGroup>
+</Project>
