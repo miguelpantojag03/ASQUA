@@ -232,9 +232,9 @@ namespace Ascua.LevelGen.Tests
             List<DnaRow> rows = LevelDnaRows.Compare(baseDna, harder);
 
             Assert.IsTrue(rows.Count > 10);
-            DnaRow decay = rows.Find(r => r.Label.StartsWith("Caída"));
+            DnaRow decay = rows.Find(r => r.Label.StartsWith("Caída", System.StringComparison.Ordinal));
             Assert.AreEqual("+100%", decay.DeltaText);
-            DnaRow duration = rows.Find(r => r.Label.StartsWith("Duración"));
+            DnaRow duration = rows.Find(r => r.Label.StartsWith("Duración", System.StringComparison.Ordinal));
             Assert.AreEqual("=", duration.DeltaText);
         }
 
@@ -262,8 +262,8 @@ namespace Ascua.LevelGen.Tests
             List<string> log = LevelValidator.Repair(dna);
             Assert.AreEqual(LevelDnaLimits.HuntCountMax, dna.huntCount);
             Assert.AreEqual(LevelDnaLimits.HuntSpeedMax, dna.huntSpeed);
-            Assert.IsTrue(log.Exists(l => l.StartsWith("huntCount")), "Anota la corrección de huntCount");
-            Assert.IsTrue(log.Exists(l => l.StartsWith("huntSpeed")), "Anota la corrección de huntSpeed");
+            Assert.IsTrue(log.Exists(l => l.StartsWith("huntCount", System.StringComparison.Ordinal)), "Anota la corrección de huntCount");
+            Assert.IsTrue(log.Exists(l => l.StartsWith("huntSpeed", System.StringComparison.Ordinal)), "Anota la corrección de huntSpeed");
 
             dna = BaseDna();
             dna.huntCount = -4;
@@ -366,7 +366,7 @@ namespace Ascua.LevelGen.Tests
             dna.snuffers = 12;
             List<string> log = LevelValidator.Repair(dna);
             Assert.AreEqual(LevelDnaLimits.SnuffersMax, dna.snuffers);
-            Assert.IsTrue(log.Exists(l => l.StartsWith("snuffers")), "Anota la corrección");
+            Assert.IsTrue(log.Exists(l => l.StartsWith("snuffers", System.StringComparison.Ordinal)), "Anota la corrección");
 
             dna = BaseDna();
             dna.snuffers = -5;
