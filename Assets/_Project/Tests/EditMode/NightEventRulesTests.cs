@@ -46,5 +46,21 @@ namespace Ascua.LevelGen.Tests
             Assert.IsTrue(NightEventRules.IsTooLate(0.9f));
             Assert.IsFalse(NightEventRules.IsTooLate(0.89f));
         }
+
+        [Test]
+        public void UmbralMasTardeQueElCorte_NuncaOcurre()
+        {
+            for (float progress = 0f; progress <= 1f; progress += 0.01f)
+            {
+                Assert.IsFalse(NightEventRules.ShouldTrigger(5, 5, progress, 0.95f, false, false), "progreso " + progress);
+            }
+        }
+
+        [Test]
+        public void ProgresoInvalido_NoDispara()
+        {
+            Assert.IsFalse(NightEventRules.ShouldTrigger(3, 3, float.NaN, 0.1f, false, false));
+            Assert.IsFalse(NightEventRules.ShouldTrigger(3, 3, -0.5f, 0.1f, false, false));
+        }
     }
 }
