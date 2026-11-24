@@ -14,7 +14,7 @@ namespace Ascua.LevelGen
 
         public TutorialSequence(float[] minSeconds)
         {
-            this.minSeconds = minSeconds ?? new float[0];
+            this.minSeconds = minSeconds ?? Array.Empty<float>();
         }
 
         /// <summary>Paso actual (igual a Count al terminar).</summary>

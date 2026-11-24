@@ -95,5 +95,63 @@ namespace Ascua.LevelGen.Tests
         {
             Assert.AreEqual(-1, SnuffPlanner.PickBest(new List<SnuffCandidate>(), 0f, 0f));
         }
+
+        [Test]
+        public void ListaNulaDevuelveMenosUno()
+        {
+            Assert.AreEqual(-1, SnuffPlanner.PickBest(null, 0f, 0f));
+        }
+
+        [Test]
+        public void MasApagavelasQueHuecos_SalenVariosALaVez()
+        {
+            // HuntSchedule da como mucho 5 momentos: con 8 Apagavelas se repiten, sin salir del rango.
+            List<float> moments = SnuffPlanner.Schedule(SnuffPlanner.MaxSnuffers, 5);
+            HashSet<float> distinct = new HashSet<float>(moments);
+            Assert.AreEqual(SnuffPlanner.MaxSnuffers, moments.Count);
+            Assert.AreEqual(HuntSchedule.MaxHunts, distinct.Count);
+            foreach (float m in moments)
+            {
+                Assert.GreaterOrEqual(m, SnuffPlanner.Earliest);
+                Assert.LessOrEqual(m, SnuffPlanner.Latest);
+            }
+        }
+
+        [Test]
+        public void CantidadNegativaNoProgramaNada()
+        {
+            CollectionAssert.IsEmpty(SnuffPlanner.Schedule(-3, 1));
+        }
+
+        [Test]
+        public void EsperanzaFueraDeRangoSeAcota()
+        {
+            SnuffCandidate overHope = new SnuffCandidate(0, true, 5f, 0f, 0f);
+            SnuffCandidate fullHope = new SnuffCandidate(1, true, 1f, 0f, 0f);
+            SnuffCandidate underHope = new SnuffCandidate(2, true, -3f, 0f, 0f);
+            SnuffCandidate noHope = new SnuffCandidate(3, true, 0f, 0f, 0f);
+
+            Assert.AreEqual(SnuffPlanner.ScoreTarget(fullHope, 0f, 0f), SnuffPlanner.ScoreTarget(overHope, 0f, 0f));
+            Assert.AreEqual(SnuffPlanner.ScoreTarget(noHope, 0f, 0f), SnuffPlanner.ScoreTarget(underHope, 0f, 0f));
+        }
+
+        [Test]
+        public void LaDistanciaPesaHastaUnTope()
+        {
+            // Más allá de 190 m la distancia ya no resta: dos luces lejanas empatan y decide el Id.
+            SnuffCandidate far = new SnuffCandidate(0, true, 0.5f, 200f, 0f);
+            SnuffCandidate farther = new SnuffCandidate(1, true, 0.5f, 900f, 0f);
+            Assert.AreEqual(SnuffPlanner.ScoreTarget(far, 0f, 0f), SnuffPlanner.ScoreTarget(farther, 0f, 0f));
+        }
+
+        [Test]
+        public void UnaLuzApagadaNuncaGanaAUnaEncendida()
+        {
+            // Lo peor para la encendida (zona llena, lejísimos) contra lo mejor para la apagada.
+            SnuffCandidate lit = new SnuffCandidate(5, true, 1f, 1000f, 0f);
+            SnuffCandidate dark = new SnuffCandidate(0, false, 0f, 0f, 0f);
+            var list = new List<SnuffCandidate> { dark, lit };
+            Assert.AreEqual(1, SnuffPlanner.PickBest(list, 0f, 0f));
+        }
     }
 }

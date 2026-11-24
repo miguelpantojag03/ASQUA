@@ -28,7 +28,7 @@ namespace Ascua.Quests
         [SerializeField] private bool startOpen = false;
         [SerializeField] private float refreshInterval = 0.25f;
         [Tooltip("Personajes cuyo Vínculo se muestra (ids de NpcIdentity).")]
-        [SerializeField] private string[] bondNpcIds = { "mina", "teo" };
+        [SerializeField] private string[] bondNpcIds = { "mina", "teo", "perpetua" };
 
         private readonly StringBuilder builder = new StringBuilder(256);
         private bool open;

@@ -1,0 +1,19 @@
+<Project>
+  <!--
+    Compila fuera de Unity los ensamblados de lógica pura (noEngineReferences: true).
+    LangVersion 9 = la versión de C# que acepta Unity 6, así nada compila aquí y falla allá.
+  -->
+  <PropertyGroup>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- CA1051: JsonUtility y el Inspector de Unity solo serializan campos públicos; no aplica aquí. -->
+    <NoWarn>$(NoWarn);CA1051</NoWarn>
+    <AscuaScripts>$(MSBuildThisFileDirectory)../Assets/_Project/Scripts/</AscuaScripts>
+    <AscuaTests>$(MSBuildThisFileDirectory)../Assets/_Project/Tests/</AscuaTests>
+  </PropertyGroup>
+</Project>
