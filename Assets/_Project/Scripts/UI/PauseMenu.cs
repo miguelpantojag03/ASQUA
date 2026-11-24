@@ -12,7 +12,7 @@ namespace Ascua.UI
 {
     /// <summary>
     /// Menú de pausa (Esc / Start): pausa real del juego, Reanudar / Reintentar noche / Diario /
-    /// Accesibilidad / Salir al título, y volúmenes de Música, Ambiente y Efectos conectados al
+    /// Accesibilidad / Cómo jugar / Salir al título, y volúmenes de Música, Ambiente y Efectos conectados al
     /// AudioManager. El panel de Accesibilidad ajusta tamaño de texto, sacudidas y subtítulos.
     /// </summary>
     public class PauseMenu : MonoBehaviour
@@ -47,6 +47,9 @@ namespace Ascua.UI
 
         private bool paused;
         private float previousTimeScale = 1f;
+        // "Cómo jugar": botón y pantalla creados por código (la escena no cambia).
+        private Button howToButton;
+        private HowToPlayPanel howToPlay;
         private PlayerInputReader playerInput;
         private bool syncing;
 
@@ -74,6 +77,44 @@ namespace Ascua.UI
             if (subtitlesToggle != null) subtitlesToggle.onValueChanged.AddListener(v => { if (!syncing) AccessibilitySettings.SetSfxSubtitles(v); });
             if (flashesToggle != null) flashesToggle.onValueChanged.AddListener(v => { if (!syncing) AccessibilitySettings.SetReduceFlashes(v); });
             if (rumbleToggle != null) rumbleToggle.onValueChanged.AddListener(v => { if (!syncing) AccessibilitySettings.SetRumble(v); });
+
+            BuildHowToPlay();
+        }
+
+        /// <summary>
+        /// Añade "Cómo jugar" bajo Accesibilidad (copia de ese botón) y baja "Salir al título" un hueco
+        /// (de 0.26 a 0.16: sigue por encima de la ayuda "Esc · volver al juego", en 0.1).
+        /// </summary>
+        private void BuildHowToPlay()
+        {
+            if (accessibilityButton == null || group == null) return;
+            howToButton = EndingUi.CloneButton(accessibilityButton, accessibilityButton.transform.parent, "Boton_ComoJugar", "Cómo jugar");
+            howToButton.onClick.AddListener(OpenHowToPlay);
+            const float step = 0.1f;
+            RectTransform access = (RectTransform)accessibilityButton.transform;
+            SetAnchorY(howToButton, access.anchorMin.y - step);
+            if (titleButton != null) SetAnchorY(titleButton, access.anchorMin.y - step * 2f);
+
+            TMP_Text font = resumeButton != null ? resumeButton.GetComponentInChildren<TMP_Text>(true) : null;
+            if (font == null) font = textScaleLabel;
+            if (font != null) howToPlay = new HowToPlayPanel(group.transform.parent, font, accessibilityButton);
+        }
+
+        private static void SetAnchorY(Button button, float y)
+        {
+            RectTransform rect = (RectTransform)button.transform;
+            rect.anchorMin = new Vector2(rect.anchorMin.x, y);
+            rect.anchorMax = new Vector2(rect.anchorMax.x, y);
+        }
+
+        private void OpenHowToPlay()
+        {
+            Click();
+            if (howToPlay == null) return;
+            howToPlay.Open(() =>
+            {
+                if (howToButton != null && EventSystem.current != null) EventSystem.current.SetSelectedGameObject(howToButton.gameObject);
+            });
         }
 
         private void OnDestroy()
@@ -92,12 +133,19 @@ namespace Ascua.UI
             Keyboard keyboard = Keyboard.current;
             Gamepad gamepad = Gamepad.current;
             bool pressed = (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) || (gamepad != null && gamepad.startButton.wasPressedThisFrame);
+            // B en el mando también cierra "Cómo jugar".
+            if (!pressed && paused && howToPlay != null && howToPlay.IsOpen && gamepad != null && gamepad.buttonEast.wasPressedThisFrame) pressed = true;
             if (!pressed) return;
 
             // Esc cierra primero lo que esté encima.
             if (CodexUI.Instance != null && CodexUI.Instance.IsOpen)
             {
                 CodexUI.Instance.Close();
+                return;
+            }
+            if (paused && howToPlay != null && howToPlay.IsOpen)
+            {
+                howToPlay.Close();
                 return;
             }
             if (paused && accessibilityPanel != null && accessibilityPanel.alpha > 0.5f)
@@ -137,6 +185,7 @@ namespace Ascua.UI
             paused = false;
             SetGroup(group, false);
             SetGroup(accessibilityPanel, false);
+            if (howToPlay != null && howToPlay.IsOpen) howToPlay.Close();
             Time.timeScale = previousTimeScale > 0f ? previousTimeScale : 1f;
             if (playerInput != null) playerInput.SetGameplayEnabled(true);
             GameSession.PopModal();

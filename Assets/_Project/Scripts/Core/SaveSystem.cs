@@ -44,6 +44,19 @@ namespace Ascua.Core
             Write();
         }
 
+        // ================================================================== Tutorial
+
+        /// <summary>True si el jugador eligió "Saltar tutorial" (no se ven los pensamientos de tutorial de Ilse).</summary>
+        public static bool SkipTutorial => Data.skipTutorial;
+
+        /// <summary>Cambia "Saltar tutorial" y lo guarda al momento.</summary>
+        public static void SetSkipTutorial(bool value)
+        {
+            if (Data.skipTutorial == value) return;
+            Data.skipTutorial = value;
+            Write();
+        }
+
         // ================================================================== Progreso
 
         /// <summary>True si hay una partida guardada que se pueda continuar.</summary>

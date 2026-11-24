@@ -16,6 +16,11 @@ namespace Ascua.Core
         /// <summary>False hasta el primer guardado automático: decide si aparece "Continuar".</summary>
         public bool hasProgress;
         public ProgressData progress = new ProgressData();
+        /// <summary>
+        /// Preferencia "Saltar tutorial" (pantalla Cómo jugar). Vive fuera del progreso, como los finales:
+        /// sirve para todas las partidas. Los guardados viejos no la tienen y se leen como false.
+        /// </summary>
+        public bool skipTutorial;
     }
 
     /// <summary>La partida en curso: GameProgress + Vínculos + mejoras del Farol.</summary>

@@ -3,6 +3,7 @@ using Ascua.Core;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -10,8 +11,8 @@ namespace Ascua.UI
 {
     /// <summary>
     /// Pantalla de título: fundido de entrada, título "Ascua" que respira como una brasa,
-    /// deriva lenta de cámara sobre el skyline de Vesper y botones Jugar / Continuar / Finales / Salir.
-    /// "Continuar" y "Finales" se crean por código copiando el botón Jugar (la escena no cambia).
+    /// deriva lenta de cámara sobre el skyline de Vesper y botones Jugar / Continuar / Cómo jugar / Finales / Salir.
+    /// "Continuar", "Cómo jugar" y "Finales" se crean por código copiando el botón Jugar (la escena no cambia).
     /// </summary>
     public class TitleScreen : MonoBehaviour
     {
@@ -42,7 +43,9 @@ namespace Ascua.UI
         // Creados por código (copias de playButton).
         private Button continueButton;
         private Button endingsButton;
+        private Button howToButton;
         private EndingGallery gallery;
+        private HowToPlayPanel howToPlay;
 
         private void Awake()
         {
@@ -52,7 +55,7 @@ namespace Ascua.UI
             BuildExtraButtons();
         }
 
-        /// <summary>Añade "Continuar" y "Finales" y reparte los cuatro botones en columna.</summary>
+        /// <summary>Añade "Continuar", "Cómo jugar" y "Finales" y reparte los cinco botones en columna.</summary>
         private void BuildExtraButtons()
         {
             if (playButton == null) return;
@@ -62,16 +65,25 @@ namespace Ascua.UI
             continueButton.onClick.AddListener(OnContinue);
             continueButton.gameObject.SetActive(SaveSystem.HasProgress);
 
+            howToButton = EndingUi.CloneButton(playButton, parent, "Boton_ComoJugar", "Cómo jugar");
+            howToButton.onClick.AddListener(OnHowToPlay);
+
             endingsButton = EndingUi.CloneButton(playButton, parent, "Boton_Finales", "Finales");
             endingsButton.onClick.AddListener(OnEndings);
 
-            SetAnchorY(playButton, 0.42f);
-            SetAnchorY(continueButton, 0.33f);
-            SetAnchorY(endingsButton, 0.24f);
-            SetAnchorY(quitButton, 0.15f);
+            // Cinco botones de 72 px cada 0.08 (86 px): el primero no toca el subtítulo (0.5) ni el último la versión.
+            SetAnchorY(playButton, 0.43f);
+            SetAnchorY(continueButton, 0.35f);
+            SetAnchorY(howToButton, 0.27f);
+            SetAnchorY(endingsButton, 0.19f);
+            SetAnchorY(quitButton, 0.11f);
 
-            // La galería usa la tipografía del título y el estilo de los botones.
-            if (titleText != null) gallery = new EndingGallery(transform, titleText, playButton);
+            // La galería y "Cómo jugar" usan la tipografía del título y el estilo de los botones.
+            if (titleText != null)
+            {
+                gallery = new EndingGallery(transform, titleText, playButton);
+                howToPlay = new HowToPlayPanel(transform, titleText, playButton);
+            }
         }
 
         private static void SetAnchorY(Button button, float y)
@@ -103,6 +115,9 @@ namespace Ascua.UI
 
         private void Update()
         {
+            // Esc o B cierran "Cómo jugar".
+            if (howToPlay != null && howToPlay.IsOpen && BackPressed()) howToPlay.Close();
+
             if (titleText != null)
             {
                 float breath = 0.5f + 0.5f * Mathf.Sin(Time.time * breathSpeed * Mathf.PI * 2f);
@@ -146,6 +161,21 @@ namespace Ascua.UI
             StartCoroutine(LoadGameplay());
         }
 
+        private static bool BackPressed()
+        {
+            Keyboard keyboard = Keyboard.current;
+            Gamepad gamepad = Gamepad.current;
+            return (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+                   || (gamepad != null && gamepad.buttonEast.wasPressedThisFrame);
+        }
+
+        private void OnHowToPlay()
+        {
+            if (loading || howToPlay == null) return;
+            EndingUi.Click();
+            howToPlay.Open(() => EndingUi.Select(howToButton));
+        }
+
         private void OnEndings()
         {
             if (loading || gallery == null) return;
@@ -168,6 +198,7 @@ namespace Ascua.UI
             if (quitButton != null) quitButton.interactable = false;
             if (continueButton != null) continueButton.interactable = false;
             if (endingsButton != null) endingsButton.interactable = false;
+            if (howToButton != null) howToButton.interactable = false;
             if (fadeGroup != null) yield return Fade(fadeGroup.alpha, 1f);
             SceneManager.LoadScene(gameplaySceneName);
         }
