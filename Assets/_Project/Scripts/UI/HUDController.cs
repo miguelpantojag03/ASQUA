@@ -92,6 +92,9 @@ namespace Ascua.UI
             if (lantern != null) OnRadiusChanged(lantern.RadiusIndex);
             if (fpsText != null) fpsText.gameObject.SetActive(showFps);
             if (fadeGroup != null) fadeGroup.alpha = 1f;
+
+            // Indicador compacto "Noche N · objetivo" (creado por código; H lo oculta).
+            NightCompactIndicator.Create();
         }
 
         private void Update()

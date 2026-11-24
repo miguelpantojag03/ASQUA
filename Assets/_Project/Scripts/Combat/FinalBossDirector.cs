@@ -118,6 +118,8 @@ namespace Ascua.Combat
             }
             Instance = this;
             BuildFade();
+            // Barra de vida de La Marea (arriba al centro, solo durante el combate).
+            BossHealthBarUI.Ensure();
         }
 
         private void OnDestroy()
