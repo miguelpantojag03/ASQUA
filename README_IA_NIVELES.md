@@ -152,3 +152,46 @@ Sombra voladora que **no persigue a Ilse**: va a las luces (farolas y velas de T
 **Probar:** `F1` y después `F9` hace aparecer uno ya; el panel muestra cuántos hay activos y cuándo sale el siguiente. Pruebas: `SnuffPlannerTests` y las nuevas de `LevelGenTests`.
 
 **Archivos:** `Scripts/Combat/Apagavelas.cs`, `SnuffDirector.cs`, `SnuffTarget.cs`, `Scripts/World/RelightOnLantern.cs`, `Scripts/AI_LevelGen/Logica/SnuffPlanner.cs`.
+
+# Jefe final, HUD y tutorial
+
+## La Marea (jefe final)
+
+Al terminar las misiones de la **Noche 5** (la última de la campaña), o al acabarse su tiempo si no se terminan, sale **La Marea** en el centro de La Plaza, **antes** del resumen y del final. No sale en las noches posteriores ("Noches sin fin") ni si ya se derrotó en esta partida.
+
+1. **Entrada:** el reloj de la noche se detiene y se espera a que no haya diálogo, oleada, Cacería, momento narrativo ni pausa. Fundido a negro: Ilse aparece a ~9 m del centro de La Plaza, con el Farol lleno, y La Marea sale de la niebla. Los Apagavelas se retiran y el Heraldo se aleja mientras dure el combate.
+2. **La luz manda:** solo recibe daño completo si el Farol (o el Pulso) la ilumina (×4 el daño del golpe); si no, 1 de daño. La barra brilla cuando está *bajo la luz*. La primera vez que un golpe no hace casi nada sale el aviso "solo se deshace bajo la luz".
+3. **Fases (por vida, `FinalBossRules`):**
+   - **100-66 %:** golpe lento en área. Un aro coral marca el suelo y otro se llena hasta el impacto (1.5 s). Tras el golpe queda quieta 1.3 s.
+   - **66-33 %:** además invoca **2 Polillas cada 12 s** (de las inactivas de la escena, con su propio tag: no son oleada; máximo 4 vivas).
+   - **33-0 %:** además, cada 14 s, un **pulso** que apaga las farolas a menos de 16 m (`StreetLampToggle.TurnOff` + `SetLocked`, y `RelightOnLantern` para reencenderlas con el Farol). Camina y golpea más rápido.
+   - Cada cambio de fase: rugido de 1.2 s con subtítulo.
+4. **Si Ilse cae** (un golpe la deja a 0 de energía): fundido y **reintento desde el inicio del combate**, sin perder nada de la noche (misiones, Vínculos, páginas). A la **3ª caída** La Marea se retira a la niebla y la noche sigue al final sin premio.
+5. **Si se vence:** pausa dramática de 2 s (un instante a cámara lenta), subtítulo "La Marea se deshace en luz. Vesper respira.", **+10 de Esperanza** a las zonas vivas y se guarda al momento que ya se venció. Después, el flujo normal: resumen → *Ver el final*.
+6. **No cambia qué final sale:** el final lo sigue decidiendo `EndingResolver` con las zonas salvadas, los Vínculos, el Diario y los Tratos. Durante el combate las zonas no pierden Esperanza (no puede apagarse ninguna) y el premio solo suma a zonas vivas.
+
+**Cómo se hace sin escena:** `NightManager` crea `FinalBossDirector` en `Awake`. El director clona una **Sombra Mayor** (también de las inactivas del pool; mejor una sin velo) dentro de un padre inactivo, le quita `ShadowBrute` (y `LitVulnerable`) y le pone `MareaBoss` (hereda de `ShadowCreature`): escala ×2.5 y tinte casi negro con `MaterialPropertyBlock`. `ShadowCreature` tiene un método nuevo, `AdjustDamage`, que por defecto devuelve el daño del golpe (las demás criaturas no cambian).
+
+**Guardado:** `GameProgressData.bossDefeated` (los guardados viejos no lo tienen y se leen como `false`). `SaveSystem.MarkBossDefeated` lo escribe en la partida guardada al vencer, así *Continuar* no repite el combate.
+
+**Convivencia:** con el reloj detenido no empiezan oleadas, Apagavelas, Cacerías ni eventos (`FinalBossDirector.HoldsNight`). Música de combate con el mismo evento que una oleada (`EventBus.RaiseCombatWave("marea", ...)`).
+
+**Accesibilidad:** todo con `Time.deltaTime` (la pausa lo congela); con *reducir destellos* los aros no laten y los destellos se atenúan (`AccessibilitySettings.FlashScale`); los ataques y fases tienen subtítulo.
+
+**Probar:** `F1` y después `F10` invoca a La Marea en cualquier noche (fuera de la Noche 5 no guarda nada ni termina la noche). Para llegar a la Noche 5: `F5`. El panel muestra estado, vida, fase, si está iluminada y las caídas. Pruebas: `FinalBossRulesTests`.
+
+## HUD
+
+- **Barra de La Marea** (`BossHealthBarUI`): arriba al centro, solo durante el combate. Nombre, 3 rombos de fase, marcas en el 66 % y el 33 %, y el relleno brilla bajo la luz. Estilo del `UIStyleKit` (`UIStyledPanel`, rol *Hud*).
+- **Indicador compacto** (`NightCompactIndicator`): "Noche N · objetivo actual" bajo el reloj. No guarda datos: lee `NightManager` y `QuestManager.TrackedQuest` (lo mismo que `ObjectiveTrackerUI`) o la oleada activa. **H** (o la cruceta izquierda) lo oculta y se recuerda. Sigue la opacidad de la capa secundaria de `HudFocus`; se oculta en diálogos, Cacerías y el combate con La Marea (usan ese hueco).
+- **Sin solapes:** ambos se crean con un lienzo 1920×1080 y mezcla 0.5, como el HUD de la escena, así a 1080p y a 720p (misma proporción) todo escala igual. Miden 470 px (498 con su filo) y empiezan en y −140/−142: quedan bajo el reloj *Noche* (hasta −128 con su filo), a la derecha del objetivo actual (hasta x 652) y a la izquierda de la Esperanza (desde x 1418).
+
+## Tutorial
+
+- **Noche 2** (solo la primera vez en la partida), mismo estilo de pensamientos de Ilse: esquivar (Ctrl / B) → la luz contra las sombras (golpear una) → ataque cargado (solo si ya tiene la Lupa de Mina) → contraataque (solo si ya tiene el Reloj de Nadir). Cada paso cuenta desde que aparece y **avanza al hacerlo, no al leer** (`TutorialSequence`).
+- **Pensamientos de una vez:** la primera Cacería del Heraldo ("Me busca. Corro a un refugio de luz.") y el primer Apagavelas ("Algo apaga las luces. Con el Farol las vuelvo a encender."). Se marcan como momentos vistos de la partida.
+- **Cómo jugar** (`HowToPlayPanel`): controles de teclado y de mando, desde la pausa (bajo *Accesibilidad*; *Salir al título* baja un hueco) y desde el título (cinco botones). Esc / B la cierran.
+- **Saltar tutorial:** interruptor en *Cómo jugar*. Se guarda en `SaveData.skipTutorial` (fuera del progreso, como los finales: vale para todas las partidas; los guardados viejos lo leen como `false`). Activado a mitad de un capítulo, lo termina en ese momento.
+- Pruebas: `TutorialSequenceTests` (avance de pasos, pasos no disponibles, saltar, capítulo por noche).
+
+**Archivos:** `Scripts/Combat/MareaBoss.cs`, `FinalBossDirector.cs`, `Scripts/AI_LevelGen/Logica/FinalBossRules.cs`, `TutorialSequence.cs`, `Scripts/UI/BossHealthBarUI.cs`, `NightCompactIndicator.cs`, `HudBuild.cs`, `HowToPlayPanel.cs`, `Scripts/Quests/TutorialHints.cs`, `Tests/EditMode/FinalBossRulesTests.cs`, `TutorialSequenceTests.cs`.
