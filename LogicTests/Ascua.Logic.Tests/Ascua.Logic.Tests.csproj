@@ -8,8 +8,10 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <!-- CA1707: los nombres de prueba usan Contexto_Caso_Resultado, como en el resto del repo.
-         CA1861: en una prueba, un arreglo literal es más legible que un campo static readonly. -->
-    <NoWarn>$(NoWarn);CA1707;CA1861</NoWarn>
+         CA1861: en una prueba, un arreglo literal es más legible que un campo static readonly.
+         CA2263: Enum.GetValues<T>() no existe en el .NET Standard 2.1 de Unity; las pruebas EditMode
+         también compilan allá, así que se mantiene Enum.GetValues(typeof(T)). -->
+    <NoWarn>$(NoWarn);CA1707;CA1861;CA2263</NoWarn>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
