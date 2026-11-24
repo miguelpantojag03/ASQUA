@@ -35,6 +35,9 @@ namespace Ascua.Core
         /// <summary>Oleadas de sombras superadas en toda la partida (la Vara de luz se desbloquea con 3).</summary>
         public static int WavesDefended { get; private set; }
 
+        /// <summary>True si La Marea (jefe final de la Noche 5) ya se derrotó en esta partida: no vuelve a salir.</summary>
+        public static bool BossDefeated { get; private set; }
+
         /// <summary>Ids de los Recuerdos que ya enseñan un movimiento.</summary>
         public static IReadOnlyCollection<string> Recuerdos => recuerdos;
 
@@ -59,6 +62,7 @@ namespace Ascua.Core
             flagsThisNight.Clear();
             momentsThisNight.Clear();
             WavesDefended = 0;
+            BossDefeated = false;
             // Partida nueva: se olvidan los niveles generados y el perfil del jugador (IA de niveles).
             Ascua.AILevelGen.AIDirector.ResetAll();
         }
@@ -108,6 +112,9 @@ namespace Ascua.Core
         public static bool HasRecuerdo(string id) => recuerdos.Contains(id);
 
         public static void AddWaveDefended() => WavesDefended++;
+
+        /// <summary>La Marea se derrotó: no vuelve a aparecer en esta partida (SaveSystem lo guarda al momento).</summary>
+        public static void MarkBossDefeated() => BossDefeated = true;
 
         /// <summary>Guarda una decisión que tendrá consecuencias en noches futuras.</summary>
         public static void SetFlag(string flag)
@@ -167,7 +174,8 @@ namespace Ascua.Core
                 seenMoments = new List<string>(seenMoments),
                 recuerdos = new List<string>(recuerdos),
                 flags = new List<string>(flags),
-                wavesDefended = WavesDefended
+                wavesDefended = WavesDefended,
+                bossDefeated = BossDefeated
             };
         }
 
@@ -179,6 +187,7 @@ namespace Ascua.Core
             CurrentNight = Mathf.Max(1, data.currentNight);
             TutorialPending = data.tutorialPending;
             WavesDefended = Mathf.Max(0, data.wavesDefended);
+            BossDefeated = data.bossDefeated;
             CopyInto(data.completedQuests, completedQuests);
             CopyInto(data.foundPages, foundPages);
             CopyInto(data.shortcuts, discoveredShortcuts);

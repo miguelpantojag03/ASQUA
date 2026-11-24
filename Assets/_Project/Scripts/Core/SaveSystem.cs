@@ -91,6 +91,25 @@ namespace Ascua.Core
             }
         }
 
+        /// <summary>
+        /// La Marea se derrotó: se apunta en la partida guardada al momento (sin esperar al cambio de noche),
+        /// así "Continuar" no vuelve a enfrentarla. Los guardados viejos no tienen el campo y se leen como false.
+        /// </summary>
+        public static void MarkBossDefeated()
+        {
+            GameProgress.MarkBossDefeated();
+            try
+            {
+                if (!HasProgress || Data.progress.game.bossDefeated) return;
+                Data.progress.game.bossDefeated = true;
+                Write();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[SaveSystem] No se pudo guardar el jefe derrotado: " + e.Message);
+            }
+        }
+
         // ================================================================== Disco
 
         private static SaveData Data

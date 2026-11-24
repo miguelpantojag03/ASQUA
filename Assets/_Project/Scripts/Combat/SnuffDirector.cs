@@ -146,6 +146,7 @@ namespace Ascua.Combat
         public bool IsBusy()
         {
             if (PauseMenu.IsPaused) return true;
+            if (FinalBossDirector.HoldsNight) return true;
             if (DialogueRunner.Instance != null && DialogueRunner.Instance.IsOpen) return true;
             HeraldoHuntDirector hunts = HeraldoHuntDirector.Instance;
             if (hunts != null && hunts.IsBusy) return true;

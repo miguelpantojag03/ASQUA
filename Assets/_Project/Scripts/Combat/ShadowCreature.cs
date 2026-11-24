@@ -327,7 +327,7 @@ namespace Ascua.Combat
             flash = 1f;
             if (squashTimer < 0f) restScale = transform.localScale;
             squashTimer = 0f;
-            health -= Mathf.Max(1, hit.Damage);
+            health -= Mathf.Max(1, AdjustDamage(hit));
             stunTimer = Mathf.Max(stunTimer, hit.StunSeconds);
 
             Vector3 away = transform.position - hit.SourcePosition;
@@ -353,6 +353,9 @@ namespace Ascua.Combat
         /// <summary>False = el golpe no afecta (p. ej. invulnerable hasta ser iluminada).</summary>
         /// <remarks>Por defecto: siempre, salvo que tenga LitVulnerable y no esté revelada.</remarks>
         protected virtual bool AcceptsHit(HitInfo hit) => veil == null || veil.IsRevealed;
+
+        /// <summary>Daño que hace un golpe aceptado. Por defecto, el del golpe (La Marea lo cambia según la luz).</summary>
+        protected virtual int AdjustDamage(HitInfo hit) => hit.Damage;
 
         protected virtual void OnDeflected(HitInfo hit)
         {

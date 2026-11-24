@@ -124,6 +124,7 @@ namespace Ascua.Narrative
         public bool IsBusy()
         {
             if (PauseMenu.IsPaused) return true;
+            if (FinalBossDirector.HoldsNight) return true;
             if (DialogueRunner.Instance != null && DialogueRunner.Instance.IsOpen) return true;
             CombatWaveDirector waves = CombatWaveDirector.Instance;
             if (waves != null && (waves.HasActiveWave || waves.AliveCount > 0)) return true;

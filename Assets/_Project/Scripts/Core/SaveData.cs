@@ -27,7 +27,7 @@ namespace Ascua.Core
         public UpgradesData upgrades = new UpgradesData();
     }
 
-    /// <summary>Copia de GameProgress (noche, misiones, Diario, atajos, momentos, Recuerdos, marcas y oleadas).</summary>
+    /// <summary>Copia de GameProgress (noche, misiones, Diario, atajos, momentos, Recuerdos, marcas, oleadas y jefe final).</summary>
     [Serializable]
     public class GameProgressData
     {
@@ -40,6 +40,8 @@ namespace Ascua.Core
         public List<string> recuerdos = new List<string>();
         public List<string> flags = new List<string>();
         public int wavesDefended;
+        /// <summary>La Marea (jefe final) ya se derrotó en esta partida. Los guardados viejos no lo tienen: false.</summary>
+        public bool bossDefeated;
     }
 
     /// <summary>Vínculo con un personaje (los diccionarios no se pueden guardar con JsonUtility).</summary>

@@ -121,6 +121,9 @@ namespace Ascua.Core
 
             // Apagavelas de la noche (creado por código; cuántos depende de la noche o del ADN).
             Ascua.Combat.SnuffDirector.Ensure();
+
+            // Jefe final "La Marea": solo en la última noche de la campaña y si aún no se venció (creado por código).
+            Ascua.Combat.FinalBossDirector.CreateFor(nightNumber, finalNight);
         }
 
         private List<NightQuestSet> CollectAuthoredSets()
@@ -273,9 +276,14 @@ namespace Ascua.Core
         {
             if (!IsRunning) return;
 
+            bool allDead = endWhenAllZonesDead && AllZonesDead();
+            // Jefe final: mientras se prepara o se combate, el reloj de la noche se detiene.
+            if (Ascua.Combat.FinalBossDirector.HoldsNight && !allDead) return;
+
             Elapsed += Time.deltaTime;
             bool timeUp = Elapsed >= nightDuration;
-            bool allDead = endWhenAllZonesDead && AllZonesDead();
+            // Se acabó el tiempo en la Noche 5: La Marea sale antes del resumen y del final.
+            if (timeUp && !allDead && Ascua.Combat.FinalBossDirector.TryBeginBeforeEnding()) return;
             if (timeUp || allDead) EndNight(allDead && !timeUp);
         }
 

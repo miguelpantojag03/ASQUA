@@ -244,6 +244,7 @@ namespace Ascua.Combat
             if (heraldo == null || !heraldo.IsPresent || !heraldo.IsAvailableForHunt) return false;
             if (phase != Phase.Idle) return false;
             if (PauseMenu.IsPaused) return false;
+            if (FinalBossDirector.HoldsNight) return false;
             if (DialogueRunner.Instance != null && DialogueRunner.Instance.IsOpen) return false;
             CombatWaveDirector waves = CombatWaveDirector.Instance;
             if (waves != null && (waves.HasActiveWave || waves.AliveCount > 0)) return false;

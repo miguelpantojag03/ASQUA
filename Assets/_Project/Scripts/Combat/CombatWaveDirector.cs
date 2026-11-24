@@ -85,6 +85,8 @@ namespace Ascua.Combat
             if (active == null)
             {
                 if (nextWave >= waves.Count) return;
+                // Con el jefe final en marcha (reloj detenido) no empiezan oleadas nuevas.
+                if (FinalBossDirector.HoldsNight) return;
                 if (night.Progress01 < waves[nextWave].atProgress) return;
                 if (DialogueRunner.Instance != null && DialogueRunner.Instance.IsOpen) return;
                 StartWave(nextWave);

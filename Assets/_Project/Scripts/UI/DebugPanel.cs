@@ -64,6 +64,8 @@ namespace Ascua.UI
             if (IsAllowed && visible && keyboard != null && keyboard.f7Key.wasPressedThisFrame) StartNightEventNow();
             // F9 (solo con el panel abierto): hace aparecer un Apagavelas ya.
             if (IsAllowed && visible && keyboard != null && keyboard.f9Key.wasPressedThisFrame) SpawnSnufferNow();
+            // F10 (solo con el panel abierto): invoca ya a La Marea (jefe final).
+            if (IsAllowed && visible && keyboard != null && keyboard.f10Key.wasPressedThisFrame) StartBossNow();
 
             // Los FPS se miden siempre (es barato) para que el dato sea fiable al abrir el panel.
             fpsFrames++;
@@ -89,6 +91,15 @@ namespace Ascua.UI
             Debug.Log(spawned
                 ? "[Debug] F9: aparece un Apagavelas."
                 : "[Debug] F9: no hay Apagavelas libres (o no hay Polilla que clonar en la escena).");
+        }
+
+        private static void StartBossNow()
+        {
+            FinalBossDirector director = FinalBossDirector.Ensure();
+            bool started = director.StartNow();
+            Debug.Log(started
+                ? "[Debug] F10: La Marea aparecerá en cuanto no haya diálogo, oleada, Cacería ni momento en curso."
+                : "[Debug] F10: ahora no puede empezar (la noche no está en marcha o ya hay un combate con La Marea).");
         }
 
         private static void StartNightEventNow()
@@ -136,7 +147,7 @@ namespace Ascua.UI
             if (text == null) return;
             builder.Clear();
 
-            builder.Append("<b>DEBUG</b>  (F1 oculta · F5 salta de noche · F6 cacería · F7 evento · F9 apagavelas)\n");
+            builder.Append("<b>DEBUG</b>  (F1 oculta · F5 salta de noche · F6 cacería · F7 evento · F9 apagavelas · F10 La Marea)\n");
             builder.Append("FPS: ").Append(Mathf.RoundToInt(fps)).Append("  (").Append((1000f / Mathf.Max(1f, fps)).ToString("0.0")).Append(" ms)\n");
 
             NightManager night = NightManager.Instance;
@@ -176,8 +187,21 @@ namespace Ascua.UI
                 builder.Append("Apagavelas: ").Append(snuff.ActiveCount).Append(" activos · quedan ")
                        .Append(snuff.RemainingCount).Append('/').Append(snuff.ScheduledCount);
                 if (snuff.NextMoment >= 0f) builder.Append(" · siguiente al ").Append(Mathf.RoundToInt(snuff.NextMoment * 100f)).Append('%');
-                builder.Append('
-');
+                builder.Append("\n");
+            }
+
+            FinalBossDirector bossDirector = FinalBossDirector.Instance;
+            if (bossDirector != null)
+            {
+                builder.Append("La Marea: ").Append(bossDirector.StateName);
+                MareaBoss marea = bossDirector.Boss;
+                if (marea != null && marea.IsAlive)
+                {
+                    builder.Append(" · vida ").Append(Mathf.RoundToInt(marea.Health01 * 100f)).Append("% · fase ").Append(marea.Phase)
+                           .Append(marea.IsLit ? " · iluminada" : "");
+                }
+                if (bossDirector.Defeats > 0) builder.Append(" · caídas ").Append(bossDirector.Defeats);
+                builder.Append("\n");
             }
 
             HeraldoHuntDirector hunts = HeraldoHuntDirector.Instance;
